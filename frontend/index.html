@@ -114,33 +114,35 @@
                             <input
                                 type="search"
                                 id="pesquisa-transacoes"
+                                aria-label="Buscar transações pelo nome"
                                 placeholder="Buscar transação pelo nome..."
                             >
 
-                            <select id="filtro-tipo">
+                            <select id="filtro-tipo" aria-label="Filtrar por tipo de transação">
                                 <option value="todos">Todas</option>
                                 <option value="receita">Receitas</option>
                                 <option value="despesa">Despesas</option>
                             </select>
 
-                            <select id="filtro-categoria">
+                            <select id="filtro-categoria" aria-label="Filtrar por categoria">
                                 <option value="todas">Todas as categorias</option>
                             </select>
 
                             <div class="filtro-data">
                                 <label for="data-inicial">De:</label>
-                                <input type="date" id="data-inicial">
+                                <input type="date" id="data-inicial" aria-label="Data inicial das transações" aria-describedby="erro-filtro-datas">
                             </div>
 
                             <div class="filtro-data">
                                 <label for="data-final">Até:</label>
-                                <input type="date" id="data-final">
+                                <input type="date" id="data-final" aria-label="Data final das transações" aria-describedby="erro-filtro-datas">
                             </div>
 
                             <button type="button" id="limpar-filtros">
                                 Limpar filtros
                             </button>
                         </div>
+                        <p id="erro-filtro-datas" class="erro-campo" role="status" aria-live="polite" aria-atomic="true"></p>
 
                         <div class="area-acoes" id="area-acoes-completa">
                             <div class="barra-acoes" id="barra-acoes-completa">
@@ -264,22 +266,22 @@
         ========================= -->
 
         <div id="modal-overlay" class="modal-overlay hidden">
-            <div class="modal">
+            <div class="modal" role="dialog" aria-modal="true" aria-labelledby="titulo-modal-transacao" tabindex="-1">
                 <div class="modal-header">
-                    <h2 class="modal-title">Adicionar Transação</h2>
+                    <h2 class="modal-title" id="titulo-modal-transacao">Adicionar Transação</h2>
                     <button class="close-modal" aria-label="Fechar Modal">&#10060;</button>
                 </div>
                 
-                <form class="form-transacao">
+                <form class="form-transacao" novalidate>
                     <div class="form-group">
                         <label for="nome">Nome</label>
-                        <input type="text" id="nome" name="nome" placeholder="Digite o nome da transação">
+                        <input type="text" id="nome" name="nome" placeholder="Digite o nome da transação" required aria-describedby="erro-nome">
                         <small class="erro-campo" id="erro-nome"></small>
                     </div>
 
                     <div class="form-group">
                         <label for="valor">Valor</label>
-                        <input type="number" id="valor" name="valor" min="0.01" step="0.01" placeholder="Digite o valor da transação">
+                        <input type="number" id="valor" name="valor" min="0.01" step="0.01" placeholder="Digite o valor da transação" required aria-describedby="erro-valor">
                         <small class="erro-campo" id="erro-valor"></small>
                     </div>
 
@@ -290,6 +292,8 @@
                             id="categoria"
                             name="categoria"
                             list="categorias"
+                            required
+                            aria-describedby="erro-categoria"
                         >
                         <datalist id="categorias">
                             <option value="Alimentação">
@@ -302,7 +306,7 @@
 
                     <div class="form-group campo-classificacao">
                         <label for="classificacao">Classificação</label>
-                        <select id="classificacao" name="classificacao">
+                        <select id="classificacao" name="classificacao" aria-describedby="erro-classificacao">
                             <option value="">Selecione...</option>
                             <option value="Essencial">Essencial / Necessidade</option>
                             <option value="Desejo">Desejo</option>
@@ -315,7 +319,7 @@
                     
                     <div class="form-group campo-pagamento hidden">
                         <label for="pagamento">Forma de Pagamento</label>
-                        <select id="pagamento" name="pagamento">
+                        <select id="pagamento" name="pagamento" aria-describedby="erro-pagamento">
                             <option value="">Selecione...</option>
                             <option value="Pix">Pix</option>
                             <option value="Credito">Crédito</option>
@@ -329,7 +333,7 @@
 
                     <div class="form-group">
                         <label for="conta">Conta</label>
-                        <select id="conta" name="conta">
+                        <select id="conta" name="conta" required aria-describedby="erro-conta">
                             <option value="">Selecione uma conta...</option>
                             <option value="Nubank">Nubank</option>
                             <option value="Bradesco">Bradesco</option>
@@ -340,7 +344,7 @@
 
                     <div class="form-group">
                         <label for="data">Data</label>
-                        <input type="date" id="data" name="data">
+                        <input type="date" id="data" name="data" required aria-describedby="erro-data">
                         <small class="erro-campo" id="erro-data"></small>
                     </div>
 
@@ -358,34 +362,37 @@
     ========================= -->
     <div id="modal-conta" class="modal-overlay hidden">
 
-        <div class="modal">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="titulo-modal-conta" tabindex="-1">
 
             <div class="modal-header">
                 <h2 id="titulo-modal-conta">Adicionar Conta</h2>
                 <button type="button" id="fechar-modal-conta" class="close-modal" aria-label="Fechar modal"> &#10060; </button>
             </div>
 
-            <form id="form-conta">
+            <form id="form-conta" novalidate>
                 <div class="form-group">
                     <label for="nome-conta">Nome da conta</label>
                     <input
                         type="text"
                         id="nome-conta"
+                        aria-describedby="erro-nome-conta"
                         placeholder="Ex: Nubank, Reserva de emergência..."
                         required
                     >
+                    <small class="erro-campo" id="erro-nome-conta"></small>
                 </div>
 
                 <div class="form-group">
                     <label for="tipo-conta">Tipo de conta</label>
 
-                    <select id="tipo-conta" required>
+                    <select id="tipo-conta" required aria-describedby="erro-tipo-conta">
                         <option value="">Selecione um tipo</option>
                         <option value="corrente">Conta corrente</option>
                         <option value="poupanca">Poupança</option>
                         <option value="reserva">Reserva</option>
                         <option value="carteira">Carteira física</option>
                     </select>
+                    <small class="erro-campo" id="erro-tipo-conta"></small>
                 </div>
 
                 <div class="form-group">
@@ -402,11 +409,13 @@
                     <input
                         type="number"
                         id="saldo-inicial-conta"
+                        aria-describedby="erro-saldo-inicial-conta"
                         min="0"
                         step="0.01"
                         placeholder="0.00"
                         required
                     >
+                    <small class="erro-campo" id="erro-saldo-inicial-conta"></small>
                 </div>
 
                 <div class="modal-footer">
@@ -425,8 +434,8 @@
     </div>
 
     <div class="modal-overlay hidden" id="modal-exclusao">
-        <div class="modal-confirmacao">
-            <h2>Excluir transações?</h2>
+        <div class="modal-confirmacao" role="dialog" aria-modal="true" aria-labelledby="titulo-modal-exclusao" aria-describedby="mensagem-exclusao" tabindex="-1">
+            <h2 id="titulo-modal-exclusao">Excluir transações?</h2>
 
             <p id="mensagem-exclusao">
                 Tem certeza que deseja excluir as transações selecionadas?

@@ -88,11 +88,11 @@ body {
 }
 .sidebar a:hover {
     background: #ffffff;
-    color: #14161a;
+    color: #19141e;
 }
 .sidebar a.ativo {
     background: #fcf9ff;
-    color: #14161a;
+    color: #19141e;
     font-weight: 600;
 }
 .sidebar a::before {
@@ -105,7 +105,7 @@ body {
     width: 3px;
     height: 60%;
 
-    background: #a563f1;
+    background: #a163f1;
     border-radius: 0 4px 4px 0;
 
     opacity: 0;
@@ -151,8 +151,8 @@ button {
     transition: background 0.2s, color 0.2s;
 }
 button:hover {
-    background: #f1f3f7ef;
-    color: #20242a;
+    background: #f4f1f7ef;
+    color: #26202a;
     cursor:pointer;
 }
 /* =========================
@@ -187,8 +187,8 @@ button:hover {
     transition: background 0.2s, color 0.2s;
 }
 .transacoes-header a:hover {
-    background: #f3f4f6;
-    color: #111827;
+    background: #f5f3f6;
+    color: #1c1427;
 }
 
 table {
@@ -204,7 +204,7 @@ th:last-child, td:last-child {
 }
 
 tbody tr:hover {
-    background: #f8f9fa;
+    background: #f9f8fa;
 }
 /* =========================
    MODAL
@@ -265,8 +265,8 @@ tbody tr:hover {
 }
 
 .close-modal:hover {
-    background: #f3f4f6;
-    color: #111827;
+    background: #f5f3f6;
+    color: #1c1427;
 }
 
 /* =========================
@@ -295,10 +295,10 @@ tbody tr:hover {
     width: 100%;
     box-sizing: border-box;
     padding: 11px 12px;
-    border: 1px solid #d1d5db;
+    border: 1px solid #d7d1db;
     border-radius: 8px;
     background: #fff;
-    color: #111827;
+    color: #1c1427;
     font-size: 0.95rem;
     outline: none;
     transition: border-color 0.2s, box-shadow 0.2s;
@@ -311,7 +311,7 @@ tbody tr:hover {
 .modal input:focus,
 .modal select:focus {
     border-color: #a163f1;
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+    box-shadow: 0 0 0 3px rgba(161, 99, 241, 0.12);
 }
 
 .modal input.invalido:focus,
@@ -349,7 +349,7 @@ tbody tr:hover {
 }
 
 .form-actions button[type="button"]:hover {
-    background: #eaecf0;
+    background: #edeaf0;
 }
 
 .form-actions button[type="submit"] {
@@ -373,8 +373,21 @@ tbody tr:hover {
     margin-top: 4px;
 }
 
-.invalido {
+.modal input.invalido,
+.modal select.invalido {
     border-color: #c0392b;
+}
+
+#form-conta .erro-campo:empty {
+    display: none;
+}
+
+#erro-filtro-datas {
+    margin: 0;
+}
+
+#erro-filtro-datas:not(:empty) {
+    margin-bottom: 10px;
 }
 
 td.receita {
@@ -528,10 +541,10 @@ td.despesa {
     box-sizing: border-box;
     min-width: 0;
     padding: 11px 14px;
-    background: #f8fafc;
+    background: #faf8fc;
     border: 1px solid #e7e2f0;
     border-radius: 8px;
-    color: #20242a;
+    color: #26202a;
     font: inherit;
     font-size: 14px;
     outline: none;
@@ -585,18 +598,22 @@ td.despesa {
 /* Hover */
 .area-pesquisa input:hover,
 .area-pesquisa select:hover {
-    border-color: #cbd5e1;
+    border-color: #d5cbe1;
 }
 
 /* Foco */
 .area-pesquisa input:focus,
 .area-pesquisa select:focus {
     background: #ffffff;
-    border-color: #b581f8;
-    box-shadow: 0 0 0 3px rgba(195, 129, 248, 0.12);
+    border-color: #a163f1;
+    box-shadow: 0 0 0 3px rgba(161, 99, 241, 0.12);
 }
 
 /* Nenhum resultado */
+.area-pesquisa input.invalido {
+    border-color: #c0392b;
+}
+
 .mensagem-sem-resultados {
     padding: 36px 16px;
     text-align: center;
@@ -760,7 +777,7 @@ td.despesa {
 .secao-contas,
 .secao-cartoes {
     background: #ffffff;
-    box-shadow: 0 2px 8px rgba(71, 30, 90, 0.082);
+    box-shadow: 0 2px 8px rgba(55, 30, 90, 0.082);
     border: 1px solid #f0e5fc;
     border-radius: 12px;
     padding: 15px 20px 15px 20px;
@@ -801,7 +818,7 @@ td.despesa {
 
 #btn-nova-conta:hover,
 #btn-novo-cartao:hover {
-    background: #f8fafc;
+    background: #faf8fc;
     border-color: #e0c9ff;
 }
 
