@@ -859,3 +859,111 @@ td.despesa {
     font-size: 16px;
     color: #20242a;
 }
+
+/* =========================
+   NOTIFICAÇÕES
+========================= */
+
+#notificacoes {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    width: min(360px, calc(100% - 32px));
+    max-height: calc(100vh - 32px);
+    max-height: calc(100dvh - 32px);
+    overflow-y: auto;
+    z-index: 1100;
+    pointer-events: none;
+}
+
+#anuncio-notificacoes {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+#lista-notificacoes {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.notificacao {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px;
+    background: #fff;
+    border: 1px solid #edf0f5;
+    border-left: 4px solid #a163f1;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(30, 55, 90, 0.144);
+    pointer-events: auto;
+}
+
+.notificacao-sucesso {
+    border-left-color: #28d166;
+}
+
+.notificacao-erro {
+    border-left-color: #c0392b;
+}
+
+.notificacao-texto {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.notificacao .notificacao-titulo {
+    color: #20242a;
+    font-size: 0.9rem;
+}
+
+.notificacao .notificacao-mensagem {
+    margin: 5px 0 0;
+    color: #374151;
+    font-size: 0.85rem;
+    line-height: 1.5;
+}
+
+.notificacao .fechar-notificacao {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+    color: #6b7280;
+    cursor: pointer;
+}
+
+.notificacao .fechar-notificacao:hover {
+    background: #faf8fc;
+    color: #703bb4;
+}
+
+.notificacao .fechar-notificacao:focus-visible {
+    outline: 2px solid #a163f1;
+    outline-offset: 2px;
+}
+
+@media (max-width: 480px) {
+    #notificacoes {
+        top: 12px;
+        right: 12px;
+        left: 12px;
+        width: auto;
+        max-height: calc(100vh - 24px);
+        max-height: calc(100dvh - 24px);
+    }
+}

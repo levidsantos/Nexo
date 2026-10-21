@@ -14,6 +14,14 @@ const selectPagamento = document.getElementById("pagamento");
 const campoConta = document.getElementById("conta");
 const campoData = document.getElementById("data");
 let tipoTransacao = "";
+// Inicializar antes da leitura: erros de carregamento também geram notificações.
+const areaNotificacoes = document.getElementById("notificacoes");
+const listaNotificacoes = document.getElementById("lista-notificacoes");
+const anuncioNotificacoes = document.getElementById("anuncio-notificacoes");
+const notificacoesAtivas = [];
+const filaNotificacoes = [];
+let mensagensParaAnunciar = [];
+let anuncioPendente = null;
 const colecoesBloqueadas = new Set();
 let transacoes = carregarColecao("transacoes", validarTransacao);
 let contas = carregarColecao("contas", validarConta);
@@ -98,6 +106,117 @@ botoesFechar.forEach((fechar) => {
 });
 
 // funcoes reutilizaveis
+function mostrarToast(mensagem, tipo = "informacao") {
+    if (!["sucesso", "erro", "informacao"].includes(tipo)) tipo = "informacao";
+    const repetida = [...notificacoesAtivas, ...filaNotificacoes].some((notificacao) => {
+        return notificacao.mensagem === mensagem && notificacao.tipo === tipo;
+    });
+    if (repetida) return;
+
+    filaNotificacoes.push({ mensagem, tipo });
+    if (notificacoesAtivas.length === 3) {
+        const temporaria = notificacoesAtivas.find((notificacao) => {
+            return notificacao.tipo !== "erro"
+                && !notificacao.elemento.contains(document.activeElement);
+        });
+        if (temporaria) {
+            fecharToast(temporaria);
+            return;
+        }
+    }
+    exibirProximosToasts();
+}
+
+function exibirProximosToasts() {
+    const titulos = { sucesso: "Sucesso", erro: "Erro", informacao: "Informação" };
+    while (notificacoesAtivas.length < 3 && filaNotificacoes.length > 0) {
+        const notificacao = filaNotificacoes.shift();
+        const elemento = document.createElement("div");
+        elemento.classList.add("notificacao", `notificacao-${notificacao.tipo}`);
+        elemento.setAttribute("role", "group");
+        elemento.setAttribute("aria-label", titulos[notificacao.tipo]);
+        const texto = document.createElement("div");
+        texto.classList.add("notificacao-texto");
+        const titulo = document.createElement("strong");
+        titulo.classList.add("notificacao-titulo");
+        titulo.textContent = titulos[notificacao.tipo];
+        const mensagem = document.createElement("p");
+        mensagem.classList.add("notificacao-mensagem");
+        mensagem.textContent = notificacao.mensagem;
+        const fechar = document.createElement("button");
+        fechar.type = "button";
+        fechar.classList.add("fechar-notificacao");
+        fechar.setAttribute("aria-label", `Fechar notificação: ${titulos[notificacao.tipo]}`);
+        fechar.textContent = "×";
+        fechar.addEventListener("click", () => fecharToast(notificacao));
+        texto.append(titulo, mensagem);
+        elemento.append(texto, fechar);
+        listaNotificacoes.appendChild(elemento);
+        notificacao.elemento = elemento;
+        notificacao.restante = 4000;
+        notificacao.temporizador = null;
+        notificacoesAtivas.push(notificacao);
+
+        elemento.addEventListener("mouseenter", () => pausarToast(notificacao));
+        elemento.addEventListener("mouseleave", () => retomarToast(notificacao));
+        elemento.addEventListener("focusin", (evento) => {
+            if (!elemento.contains(evento.relatedTarget)) notificacao.focoAnterior = evento.relatedTarget;
+            pausarToast(notificacao);
+        });
+        elemento.addEventListener("focusout", (evento) => {
+            if (!elemento.contains(evento.relatedTarget)) retomarToast(notificacao);
+        });
+        retomarToast(notificacao);
+        mensagensParaAnunciar.push(`${titulos[notificacao.tipo]}: ${notificacao.mensagem}`);
+    }
+    // Agrupa anúncios que surgem juntos, como falhas nas duas coleções ao iniciar.
+    if (mensagensParaAnunciar.length > 0 && anuncioPendente === null) {
+        anuncioNotificacoes.textContent = "";
+        anuncioPendente = setTimeout(() => {
+            anuncioNotificacoes.textContent = mensagensParaAnunciar.join(" ");
+            mensagensParaAnunciar = [];
+            anuncioPendente = null;
+        }, 100);
+    }
+}
+
+function pausarToast(notificacao) {
+    if (notificacao.temporizador === null) return;
+    clearTimeout(notificacao.temporizador);
+    notificacao.temporizador = null;
+    notificacao.restante = Math.max(0, notificacao.restante - (Date.now() - notificacao.inicio));
+}
+
+function retomarToast(notificacao) {
+    if (!notificacao.elemento.isConnected || notificacao.tipo === "erro" || notificacao.temporizador !== null
+        || notificacao.elemento.matches(":hover")
+        || notificacao.elemento.contains(document.activeElement)) return;
+    notificacao.inicio = Date.now();
+    notificacao.temporizador = setTimeout(() => fecharToast(notificacao), notificacao.restante);
+}
+
+function fecharToast(notificacao) {
+    const indice = notificacoesAtivas.indexOf(notificacao);
+    if (indice === -1) return;
+    const tinhaFoco = notificacao.elemento.contains(document.activeElement);
+    clearTimeout(notificacao.temporizador);
+    notificacoesAtivas.splice(indice, 1);
+    notificacao.elemento.remove();
+    exibirProximosToasts();
+    if (tinhaFoco) {
+        const proxima = notificacoesAtivas[Math.min(indice, notificacoesAtivas.length - 1)];
+        if (proxima) {
+            proxima.elemento.querySelector("button").focus();
+        } else if (podeReceberFoco(notificacao.focoAnterior)) {
+            notificacao.focoAnterior.focus();
+        } else if (modalAtivo) {
+            modalAtivo.querySelector("button, input").focus();
+        } else {
+            addReceita.focus();
+        }
+    }
+}
+
 function textoPreenchido(valor) {
     return typeof valor === "string" && valor.trim() !== "";
 }
@@ -158,24 +277,24 @@ function carregarColecao(chave, validarRegistro) {
         return registros;
     } catch (erro) {
         colecoesBloqueadas.add(chave);
-        alert(`Os dados de ${chave} estão indisponíveis: não foi possível lê-los ou validá-los. `
-            + "O conteúdo armazenado não foi alterado. As gravações desta coleção estão bloqueadas nesta sessão.");
+        mostrarToast(`Os dados de ${chave} estão indisponíveis: não foi possível lê-los ou validá-los. `
+            + "O conteúdo armazenado não foi alterado. As gravações desta coleção estão bloqueadas nesta sessão.", "erro");
         return [];
     }
 }
 
 function persistirColecao(chave, registros) {
     if (colecoesBloqueadas.has(chave)) {
-        alert(`Não é possível salvar ${chave}: os dados estão indisponíveis e a coleção está bloqueada. `
-            + "O conteúdo armazenado não foi alterado.");
+        mostrarToast(`Não é possível salvar ${chave}: os dados estão indisponíveis e a coleção está bloqueada. `
+            + "O conteúdo armazenado não foi alterado.", "erro");
         return false;
     }
     try {
         localStorage.setItem(chave, JSON.stringify(registros));
         return true;
     } catch (erro) {
-        alert(`Não foi possível salvar ${chave}. A alteração não foi confirmada. `
-            + "Os dados anteriores e os campos preenchidos foram mantidos. Tente novamente.");
+        mostrarToast(`Não foi possível salvar ${chave}. A alteração não foi confirmada. `
+            + "Os dados anteriores e os campos preenchidos foram mantidos. Tente novamente.", "erro");
         return false;
     }
 }
@@ -213,7 +332,7 @@ function podeReceberFoco(elemento) {
     // A barra pode continuar visualmente presente durante a animação de saída.
     const area = elemento && elemento.closest(".area-acoes");
     if (area && !area.classList.contains("ativa")) return false;
-    return elemento && elemento.isConnected && !elemento.matches(":disabled")
+    return elemento && elemento !== document.body && elemento.isConnected && !elemento.matches(":disabled")
         && !elemento.closest("[inert]") && elemento.getClientRects().length > 0
         && getComputedStyle(elemento).visibility !== "hidden";
 }
@@ -222,6 +341,7 @@ function abrirModal(modal, focoInicial) {
     focoAnteriorModal = document.activeElement;
     modalAtivo = modal;
     modal.classList.remove("hidden");
+    modal.querySelector('[role="dialog"]').appendChild(areaNotificacoes);
 
     // Inativa apenas irmãos no caminho até o body, nunca um ancestral do modal.
     let elemento = modal;
@@ -244,6 +364,7 @@ function fecharModal(modal) {
     }
     elementosInertes = [];
     modalAtivo = null;
+    document.body.appendChild(areaNotificacoes);
 
     const destino = podeReceberFoco(focoAnteriorModal) ? focoAnteriorModal
         : document.getElementById("pagina-transacoes").classList.contains("ativa") ? campoPesquisa
@@ -678,6 +799,7 @@ formConta.addEventListener("submit", (evento) => {
     atualizarSaldoTotalContas();
 
     fecharModalConta();
+    mostrarToast("Conta criada.", "sucesso");
 });
 
 // evento campo de pesquisa
@@ -748,6 +870,7 @@ botaoCancelarExclusao.addEventListener("click", () => {
 });
 
 botaoConfirmarExclusao.addEventListener("click", () => {
+    const quantidade = transacoesSelecionadas.length;
 const transacoesRestantes = transacoes.filter((transacao) => {
     return !transacoesSelecionadas.includes(transacao.id);
 });
@@ -764,6 +887,7 @@ const transacoesRestantes = transacoes.filter((transacao) => {
     atualizarBarraAcoes();
 
     fecharModal(modalExclusao);
+    mostrarToast(quantidade === 1 ? "Transação excluída." : `${quantidade} transações excluídas.`, "sucesso");
 });
 [botaoEditar, botaoEditarCompleta].forEach((botao) => {
     botao.addEventListener("click", () => {
@@ -914,7 +1038,9 @@ formTransacao.addEventListener("submit", (enviar) => {
     atualizarResumo();
     atualizarBarraAcoes();
 
+    const estavaEditando = transacaoEmEdicao !== null;
     fecharModalTransacao();
+    mostrarToast(estavaEditando ? "Transação atualizada." : "Transação criada.", "sucesso");
 });
 
 navegarPara("resumo");
