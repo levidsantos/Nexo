@@ -31,8 +31,11 @@
             </header>
 
             <main class="content">
+                <!-- =========================
+                    PÁGINA RESUMO
+                ========================= -->
                 <div id="pagina-resumo" class="pagina ativa">
-                    <section id="pagina-resumo" class="resumo">
+                    <section class="resumo">
                         <div class="card card-recebido">
                             <span>Recebido</span>
                             <h3 id="valor-recebido">R$ 0,00</h3>
@@ -101,7 +104,9 @@
                         </div>
                     </section>
                 </div>
-
+                <!-- =========================
+                    PÁGINA TRANSACOES
+                ========================= -->
                 <div id="pagina-transacoes" class="pagina">
                     <div class="card">
                         <h1>Transações</h1>
@@ -189,9 +194,74 @@
                         </div>
                     </div>
                 </div>
+                <!-- =========================
+                    PÁGINA CONTAS
+                ========================= -->
+                <div id="pagina-contas" class="pagina">
+
+                    <div class="card-resumo">
+                        <div class="cabecalho-contas">
+                            <div>
+                                <h1>Minhas Contas</h1>
+                                <p>Gerencie suas contas, reservas e cartões de crédito.</p>
+                            </div>
+                        </div>
+
+                        <!-- Resumo financeiro das contas -->
+                        <section class="resumo-contas">
+                            <div class="card-conta-resumo">
+                                <span>Saldo total</span>
+                                <h2 id="saldo-total-contas">R$ 0,00</h2>
+                            </div>
+
+                            <div class="card-conta-resumo">
+                                <span>Crédito disponível</span>
+                                <h2 id="credito-disponivel">R$ 0,00</h2>
+                            </div>
+                        </section>
+                    </div>
+
+                    <!-- Listagem de contas -->
+                    <section class="secao-contas">
+                        <div class="secao-contas-header">
+                            <h2>Contas e Reservas</h2>
+
+                            <button type="button" id="btn-nova-conta">
+                                + Nova conta
+                            </button>
+                        </div>
+
+                        <div id="lista-contas" class="lista-contas">
+                            <p class="mensagem-vazia">
+                                Nenhuma conta cadastrada.
+                            </p>
+                        </div>
+                    </section>
+
+                    <!-- Listagem de cartões -->
+                    <section class="secao-cartoes">
+                        <div class="secao-cartoes-header">
+                            <h2>Cartões de Crédito</h2>
+
+                            <button type="button" id="btn-novo-cartao">
+                                + Novo cartão
+                            </button>
+                        </div>
+
+                        <div id="lista-cartoes" class="lista-cartoes">
+                            <p class="mensagem-vazia">
+                                Nenhum cartão cadastrado.
+                            </p>
+                        </div>
+                    </section>
+
+                </div>
             </main>
         </div>
 
+        <!-- =========================
+            MODAL DE TRANSACOES
+        ========================= -->
 
         <div id="modal-overlay" class="modal-overlay hidden">
             <div class="modal">
@@ -280,6 +350,77 @@
                     </div>
                 </form>
             </div>
+        </div>
+    </div>
+
+    <!-- =========================
+        MODAL DE CONTAS
+    ========================= -->
+    <div id="modal-conta" class="modal-overlay hidden">
+
+        <div class="modal">
+
+            <div class="modal-header">
+                <h2 id="titulo-modal-conta">Adicionar Conta</h2>
+                <button type="button" id="fechar-modal-conta" class="close-modal" aria-label="Fechar modal"> &#10060; </button>
+            </div>
+
+            <form id="form-conta">
+                <div class="form-group">
+                    <label for="nome-conta">Nome da conta</label>
+                    <input
+                        type="text"
+                        id="nome-conta"
+                        placeholder="Ex: Nubank, Reserva de emergência..."
+                        required
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="tipo-conta">Tipo de conta</label>
+
+                    <select id="tipo-conta" required>
+                        <option value="">Selecione um tipo</option>
+                        <option value="corrente">Conta corrente</option>
+                        <option value="poupanca">Poupança</option>
+                        <option value="reserva">Reserva</option>
+                        <option value="carteira">Carteira física</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="instituicao-conta">Instituição (opcional)</label>
+                    <input
+                        type="text"
+                        id="instituicao-conta"
+                        placeholder="Ex: Nubank, Bradesco, Inter"
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="saldo-inicial-conta">Saldo inicial</label>
+                    <input
+                        type="number"
+                        id="saldo-inicial-conta"
+                        min="0"
+                        step="0.01"
+                        placeholder="0.00"
+                        required
+                    >
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" id="cancelar-modal-conta">
+                        Cancelar
+                    </button>
+
+                    <button type="submit" id="salvar-conta">
+                        Salvar Conta
+                    </button>
+                </div>
+
+            </form>
+
         </div>
     </div>
 

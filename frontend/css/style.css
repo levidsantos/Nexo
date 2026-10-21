@@ -105,7 +105,7 @@ body {
     width: 3px;
     height: 60%;
 
-    background: #6366f1;
+    background: #a563f1;
     border-radius: 0 4px 4px 0;
 
     opacity: 0;
@@ -305,12 +305,12 @@ tbody tr:hover {
 }
 
 .modal input::placeholder {
-    color: #9ca3af;
+    color: #a79caf;
 }
 
 .modal input:focus,
 .modal select:focus {
-    border-color: #6366f1;
+    border-color: #a163f1;
     box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
 }
 
@@ -345,7 +345,7 @@ tbody tr:hover {
 
 .form-actions button[type="button"] {
     background: #f3f4f6;
-    color: #374151;
+    color: #473751;
 }
 
 .form-actions button[type="button"]:hover {
@@ -471,10 +471,6 @@ td.despesa {
         opacity 0.2s ease,
         transform 0.2s ease,
         visibility 0.2s ease;
-}
-
-.conteudo-acoes {
-    padding: 10px 14px;
 }
 
 .area-acoes.ativa .barra-acoes {
@@ -621,7 +617,7 @@ td.despesa {
 }
 
 #info-paginacao {
-    color: #64748b;
+    color: #7b648b;
     font-size: 13px;
 }
 
@@ -633,9 +629,9 @@ td.despesa {
 .botoes-paginacao button {
     padding: 4px 14px;
     background: #ffffff;
-    border: 1px solid #e2e8f0;
+    border: 1px solid #e9e2f0;
     border-radius: 8px;
-    color: #20242a;
+    color: #26202a;
     font: inherit;
     font-size: 13px;
     font-weight: 500;
@@ -698,4 +694,151 @@ td.despesa {
 
 .pagina.ativa {
     display: block;
+}
+
+/* =========================
+   PÁGINA CONTAS
+========================= */
+
+/* Cabeçalho */
+
+.cabecalho-contas {
+    margin-bottom: 24px;
+}
+
+.cabecalho-contas h1 {
+    font-size: 24px;
+    font-weight: 700;
+    color: #27202a;
+}
+
+.cabecalho-contas p {
+    margin-top: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #7b648b;
+}
+
+/* Resumo */
+.card-resumo {
+    background: #ffffff;
+    box-shadow: 0 2px 8px rgba(73, 30, 90, 0.082);
+    border: 1px solid #f2edf5;
+    border-radius: 12px;
+    padding: 10px 20px 10px 20px;
+    margin-bottom: 20px;
+}
+
+.resumo-contas {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+    margin-bottom: 4px;
+}
+
+.card-conta-resumo {
+    box-shadow: 0 2px 8px rgba(73, 30, 90, 0.068);
+    border: 1px solid #f1edf583;
+    border-radius: 12px;
+    padding: 10px 0px 5px 20px;
+}
+
+.card-conta-resumo span {
+    font-size: 14px;
+    color: #7f648b;
+}
+
+.card-conta-resumo h2 {
+    margin-top: 12px;
+    font-size: 26px;
+    font-weight: 600;
+    color: #26202a;
+}
+
+/* Seções */
+
+.secao-contas,
+.secao-cartoes {
+    background: #ffffff;
+    box-shadow: 0 2px 8px rgba(71, 30, 90, 0.082);
+    border: 1px solid #f0e5fc;
+    border-radius: 12px;
+    padding: 15px 20px 15px 20px;
+    margin-bottom: 24px;
+}
+
+.secao-contas-header,
+.secao-cartoes-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.secao-contas-header h2,
+.secao-cartoes-header h2 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #27202a;
+}
+
+/* Botões */
+
+#btn-nova-conta,
+#btn-novo-cartao {
+    padding: 4px 10px;
+    background: #ffffff;
+    border: 1px solid #f7f1fd;
+    border-radius: 8px;
+    color: #25202a;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+#btn-nova-conta:hover,
+#btn-novo-cartao:hover {
+    background: #f8fafc;
+    border-color: #e0c9ff;
+}
+
+/* Estados vazios */
+
+.mensagem-vazia {
+    padding: 36px 16px;
+    text-align: center;
+    font-size: 14px;
+    color: #a894b8;
+}
+
+.item-conta {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+
+    padding: 18px 16px;
+    border: 1px solid #edf0f5;
+    border-radius: 10px;
+
+    margin-bottom: 10px;
+}
+
+.item-conta h3 {
+    font-size: 15px;
+    font-weight: 600;
+    color: #20242a;
+}
+
+.item-conta p {
+    font-size: 13px;
+    color: #64748b;
+}
+
+.item-conta strong {
+    margin-left: auto;
+    font-size: 16px;
+    color: #20242a;
 }

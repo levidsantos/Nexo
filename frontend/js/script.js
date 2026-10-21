@@ -1,6 +1,6 @@
 const addReceita = document.getElementById("add_receita");
 const addDespesa = document.getElementById("add_despesa");
-const botoesFechar = document.querySelectorAll(".close-modal, .cancel-modal");
+const botoesFechar = document.querySelectorAll("#modal-overlay .close-modal, #modal-overlay .cancel-modal");
 const modalOverlay = document.getElementById("modal-overlay");
 const modalTitle = document.querySelector(".modal-title");
 const campoClassificacao = document.querySelector(".campo-classificacao");
@@ -15,6 +15,7 @@ const campoConta = document.getElementById("conta");
 const campoData = document.getElementById("data");
 let tipoTransacao = "";
 const transacoes = JSON.parse(localStorage.getItem("transacoes")) || [];
+const contas = JSON.parse(localStorage.getItem("contas")) || [];
 const listaTransacoes = document.getElementById("lista-transacoes");
 const listaTransacoesCompleta = document.getElementById("lista-transacoes-completa");
 const valorRecebido = document.getElementById("valor-recebido");
@@ -48,6 +49,17 @@ const transacoesPorPagina = 8;
 const infoPaginacao = document.getElementById("info-paginacao");
 const botaoPaginaAnterior = document.getElementById("pagina-anterior");
 const botaoProximaPagina = document.getElementById("proxima-pagina");
+const botaoNovaConta = document.getElementById("btn-nova-conta");
+const modalConta = document.getElementById("modal-conta");
+const botaoFecharConta = document.getElementById("fechar-modal-conta");
+const botaoCancelarConta = document.getElementById("cancelar-modal-conta");
+const formConta = document.getElementById("form-conta");
+const campoNomeConta = document.getElementById("nome-conta");
+const campoTipoConta = document.getElementById("tipo-conta");
+const campoInstituicaoConta = document.getElementById("instituicao-conta");
+const campoSaldoInicial = document.getElementById("saldo-inicial-conta");
+const listaContas = document.getElementById("lista-contas");
+const saldoTotalContas = document.getElementById("saldo-total-contas");
 
 // botoes para abrir e fechar o modal
 addReceita.addEventListener("click", () => {
@@ -108,7 +120,7 @@ const formatadorMoeda = new Intl.NumberFormat("pt-BR", {
 function renderizarTransacoes(tabelaDestino, limite=null, pesquisa="", tipo="todos", categoria="todas", dataInicial="", dataFinal="") {
     tabelaDestino.innerHTML = "";
     
-    transacoesOrdenadas = transacoes.toSorted((a, b) => {
+    const transacoesOrdenadas = transacoes.toSorted((a, b) => {
         return b.data.localeCompare(a.data);
     });
     const transacoesFiltradas = transacoesOrdenadas.filter((transacao) => {
@@ -185,13 +197,16 @@ function renderizarTransacoes(tabelaDestino, limite=null, pesquisa="", tipo="tod
         checkbox.addEventListener("change", () => {
             const id = checkbox.value;
             if (checkbox.checked) {
-                transacoesSelecionadas.push(id);
+                if (!transacoesSelecionadas.includes(id)) {
+                    transacoesSelecionadas.push(id);
+                }
             } else {
                 transacoesSelecionadas = transacoesSelecionadas.filter((idSelecionado) => {
                     return idSelecionado !== id;
                 });   
             }
-             atualizarBarraAcoes();
+            sincronizarCheckboxes();
+            atualizarBarraAcoes();
         });
 
         const celulaNome = document.createElement("td");
@@ -254,6 +269,18 @@ function atualizarResumo() {
     valorSaldo.textContent = formatadorMoeda.format(saldo);
 }
 
+function sincronizarCheckboxes() {
+    document.querySelectorAll(".checkbox-transacao").forEach((checkbox) => {
+        checkbox.checked = transacoesSelecionadas.includes(checkbox.value);
+    });
+}
+
+function limparSelecao() {
+    transacoesSelecionadas = [];
+    sincronizarCheckboxes();
+    atualizarBarraAcoes();
+}
+
 function atualizarBarraAcoes() {
     const quantidade = transacoesSelecionadas.length;
 
@@ -295,6 +322,10 @@ function navegarPara(paginaDestino) {
     );
 
     if (!paginaSelecionada) return;
+
+    if (!paginaSelecionada.classList.contains("ativa")) {
+        limparSelecao();
+    }
 
     paginas.forEach((pagina) => {
         pagina.classList.remove("ativa");
@@ -343,8 +374,73 @@ function atualizarCategorias() {
 }
 
 function aplicarFiltros() {
+    limparSelecao();
     paginaAtual = 1;
     atualizarTabelaCompleta();
+}
+
+function abrirModalConta() {
+    formConta.reset();
+    modalConta.classList.remove("hidden");
+}
+
+function fecharModalConta() {
+    modalConta.classList.add("hidden");
+    formConta.reset();
+}
+
+function renderizarContas() {
+    listaContas.innerHTML = "";
+
+    if (contas.length === 0) {
+        listaContas.innerHTML = `
+            <p class="mensagem-vazia">
+                Nenhuma conta cadastrada.
+            </p>
+        `;
+        return;
+    }
+
+    contas.forEach((conta) => {
+        const item = document.createElement("div");
+        item.classList.add("item-conta");
+
+        const nome = document.createElement("h3");
+        nome.textContent = conta.nome;
+
+        const detalhes = document.createElement("p");
+
+        const tipos = {
+            corrente: "Conta corrente",
+            poupanca: "Poupança",
+            reserva: "Reserva",
+            carteira: "Carteira física"
+        };
+
+        detalhes.textContent = [
+            conta.instituicao,
+            tipos[conta.tipo] || conta.tipo
+        ].filter(Boolean).join(" · ");
+
+        const saldo = document.createElement("strong");
+        saldo.textContent = conta.saldoInicial.toLocaleString("pt-BR", {
+            style: "currency",
+            currency: "BRL"
+        });
+
+        item.append(nome, detalhes, saldo);
+        listaContas.appendChild(item);
+    });
+}
+function atualizarSaldoTotalContas() {
+    const total = contas.reduce((soma, conta) => {
+        return soma + conta.saldoInicial;
+    }, 0);
+
+    saldoTotalContas.textContent = total.toLocaleString("pt-BR", {
+        style: "currency",
+        currency: "BRL"
+    });
 }
 
 // eventos links de navegação
@@ -356,6 +452,43 @@ linksNavegacao.forEach((link) => {
 
         navegarPara(paginaDestino);
     });
+});
+
+// evento modal de conta
+botaoNovaConta.addEventListener("click", abrirModalConta);
+
+botaoFecharConta.addEventListener("click", fecharModalConta);
+
+botaoCancelarConta.addEventListener("click", fecharModalConta);
+formConta.addEventListener("submit", (evento) => {
+    evento.preventDefault();
+
+    const nome = campoNomeConta.value.trim();
+    const tipo = campoTipoConta.value;
+    const instituicao = campoInstituicaoConta.value.trim();
+    const valorInformado = campoSaldoInicial.value;
+    const saldoInicial = Number(valorInformado);
+
+    // Validação inicial
+    if (!nome || !tipo || valorInformado === "" || !Number.isFinite(saldoInicial) || saldoInicial < 0) {
+        return;
+    }
+
+    const novaConta = {
+        id: crypto.randomUUID(),
+        nome: nome,
+        tipo: tipo,
+        instituicao: instituicao,
+        saldoInicial: saldoInicial
+    };
+
+    contas.push(novaConta);
+
+    localStorage.setItem("contas", JSON.stringify(contas));
+    renderizarContas();
+    atualizarSaldoTotalContas();
+
+    fecharModalConta();
 });
 
 // evento campo de pesquisa
@@ -372,17 +505,14 @@ botaoLimparFiltros.addEventListener("click", () => {
 
     filtroDataInicial.value = "";
     filtroDataFinal.value = "";
-    paginaAtual = 1;
-
-    atualizarTabelaCompleta();
+    aplicarFiltros();
 });
 
 botaoPaginaAnterior.addEventListener("click", () => {
     if (paginaAtual <= 1) return;
 
     paginaAtual--;
-    transacoesSelecionadas = [];
-    atualizarBarraAcoes();
+    limparSelecao();
     atualizarTabelaCompleta();
 });
 
@@ -390,8 +520,7 @@ botaoProximaPagina.addEventListener("click", () => {
     if (botaoProximaPagina.disabled) return;
 
     paginaAtual++;
-    transacoesSelecionadas = [];
-    atualizarBarraAcoes();
+    limparSelecao();
     atualizarTabelaCompleta();
 });
 
@@ -579,6 +708,8 @@ atualizarCategorias();
 atualizarTabelaCompleta();
 atualizarResumo();
 atualizarBarraAcoes();
+renderizarContas();
+atualizarSaldoTotalContas();
 
 /* RESETAR OS DADOS DE TESTE
 
