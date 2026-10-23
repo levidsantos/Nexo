@@ -25,6 +25,7 @@ let anuncioPendente = null;
 const colecoesBloqueadas = new Set();
 let transacoes = carregarColecao("transacoes", validarTransacao);
 let contas = carregarColecao("contas", validarConta);
+verificarVinculosCarregados();
 const listaTransacoes = document.getElementById("lista-transacoes");
 const listaTransacoesCompleta = document.getElementById("lista-transacoes-completa");
 const valorRecebido = document.getElementById("valor-recebido");
@@ -68,6 +69,17 @@ const campoNomeConta = document.getElementById("nome-conta");
 const campoTipoConta = document.getElementById("tipo-conta");
 const campoInstituicaoConta = document.getElementById("instituicao-conta");
 const campoSaldoInicial = document.getElementById("saldo-inicial-conta");
+const campoDataReferencia = document.getElementById("data-referencia-conta");
+const campoIncluirNoSaldoDisponivel = document.getElementById("incluir-saldo-disponivel");
+let inclusaoSaldoAlterada = false;
+let contaEmEdicao = null;
+let contaEmExclusao = null;
+const tituloModalConta = document.getElementById("titulo-modal-conta");
+const botaoSalvarConta = document.getElementById("salvar-conta");
+const modalExclusaoConta = document.getElementById("modal-exclusao-conta");
+const mensagemExclusaoConta = document.getElementById("mensagem-exclusao-conta");
+const botaoCancelarExclusaoConta = document.getElementById("cancelar-exclusao-conta");
+const botaoConfirmarExclusaoConta = document.getElementById("confirmar-exclusao-conta");
 const listaContas = document.getElementById("lista-contas");
 const saldoTotalContas = document.getElementById("saldo-total-contas");
 let modalAtivo = null;
@@ -76,6 +88,7 @@ let elementosInertes = [];
 
 // botoes para abrir e fechar o modal
 addReceita.addEventListener("click", () => {
+    if (!prepararContasTransacao()) return;
     formTransacao.reset();
     limparErros(formTransacao);
     transacaoEmEdicao = null;
@@ -89,6 +102,7 @@ addReceita.addEventListener("click", () => {
 });
 
 addDespesa.addEventListener("click", () => {
+    if (!prepararContasTransacao()) return;
     formTransacao.reset();
     limparErros(formTransacao);
     transacaoEmEdicao = null;
@@ -225,9 +239,26 @@ function textoOpcional(valor) {
     return valor == null || typeof valor === "string";
 }
 
-// Isolado para permitir que a conta da transação se torne opcional no futuro.
-function validarContaTransacao(conta) {
-    return textoPreenchido(conta);
+function validarContaTransacao(contaId) {
+    return !colecoesBloqueadas.has("contas") && textoPreenchido(contaId)
+        && contas.some((conta) => conta.id === contaId);
+}
+
+function validarVinculosTransacoes(registros, contasCadastradas) {
+    const idsContas = new Set(contasCadastradas.map((conta) => conta.id));
+    return registros.every((transacao) => idsContas.has(transacao.contaId));
+}
+
+function verificarVinculosCarregados() {
+    if (colecoesBloqueadas.has("transacoes")) return;
+    if (colecoesBloqueadas.has("contas") || !validarVinculosTransacoes(transacoes, contas)) {
+        colecoesBloqueadas.add("transacoes");
+        // Não apresentar um histórico parcial nem gravar sobre a coleção original.
+        transacoes = [];
+        mostrarToast("Transações indisponíveis: não foi possível confirmar os vínculos com as contas. "
+            + "Há uma conta inexistente ou a coleção de contas está indisponível. "
+            + "Os dados armazenados foram preservados e as gravações de transações estão bloqueadas nesta sessão.", "erro");
+    }
 }
 
 function dataValida(data) {
@@ -245,7 +276,8 @@ function validarTransacao(registro) {
         && ["receita", "despesa"].includes(registro.tipo)
         && textoPreenchido(registro.nome)
         && textoPreenchido(registro.categoria)
-        && validarContaTransacao(registro.conta)
+        // O vínculo é verificado somente depois de carregar as duas coleções.
+        && textoPreenchido(registro.contaId)
         && Number.isFinite(registro.valor) && registro.valor > 0
         && dataValida(registro.data)
         && textoOpcional(registro.pagamento)
@@ -258,7 +290,102 @@ function validarConta(registro) {
         && textoPreenchido(registro.nome)
         && ["corrente", "poupanca", "reserva", "carteira"].includes(registro.tipo)
         && Number.isFinite(registro.saldoInicial) && registro.saldoInicial >= 0
+        && dataValida(registro.dataReferencia)
+        && typeof registro.incluirNoSaldoDisponivel === "boolean"
         && textoOpcional(registro.instituicao);
+}
+
+function validarColecao(registros, validarRegistro) {
+    if (!Array.isArray(registros)) return false;
+    const ids = new Set();
+    for (const registro of registros) {
+        if (!validarRegistro(registro) || ids.has(registro.id)) return false;
+        ids.add(registro.id);
+    }
+    return true;
+}
+
+function obterDataLocal(data = new Date()) {
+    const ano = String(data.getFullYear()).padStart(4, "0");
+    const mes = String(data.getMonth() + 1).padStart(2, "0");
+    const dia = String(data.getDate()).padStart(2, "0");
+    return `${ano}-${mes}-${dia}`;
+}
+
+function converterParaCentavos(valor) {
+    return Math.round((valor + Number.EPSILON) * 100);
+}
+
+function saldosIndisponiveis(motivo) {
+    return {
+        disponivel: false,
+        motivo,
+        saldosPorContaCentavos: null,
+        saldoTotalCentavos: null,
+        saldoDisponivelCentavos: null
+    };
+}
+
+// Recebe as coleções completas. Todos os valores retornados estão em centavos.
+// O parâmetro hoje permite testar datas sem depender do relógio da execução.
+function calcularSaldos(contasCadastradas, registrosTransacoes, hoje = obterDataLocal()) {
+    if (!dataValida(hoje) || !validarColecao(contasCadastradas, validarConta)
+        || !validarColecao(registrosTransacoes, validarTransacao)) {
+        return saldosIndisponiveis("Dados ou data inválidos para calcular os saldos.");
+    }
+    if (!validarVinculosTransacoes(registrosTransacoes, contasCadastradas)) {
+        return saldosIndisponiveis("Há transações vinculadas a contas inexistentes.");
+    }
+
+    const contasPorId = new Map();
+    const saldosPorContaCentavos = new Map();
+    for (const conta of contasCadastradas) {
+        const inicial = converterParaCentavos(conta.saldoInicial);
+        if (!Number.isSafeInteger(inicial)) {
+            return saldosIndisponiveis("O saldo inicial ultrapassa o limite de cálculo seguro em centavos.");
+        }
+        contasPorId.set(conta.id, conta);
+        saldosPorContaCentavos.set(conta.id, inicial);
+    }
+
+    for (const transacao of registrosTransacoes) {
+        const conta = contasPorId.get(transacao.contaId);
+        if (transacao.data <= conta.dataReferencia || transacao.data > hoje) continue;
+        const valor = converterParaCentavos(transacao.valor);
+        const movimento = transacao.tipo === "receita" ? valor : -valor;
+        const saldo = saldosPorContaCentavos.get(conta.id) + movimento;
+        if (!Number.isSafeInteger(valor) || !Number.isSafeInteger(saldo)) {
+            return saldosIndisponiveis("Um movimento ou saldo ultrapassa o limite de cálculo seguro em centavos.");
+        }
+        saldosPorContaCentavos.set(conta.id, saldo);
+    }
+
+    let saldoTotalCentavos = 0;
+    let saldoDisponivelCentavos = 0;
+    for (const conta of contasCadastradas) {
+        const saldo = saldosPorContaCentavos.get(conta.id);
+        saldoTotalCentavos += saldo;
+        if (conta.incluirNoSaldoDisponivel === true) saldoDisponivelCentavos += saldo;
+        if (!Number.isSafeInteger(saldoTotalCentavos) || !Number.isSafeInteger(saldoDisponivelCentavos)) {
+            return saldosIndisponiveis("Os totais ultrapassam o limite de cálculo seguro em centavos.");
+        }
+    }
+    return {
+        disponivel: true,
+        motivo: "",
+        saldosPorContaCentavos,
+        saldoTotalCentavos,
+        saldoDisponivelCentavos
+    };
+}
+
+// Ponto de entrada da aplicação: nunca calcular sobre os arrays vazios de fallback
+// usados quando uma coleção não pôde ser carregada ou seus vínculos são inválidos.
+function obterSaldosContas(hoje = obterDataLocal()) {
+    if (colecoesBloqueadas.has("contas") || colecoesBloqueadas.has("transacoes")) {
+        return saldosIndisponiveis("Dados de contas ou transações indisponíveis nesta sessão.");
+    }
+    return calcularSaldos(contas, transacoes, hoje);
 }
 
 function carregarColecao(chave, validarRegistro) {
@@ -266,13 +393,8 @@ function carregarColecao(chave, validarRegistro) {
         const conteudo = localStorage.getItem(chave);
         if (conteudo === null) return [];
         const registros = JSON.parse(conteudo);
-        if (!Array.isArray(registros)) throw new Error("O conteúdo não é um array.");
-        const ids = new Set();
-        for (const registro of registros) {
-            if (!validarRegistro(registro) || ids.has(registro.id)) {
-                throw new Error("Há registros inválidos ou IDs repetidos.");
-            }
-            ids.add(registro.id);
+        if (!validarColecao(registros, validarRegistro)) {
+            throw new Error("A coleção não é um array válido ou há registros inválidos/IDs repetidos.");
         }
         return registros;
     } catch (erro) {
@@ -287,6 +409,19 @@ function persistirColecao(chave, registros) {
     if (colecoesBloqueadas.has(chave)) {
         mostrarToast(`Não é possível salvar ${chave}: os dados estão indisponíveis e a coleção está bloqueada. `
             + "O conteúdo armazenado não foi alterado.", "erro");
+        return false;
+    }
+    const validarRegistro = chave === "contas" ? validarConta
+        : chave === "transacoes" ? validarTransacao : null;
+    if (!validarRegistro || !validarColecao(registros, validarRegistro)) {
+        mostrarToast("Não foi possível salvar: a coleção contém dados incompatíveis com o modelo atual. "
+            + "A alteração não foi confirmada e os dados anteriores foram preservados.", "erro");
+        return false;
+    }
+    if (chave === "transacoes" && (colecoesBloqueadas.has("contas")
+        || !validarVinculosTransacoes(registros, contas))) {
+        mostrarToast("Não foi possível salvar transações: selecione uma conta cadastrada e disponível. "
+            + "A alteração não foi confirmada.", "erro");
         return false;
     }
     try {
@@ -495,7 +630,8 @@ function renderizarTransacoes(tabelaDestino, limite=null, pesquisa="", tipo="tod
         linha.appendChild(celulaClassificacao);
 
         const celulaConta = document.createElement("td");
-        celulaConta.textContent = transacao.conta;
+        const conta = contas.find((conta) => conta.id === transacao.contaId);
+        celulaConta.textContent = conta ? conta.nome : "Conta indisponível";
         linha.appendChild(celulaConta);
 
         const celulaValor = document.createElement("td");
@@ -511,8 +647,9 @@ function renderizarTransacoes(tabelaDestino, limite=null, pesquisa="", tipo="tod
 }
 
 function atualizarResumo() {
+    atualizarVisualizacoesSaldos();
     if (colecoesBloqueadas.has("transacoes")) {
-        [valorRecebido, valorDespesas, valorSaldo].forEach((campo) => {
+        [valorRecebido, valorDespesas].forEach((campo) => {
             campo.textContent = "Indisponível";
         });
         return;
@@ -531,11 +668,9 @@ function atualizarResumo() {
         return acumulador;
     }, 0);
 
-    const saldo = receitas - despesas;
 
     valorRecebido.textContent = formatadorMoeda.format(receitas);
     valorDespesas.textContent = formatadorMoeda.format(despesas);
-    valorSaldo.textContent = formatadorMoeda.format(saldo);
 }
 
 function sincronizarCheckboxes() {
@@ -572,7 +707,7 @@ function preencherFormulario(transacao) {
     formTransacao.elements.namedItem("nome").value = transacao.nome;
     formTransacao.elements.namedItem("valor").value = transacao.valor;
     formTransacao.elements.namedItem("categoria").value = transacao.categoria;
-    formTransacao.elements.namedItem("conta").value = transacao.conta;
+    formTransacao.elements.namedItem("conta").value = transacao.contaId;
     formTransacao.elements.namedItem("data").value = transacao.data;
 
     formTransacao.elements.namedItem("pagamento").value = transacao.pagamento ?? "";
@@ -660,19 +795,96 @@ function aplicarFiltros() {
     atualizarTabelaCompleta();
 }
 
-function abrirModalConta() {
+function abrirModalConta(contaId = null) {
+    const conta = contaId === null ? null : contas.find((registro) => registro.id === contaId);
+    if (contaId !== null && !conta) {
+        mostrarToast("Não foi possível editar: a conta não está disponível.", "erro");
+        return;
+    }
     formConta.reset();
     limparErros(formConta);
+    contaEmEdicao = conta ? conta.id : null;
+    tituloModalConta.textContent = conta ? "Editar Conta" : "Adicionar Conta";
+    botaoSalvarConta.textContent = conta ? "Salvar alterações" : "Salvar Conta";
+    campoNomeConta.value = conta ? conta.nome : "";
+    campoTipoConta.value = conta ? conta.tipo : "";
+    campoInstituicaoConta.value = conta ? conta.instituicao ?? "" : "";
+    campoSaldoInicial.value = conta ? conta.saldoInicial : "";
+    campoDataReferencia.value = conta ? conta.dataReferencia : obterDataLocal();
+    campoIncluirNoSaldoDisponivel.checked = conta ? conta.incluirNoSaldoDisponivel : true;
+    // Na edição, a opção salva prevalece sobre sugestões baseadas no tipo.
+    inclusaoSaldoAlterada = Boolean(conta);
     abrirModal(modalConta, campoNomeConta);
+}
+
+function atualizarOpcoesContas() {
+    const contaAtual = campoConta.value;
+    campoConta.innerHTML = '<option value="">Selecione uma conta...</option>';
+    if (colecoesBloqueadas.has("contas")) return;
+    contas.forEach((conta) => {
+        const option = document.createElement("option");
+        option.value = conta.id;
+        option.textContent = conta.nome;
+        campoConta.appendChild(option);
+    });
+    campoConta.value = contas.some((conta) => conta.id === contaAtual) ? contaAtual : "";
+}
+
+function prepararContasTransacao() {
+    if (colecoesBloqueadas.has("transacoes") || colecoesBloqueadas.has("contas")) {
+        mostrarToast("Não é possível abrir o formulário: os dados de contas ou transações estão indisponíveis. "
+            + "Os dados armazenados foram preservados.", "erro");
+        return false;
+    }
+    if (contas.length === 0) {
+        mostrarToast("É necessário cadastrar uma conta antes de criar transações. "
+            + "Cadastre a primeira conta na página Contas.", "informacao");
+        return false;
+    }
+    atualizarOpcoesContas();
+    return true;
 }
 
 function fecharModalConta() {
     fecharModal(modalConta);
     formConta.reset();
     limparErros(formConta);
+    contaEmEdicao = null;
+    inclusaoSaldoAlterada = false;
 }
 
-function renderizarContas() {
+function podeExcluirConta(contaId) {
+    if (colecoesBloqueadas.has("contas") || colecoesBloqueadas.has("transacoes")) {
+        mostrarToast("Não é possível excluir a conta: os dados de contas ou transações estão indisponíveis. "
+            + "Não foi possível confirmar a ausência de vínculos.", "erro");
+        return false;
+    }
+    if (!contas.some((conta) => conta.id === contaId)) {
+        mostrarToast("Não foi possível excluir: a conta não está disponível.", "erro");
+        return false;
+    }
+    if (transacoes.some((transacao) => transacao.contaId === contaId)) {
+        mostrarToast("Esta conta possui transações vinculadas e não pode ser excluída, "
+            + "mesmo que sejam históricas. Nenhuma transação foi alterada.", "erro");
+        return false;
+    }
+    return true;
+}
+
+function solicitarExclusaoConta(contaId) {
+    if (!podeExcluirConta(contaId)) return;
+    const conta = contas.find((registro) => registro.id === contaId);
+    contaEmExclusao = conta.id;
+    mensagemExclusaoConta.textContent = `Deseja excluir a conta "${conta.nome}"? Esta ação não poderá ser desfeita.`;
+    abrirModal(modalExclusaoConta, botaoCancelarExclusaoConta);
+}
+
+function fecharModalExclusaoConta() {
+    fecharModal(modalExclusaoConta);
+    contaEmExclusao = null;
+}
+
+function renderizarContas(saldos) {
     listaContas.innerHTML = "";
 
     if (colecoesBloqueadas.has("contas")) {
@@ -683,7 +895,15 @@ function renderizarContas() {
         return;
     }
 
+    if (!saldos.disponivel) {
+        const mensagem = document.createElement("p");
+        mensagem.classList.add("mensagem-vazia");
+        mensagem.textContent = `Saldos indisponíveis. ${saldos.motivo}`;
+        listaContas.appendChild(mensagem);
+    }
+
     if (contas.length === 0) {
+        if (!saldos.disponivel) return;
         listaContas.innerHTML = `
             <p class="mensagem-vazia">
                 Nenhuma conta cadastrada.
@@ -714,28 +934,70 @@ function renderizarContas() {
         ].filter(Boolean).join(" · ");
 
         const saldo = document.createElement("strong");
-        saldo.textContent = conta.saldoInicial.toLocaleString("pt-BR", {
-            style: "currency",
-            currency: "BRL"
-        });
+        saldo.textContent = saldos.disponivel
+            ? formatadorMoeda.format(saldos.saldosPorContaCentavos.get(conta.id) / 100)
+            : "Saldo indisponível";
 
-        item.append(nome, detalhes, saldo);
+        const acoes = document.createElement("div");
+        acoes.classList.add("acoes-conta");
+        const editar = document.createElement("button");
+        editar.type = "button";
+        editar.textContent = "Editar";
+        editar.setAttribute("aria-label", `Editar conta ${conta.nome}`);
+        editar.addEventListener("click", () => abrirModalConta(conta.id));
+        const excluir = document.createElement("button");
+        excluir.type = "button";
+        excluir.classList.add("btn-excluir");
+        excluir.textContent = "Excluir";
+        excluir.setAttribute("aria-label", `Excluir conta ${conta.nome}`);
+        excluir.addEventListener("click", () => solicitarExclusaoConta(conta.id));
+        acoes.append(editar, excluir);
+        item.append(nome, detalhes, saldo, acoes);
         listaContas.appendChild(item);
     });
 }
-function atualizarSaldoTotalContas() {
-    if (colecoesBloqueadas.has("contas")) {
-        saldoTotalContas.textContent = "Indisponível";
+// Compartilha um único cálculo sobre as coleções completas entre as páginas.
+function atualizarVisualizacoesSaldos() {
+    const saldos = obterSaldosContas();
+    saldoTotalContas.textContent = saldos.disponivel
+        ? formatadorMoeda.format(saldos.saldoTotalCentavos / 100) : "Indisponível";
+    valorSaldo.textContent = saldos.disponivel
+        ? formatadorMoeda.format(saldos.saldoDisponivelCentavos / 100) : "Indisponível";
+    renderizarContas(saldos);
+    renderizarContasResumo(saldos);
+}
+
+function renderizarContasResumo(saldos) {
+    const lista = document.getElementById("contas-resumo");
+    lista.replaceChildren();
+    if (!saldos.disponivel || contas.length === 0) {
+        const mensagem = document.createElement("p");
+        mensagem.classList.add("mensagem-vazia");
+        mensagem.textContent = !saldos.disponivel
+            ? `Dados de saldo indisponíveis. ${saldos.motivo}`
+            : "Cadastre sua primeira conta para acompanhar seus saldos.";
+        lista.appendChild(mensagem);
+        if (saldos.disponivel) {
+            const cadastrar = document.createElement("button");
+            cadastrar.type = "button";
+            cadastrar.textContent = "Cadastrar primeira conta";
+            cadastrar.addEventListener("click", () => abrirModalConta());
+            lista.appendChild(cadastrar);
+        }
         return;
     }
-    const total = contas.reduce((soma, conta) => {
-        return soma + conta.saldoInicial;
-    }, 0);
-
-    saldoTotalContas.textContent = total.toLocaleString("pt-BR", {
-        style: "currency",
-        currency: "BRL"
+    const itens = document.createElement("ul");
+    itens.classList.add("lista-contas-resumo");
+    contas.slice(0, 3).forEach((conta) => {
+        const item = document.createElement("li");
+        const nome = document.createElement("span");
+        nome.textContent = conta.nome;
+        const saldo = document.createElement("strong");
+        saldo.textContent = formatadorMoeda.format(saldos.saldosPorContaCentavos.get(conta.id) / 100);
+        item.append(nome, saldo);
+        itens.appendChild(item);
     });
+    lista.appendChild(itens);
 }
 
 // eventos links de navegação
@@ -750,11 +1012,21 @@ linksNavegacao.forEach((link) => {
 });
 
 // evento modal de conta
-botaoNovaConta.addEventListener("click", abrirModalConta);
+botaoNovaConta.addEventListener("click", () => abrirModalConta());
 
 botaoFecharConta.addEventListener("click", fecharModalConta);
 
 botaoCancelarConta.addEventListener("click", fecharModalConta);
+campoTipoConta.addEventListener("change", () => {
+    // A sugestão por tipo não substitui uma escolha manual durante o cadastro.
+    if (!inclusaoSaldoAlterada) {
+        campoIncluirNoSaldoDisponivel.checked = campoTipoConta.value !== "reserva";
+    }
+});
+campoIncluirNoSaldoDisponivel.addEventListener("change", () => {
+    inclusaoSaldoAlterada = true;
+});
+
 formConta.addEventListener("submit", (evento) => {
     evento.preventDefault();
     limparErros(formConta);
@@ -764,6 +1036,8 @@ formConta.addEventListener("submit", (evento) => {
     const instituicao = campoInstituicaoConta.value.trim();
     const valorInformado = campoSaldoInicial.value;
     const saldoInicial = Number(valorInformado);
+    const dataReferencia = campoDataReferencia.value;
+    const incluirNoSaldoDisponivel = campoIncluirNoSaldoDisponivel.checked;
 
     let formularioValido = true;
     if (!nome) {
@@ -779,27 +1053,60 @@ formConta.addEventListener("submit", (evento) => {
         mostrarErro(campoSaldoInicial, "Informe um saldo igual ou maior que zero, em centavos.");
         formularioValido = false;
     }
+    if (!dataValida(dataReferencia) || !campoDataReferencia.validity.valid) {
+        mostrarErro(campoDataReferencia, "Selecione uma data de referência válida.");
+        formularioValido = false;
+    }
     if (!formularioValido) {
         focarPrimeiroErro(formConta);
         return;
     }
 
-    const novaConta = {
-        id: crypto.randomUUID(),
+    const estavaEditando = contaEmEdicao !== null;
+    const contaExistente = estavaEditando ? contas.find((conta) => conta.id === contaEmEdicao) : null;
+    if (estavaEditando && !contaExistente) {
+        mostrarToast("Não foi possível salvar: a conta em edição não está disponível.", "erro");
+        return;
+    }
+    const contaAtualizada = {
+        ...contaExistente,
+        id: estavaEditando ? contaExistente.id : crypto.randomUUID(),
         nome: nome,
         tipo: tipo,
         instituicao: instituicao,
-        saldoInicial: saldoInicial
+        saldoInicial: saldoInicial,
+        dataReferencia,
+        incluirNoSaldoDisponivel
     };
 
-    const proximasContas = [...contas, novaConta];
+    const proximasContas = estavaEditando
+        ? contas.map((conta) => conta.id === contaEmEdicao ? contaAtualizada : conta)
+        : [...contas, contaAtualizada];
     if (!persistirColecao("contas", proximasContas)) return;
     contas = proximasContas;
-    renderizarContas();
-    atualizarSaldoTotalContas();
+    atualizarOpcoesContas();
+    atualizarVisualizacoesSaldos();
+    // O nome exibido muda; os vínculos e a seleção continuam baseados nos IDs.
+    renderizarTransacoes(listaTransacoes, 5);
+    atualizarTabelaCompleta();
 
     fecharModalConta();
-    mostrarToast("Conta criada.", "sucesso");
+    mostrarToast(estavaEditando ? "Conta atualizada." : "Conta criada.", "sucesso");
+});
+
+botaoCancelarExclusaoConta.addEventListener("click", fecharModalExclusaoConta);
+modalExclusaoConta.addEventListener("click", (evento) => {
+    if (evento.target === modalExclusaoConta) fecharModalExclusaoConta();
+});
+botaoConfirmarExclusaoConta.addEventListener("click", () => {
+    if (contaEmExclusao === null || !podeExcluirConta(contaEmExclusao)) return;
+    const proximasContas = contas.filter((conta) => conta.id !== contaEmExclusao);
+    if (!persistirColecao("contas", proximasContas)) return;
+    contas = proximasContas;
+    atualizarOpcoesContas();
+    atualizarVisualizacoesSaldos();
+    fecharModalExclusaoConta();
+    mostrarToast("Conta excluída.", "sucesso");
 });
 
 // evento campo de pesquisa
@@ -844,7 +1151,8 @@ const camposFormulario = [
     campoConta,
     campoNomeConta,
     campoTipoConta,
-    campoSaldoInicial
+    campoSaldoInicial,
+    campoDataReferencia
 ];
 
 camposFormulario.forEach((campo) => {
@@ -900,6 +1208,7 @@ const transacoesRestantes = transacoes.filter((transacao) => {
         });
 
         if (!transacao) return;
+        if (!prepararContasTransacao()) return;
 
         limparErros(formTransacao);
         transacaoEmEdicao = transacao.id;
@@ -935,6 +1244,9 @@ document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && !modalExclusao.classList.contains("hidden")) {
         fecharModal(modalExclusao);
     }
+    if (event.key === "Escape" && modalAtivo === modalExclusaoConta) {
+        fecharModalExclusaoConta();
+    }
     if (event.key === "Tab" && modalAtivo) {
         const campos = [...modalAtivo.querySelectorAll(
             'button, input, select, textarea, a[href], [tabindex]:not([tabindex="-1"])'
@@ -962,7 +1274,7 @@ formTransacao.addEventListener("submit", (enviar) => {
     const categoria = campoCategoria.value.trim();
     const classificacao = selectClassificacao.value;
     const pagamento = selectPagamento.value;
-    const conta = campoConta.value;
+    const contaId = campoConta.value;
     const data = campoData.value;
     
     let formularioValido = true;
@@ -985,8 +1297,8 @@ formTransacao.addEventListener("submit", (enviar) => {
         formularioValido = false;
     }
 
-    if (conta === "") {
-        mostrarErro(campoConta, "Selecione uma conta.");
+    if (!validarContaTransacao(contaId)) {
+        mostrarErro(campoConta, "Selecione uma conta cadastrada e disponível.");
         formularioValido = false;
     }
     if (!formularioValido) {
@@ -1008,7 +1320,7 @@ formTransacao.addEventListener("submit", (enviar) => {
             categoria,
             classificacao: tipoTransacao === "despesa" ? classificacao : null,
             pagamento: tipoTransacao === "despesa" ? pagamento : null,
-            conta,
+            contaId,
             data
         };
         proximasTransacoes = transacoes.map((transacao) => {
@@ -1023,7 +1335,7 @@ formTransacao.addEventListener("submit", (enviar) => {
         categoria,
         classificacao: tipoTransacao === "despesa" ? classificacao : null,
         pagamento: tipoTransacao === "despesa" ? pagamento : null,
-        conta,
+        contaId,
         data,
     };
     proximasTransacoes = [...transacoes, transacao];
@@ -1044,13 +1356,18 @@ formTransacao.addEventListener("submit", (enviar) => {
 });
 
 navegarPara("resumo");
+atualizarOpcoesContas();
 renderizarTransacoes(listaTransacoes, 5);
 atualizarCategorias();
 atualizarTabelaCompleta();
 atualizarResumo();
 atualizarBarraAcoes();
-renderizarContas();
-atualizarSaldoTotalContas();
+
+// Usa o dia local atualizado ao retornar à aplicação ou restaurar a página.
+window.addEventListener("pageshow", atualizarVisualizacoesSaldos);
+document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") atualizarVisualizacoesSaldos();
+});
 
 /* RESETAR OS DADOS DE TESTE
 
