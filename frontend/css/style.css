@@ -756,17 +756,20 @@ td.despesa {
 
 /* Cabeçalho */
 
-.cabecalho-contas {
+.cabecalho-contas,
+.cabecalho-analises {
     margin-bottom: 24px;
 }
 
-.cabecalho-contas h1 {
+.cabecalho-contas h1,
+.cabecalho-analises h1 {
     font-size: 24px;
     font-weight: 700;
     color: #27202a;
 }
 
-.cabecalho-contas p {
+.cabecalho-contas p,
+.cabecalho-analises p {
     margin-top: 6px;
     font-size: 14px;
     font-weight: 500;
@@ -905,9 +908,155 @@ td.despesa {
     margin: 0;
 }
 
-.cabecalho-contas-resumo {
+.cabecalho-contas-resumo,
+.cabecalho-analises-resumo {
     flex-wrap: wrap;
     gap: 8px 16px;
+}
+
+.card-historico {
+    min-width: 0;
+}
+
+.area-grafico {
+    position: relative;
+    height: 340px;
+    min-width: 0;
+}
+
+.area-grafico-compacta {
+    height: 220px;
+}
+
+.controles-historico {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    margin-bottom: 16px;
+}
+
+.controles-historico button {
+    height: auto;
+    min-height: 30px;
+}
+
+.controles-historico button:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.periodo-historico {
+    color: #6b7280;
+    font-size: 0.85rem;
+}
+
+.texto-acessivel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+.card-distribuicao { min-width: 0; container-type: inline-size; position: relative; }
+#titulo-distribuicao { margin: 0 244px 12px 0; overflow-wrap: anywhere; }
+#intervalo-distribuicao { margin: 0 244px 12px 0; }
+
+.filtros-distribuicao {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    width: 220px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.filtros-distribuicao > .form-group { width: 100%; min-width: 0; }
+#meses-distribuicao:not([hidden]) {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    flex-direction: column;
+    gap: 12px;
+}
+#meses-distribuicao .form-group { min-width: 0; }
+.filtros-distribuicao label { display: block; margin-bottom: 6px; }
+.filtros-distribuicao input,
+.filtros-distribuicao select {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #edf0f5;
+    border-radius: 8px;
+    background: #fff;
+    color: inherit;
+    font: inherit;
+}
+.filtros-distribuicao .invalido { border-color: #DC5252; }
+#total-distribuicao { margin: 0 244px 12px 0; }
+#total-distribuicao > span { display: block; color: #6b7280; font-size: 14px; }
+#valor-total-distribuicao { display: block; margin-top: 6px; font-size: 28px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.conteudo-distribuicao {
+    display: grid;
+    grid-template-columns: 260px minmax(0, 460px);
+    align-items: center;
+    gap: 28px;
+    max-width: 748px;
+    margin: 0 auto;
+}
+.area-grafico-distribuicao { position: relative; width: 260px; height: 260px; max-width: 100%; justify-self: center; }
+.conteudo-distribuicao:has(.area-grafico-distribuicao[hidden]) { grid-template-columns: minmax(0, 460px); justify-content: center; }
+#legenda-distribuicao { list-style: none; margin: 0; padding: 100px 0 0; min-width: 0; align-self: start; }
+#legenda-distribuicao li {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) max-content 52px;
+    align-items: center;
+    gap: 8px 16px;
+    padding: 10px 0;
+    border-bottom: 1px solid #edf0f5;
+}
+.nome-classificacao { overflow-wrap: anywhere; }
+.valor-classificacao,
+.percentual-classificacao { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.percentual-classificacao { color: #6b7280; }
+.cor-classificacao { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 8px; }
+
+/* Mensagens podem crescer: nesses estados os filtros voltam ao fluxo normal. */
+.card-distribuicao:has(.filtros-distribuicao .invalido) .filtros-distribuicao,
+.card-distribuicao:has(#area-distribuicao[hidden]) .filtros-distribuicao {
+    position: static;
+    margin: 0 0 16px auto;
+}
+
+@container (max-width: 700px) {
+    .conteudo-distribuicao { grid-template-columns: minmax(0, 460px); justify-content: center; gap: 24px; }
+    .area-grafico-distribuicao { width: min(220px, 100%); height: min(220px, 100cqi); }
+}
+@container (max-width: 850px) {
+    .filtros-distribuicao { position: static; width: min(220px, 100%); margin: 0 0 16px auto; }
+    #titulo-distribuicao,
+    #intervalo-distribuicao,
+    #total-distribuicao { margin-right: 0; }
+    #legenda-distribuicao { padding-top: 0; align-self: center; }
+}
+@container (max-width: 440px) {
+    .filtros-distribuicao { width: 100%; }
+    #legenda-distribuicao li { grid-template-columns: minmax(0, 1fr) max-content; gap: 4px 12px; }
+    .percentual-classificacao { grid-column: 2; }
+}
+@container (max-width: 280px) {
+    #legenda-distribuicao li { display: flex; flex-direction: column; align-items: stretch; }
+    #valor-total-distribuicao { font-size: 24px; overflow-wrap: anywhere; }
+}
+
+@media (max-width: 600px) {
+    .area-grafico { height: 280px; }
+    .area-grafico-compacta { height: 200px; }
 }
 
 #contas-resumo button {

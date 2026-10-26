@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nexo</title>
     <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js" defer></script>
     <script src="js/script.js" defer></script>
 </head>
 <body>
@@ -18,6 +19,7 @@
                     <li><a href="#resumo" data-pagina="resumo" >Resumo</a></li>
                     <li><a href="#transacoes" data-pagina="transacoes">Transações</a></li>
                     <li><a href="#" data-pagina="contas">Contas</a></li>
+                    <li><a href="#analises" data-pagina="analises">Análises</a></li>
                     <li><a href="#" data-pagina="investimentos">Investimentos</a></li>
                 </ul>
             </nav>
@@ -51,9 +53,17 @@
                     </section>
 
                     <section class="overview">
-                        <div class="card">
-                            <h2>Histórico/Projeção de Transações</h2>
-                            
+                        <div class="card card-historico">
+                            <div class="transacoes-header cabecalho-analises-resumo">
+                                <h2>Histórico financeiro</h2>
+                                <a href="#analises" data-pagina="analises">Ver análises</a>
+                            </div>
+                            <p id="periodo-historico-resumo" class="periodo-historico"></p>
+                            <p id="estado-historico-resumo" class="mensagem-vazia" role="status"></p>
+                            <div id="area-historico-resumo" class="area-grafico area-grafico-compacta" hidden>
+                                <canvas id="grafico-historico-resumo" role="img" aria-label="Histórico mensal de receitas e despesas" aria-describedby="dados-historico-resumo"></canvas>
+                            </div>
+                            <p id="dados-historico-resumo" class="texto-acessivel"></p>
                         </div>
 
                         <div class="card">
@@ -242,6 +252,66 @@
 
 
                 </div>
+                <!-- =========================
+                    PÁGINA ANÁLISES
+                ========================= -->
+                <section id="pagina-analises" class="pagina" aria-labelledby="titulo-analises">
+                    <header class="cabecalho-analises">
+                        <h1 id="titulo-analises">Análises</h1>
+                        <p>Acompanhe o histórico mensal de receitas e despesas para compreender suas finanças.</p>
+                    </header>
+
+                    <section class="card card-historico" aria-labelledby="titulo-historico-financeiro">
+                        <h2 id="titulo-historico-financeiro">Histórico financeiro</h2>
+                        <div class="controles-historico" role="group" aria-label="Período do histórico financeiro">
+                            <button type="button" id="historico-anterior" disabled>Período anterior</button>
+                            <p id="periodo-historico-analises" class="periodo-historico" aria-live="polite" aria-atomic="true"></p>
+                            <button type="button" id="historico-proximo" disabled>Período seguinte</button>
+                        </div>
+                        <p id="estado-historico-analises" class="mensagem-vazia" role="status"></p>
+                        <div id="area-historico-analises" class="area-grafico" hidden>
+                            <canvas id="grafico-historico-analises" role="img" aria-label="Histórico mensal de receitas e despesas" aria-describedby="dados-historico-analises"></canvas>
+                        </div>
+                        <p id="dados-historico-analises" class="texto-acessivel"></p>
+                    </section>
+                    <section class="card card-distribuicao" aria-labelledby="titulo-distribuicao">
+                        <h2 id="titulo-distribuicao">Distribuição de despesas</h2>
+                        <div class="filtros-distribuicao">
+                            <div class="form-group">
+                                <label for="periodo-distribuicao">Período</label>
+                                <select id="periodo-distribuicao">
+                                    <option value="atual">Mês atual</option>
+                                    <option value="anterior">Mês anterior</option>
+                                    <option value="personalizado">Personalizado</option>
+                                </select>
+                            </div>
+                            <div id="meses-distribuicao" hidden>
+                                <div class="form-group">
+                                    <label for="mes-inicial-distribuicao">Mês inicial</label>
+                                    <input type="month" id="mes-inicial-distribuicao" aria-describedby="erro-mes-inicial-distribuicao">
+                                    <small class="erro-campo" id="erro-mes-inicial-distribuicao"></small>
+                                </div>
+                                <div class="form-group">
+                                    <label for="mes-final-distribuicao">Mês final</label>
+                                    <input type="month" id="mes-final-distribuicao" aria-describedby="erro-mes-final-distribuicao">
+                                    <small class="erro-campo" id="erro-mes-final-distribuicao"></small>
+                                </div>
+                            </div>
+                        </div>
+                        <p id="intervalo-distribuicao" class="periodo-historico"></p>
+                        <p id="estado-distribuicao" class="mensagem-vazia" role="status"></p>
+                        <div id="total-distribuicao" hidden>
+                            <span>Total de despesas</span>
+                            <strong id="valor-total-distribuicao"></strong>
+                        </div>
+                        <div class="conteudo-distribuicao">
+                            <div id="area-distribuicao" class="area-grafico-distribuicao" hidden>
+                                <canvas id="grafico-distribuicao" role="img" aria-label="Distribuição das despesas por classificação" aria-describedby="legenda-distribuicao total-distribuicao"></canvas>
+                            </div>
+                            <ul id="legenda-distribuicao" aria-label="Valores por classificação"></ul>
+                        </div>
+                    </section>
+                </section>
             </main>
         </div>
 
