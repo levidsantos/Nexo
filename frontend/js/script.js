@@ -23,6 +23,9 @@ const filaNotificacoes = [];
 let mensagensParaAnunciar = [];
 let anuncioPendente = null;
 const colecoesBloqueadas = new Set();
+let blocoHistoricoAnalises = 0;
+const graficosHistorico = { resumo: null, analises: null };
+let graficoDistribuicao = null;
 let transacoes = carregarColecao("transacoes", validarTransacao);
 let contas = carregarColecao("contas", validarConta);
 verificarVinculosCarregados();
@@ -388,6 +391,368 @@ function obterSaldosContas(hoje = obterDataLocal()) {
     return calcularSaldos(contas, transacoes, hoje);
 }
 
+function historicoMensalIndisponivel(motivo) {
+    return { disponivel: false, motivo, vazio: null, meses: null,
+        primeiroMes: null, ultimoMes: null, bloco: null, totalBlocos: null,
+        temAnterior: false, temProximo: false };
+}
+
+// Bloco 0: até seis meses terminando no mês atual. Blocos maiores recuam no tempo.
+// Datas são comparadas como YYYY-MM-DD; não há conversão UTC nem referência de conta.
+function prepararHistoricoMensal(registros, hoje = obterDataLocal(), bloco = 0) {
+    if (!dataValida(hoje) || !validarColecao(registros, validarTransacao)
+        || !Number.isSafeInteger(bloco) || bloco < 0) {
+        return historicoMensalIndisponivel("Transações, data ou bloco inválidos para preparar o histórico.");
+    }
+
+    const totaisPorMes = new Map();
+    let primeiroIndice = null;
+    for (const transacao of registros) {
+        if (transacao.data > hoje) continue;
+        const ano = Number(transacao.data.slice(0, 4));
+        const mes = Number(transacao.data.slice(5, 7));
+        const indice = ano * 12 + mes - 1;
+        const totais = totaisPorMes.get(indice) || { receitasCentavos: 0, despesasCentavos: 0 };
+        const campo = transacao.tipo === "receita" ? "receitasCentavos" : "despesasCentavos";
+        const valor = converterParaCentavos(transacao.valor);
+        const total = totais[campo] + valor;
+        if (!Number.isSafeInteger(valor) || !Number.isSafeInteger(total)) {
+            return historicoMensalIndisponivel("Um valor ou total mensal ultrapassa o limite seguro em centavos.");
+        }
+        totais[campo] = total;
+        totaisPorMes.set(indice, totais);
+        primeiroIndice = primeiroIndice === null ? indice : Math.min(primeiroIndice, indice);
+    }
+
+    if (primeiroIndice === null) {
+        return { disponivel: true, motivo: "Nenhuma movimentação até a data atual.", vazio: true,
+            meses: [], primeiroMes: null, ultimoMes: null, bloco: 0, totalBlocos: 0,
+            temAnterior: false, temProximo: false };
+    }
+
+    const indiceAtual = Number(hoje.slice(0, 4)) * 12 + Number(hoje.slice(5, 7)) - 1;
+    const totalBlocos = Math.ceil((indiceAtual - primeiroIndice + 1) / 6);
+    if (bloco >= totalBlocos) {
+        return historicoMensalIndisponivel("O bloco solicitado está fora do histórico disponível.");
+    }
+    const fim = indiceAtual - bloco * 6;
+    const inicio = Math.max(primeiroIndice, fim - 5);
+    const chaveMes = (indice) => `${String(Math.floor(indice / 12)).padStart(4, "0")}-${String(indice % 12 + 1).padStart(2, "0")}`;
+    const meses = [];
+    for (let indice = inicio; indice <= fim; indice++) {
+        const totais = totaisPorMes.get(indice) || { receitasCentavos: 0, despesasCentavos: 0 };
+        meses.push({ mes: chaveMes(indice), ...totais });
+    }
+    return { disponivel: true, motivo: "", vazio: false, meses,
+        primeiroMes: chaveMes(primeiroIndice), ultimoMes: chaveMes(indiceAtual),
+        bloco, totalBlocos, temAnterior: bloco + 1 < totalBlocos, temProximo: bloco > 0 };
+}
+
+// Entrada da aplicação: utiliza a coleção completa e respeita os bloqueios existentes.
+function obterHistoricoMensal(bloco = 0, hoje = obterDataLocal()) {
+    if (colecoesBloqueadas.has("transacoes") || colecoesBloqueadas.has("contas")) {
+        return historicoMensalIndisponivel("Dados de transações ou seus vínculos indisponíveis nesta sessão.");
+    }
+    if (!validarColecao(transacoes, validarTransacao) || !validarColecao(contas, validarConta)
+        || !validarVinculosTransacoes(transacoes, contas)) {
+        return historicoMensalIndisponivel("Não foi possível validar as transações e seus vínculos.");
+    }
+    return prepararHistoricoMensal(transacoes, hoje, bloco);
+}
+
+// Chaves idênticas aos valores persistidos pelo formulário; cores independem da ordem dos dados.
+const CLASSIFICACOES_DESPESAS = Object.freeze({
+    Essencial: Object.freeze({ nome: "Necessidades", cor: "#289568" }),
+    Desnecessario: Object.freeze({ nome: "Desnecessários", cor: "#DC5252" }),
+    Imprevisto: Object.freeze({ nome: "Imprevistos", cor: "#E4B044" }),
+    Investimento: Object.freeze({ nome: "Investimentos", cor: "#E58A45" }),
+    Desejo: Object.freeze({ nome: "Desejos", cor: "#9164CB" })
+});
+
+function distribuicaoDespesasIndisponivel(motivo) {
+    return { disponivel: false, motivo, vazio: null, mesInicial: null, mesFinal: null,
+        totalCentavos: null, classificacoes: null };
+}
+
+function definirPeriodoDespesas(tipo = "atual", mesInicial = null, mesFinal = null, hoje = obterDataLocal()) {
+    if (!dataValida(hoje)) return { disponivel: false, motivo: "Data local inválida." };
+    if (tipo === "atual") {
+        mesInicial = mesFinal = hoje.slice(0, 7);
+    } else if (tipo === "anterior") {
+        const ano = Number(hoje.slice(0, 4));
+        const mes = Number(hoje.slice(5, 7));
+        mesInicial = mesFinal = mes === 1 ? `${String(ano - 1).padStart(4, "0")}-12`
+            : `${ano.toString().padStart(4, "0")}-${String(mes - 1).padStart(2, "0")}`;
+    } else if (tipo !== "personalizado") {
+        return { disponivel: false, motivo: "Tipo de período inválido." };
+    }
+    if (typeof mesInicial !== "string" || typeof mesFinal !== "string"
+        || !dataValida(`${mesInicial}-01`) || !dataValida(`${mesFinal}-01`)) {
+        return { disponivel: false, motivo: "Informe meses válidos no formato YYYY-MM." };
+    }
+    if (mesInicial > mesFinal) {
+        return { disponivel: false, motivo: "O mês inicial não pode ser posterior ao mês final." };
+    }
+    if (mesInicial > hoje.slice(0, 7)) {
+        return { disponivel: false, motivo: "O período não pode ser inteiramente futuro." };
+    }
+    return { disponivel: true, motivo: "", mesInicial, mesFinal };
+}
+
+// Função pura: meses inclusivos, sem referência de saldo e sem depender da interface.
+function prepararDistribuicaoDespesas(registros, mesInicial, mesFinal, hoje = obterDataLocal()) {
+    const periodo = definirPeriodoDespesas("personalizado", mesInicial, mesFinal, hoje);
+    if (!periodo.disponivel) return distribuicaoDespesasIndisponivel(periodo.motivo);
+    if (!validarColecao(registros, validarTransacao)) {
+        return distribuicaoDespesasIndisponivel("A coleção de transações contém dados inválidos.");
+    }
+    const totais = new Map(Object.keys(CLASSIFICACOES_DESPESAS).map((id) => [id, 0]));
+    let totalCentavos = 0;
+    for (const transacao of registros) {
+        const mes = transacao.data.slice(0, 7);
+        if (transacao.tipo !== "despesa" || mes < mesInicial || mes > mesFinal || transacao.data > hoje) continue;
+        if (!totais.has(transacao.classificacao)) {
+            return distribuicaoDespesasIndisponivel("Há despesas no período sem classificação ou com classificação desconhecida. Revise os registros; nenhum dado foi alterado.");
+        }
+        const valor = converterParaCentavos(transacao.valor);
+        const subtotal = totais.get(transacao.classificacao) + valor;
+        const proximoTotal = totalCentavos + valor;
+        if (!Number.isSafeInteger(valor) || !Number.isSafeInteger(subtotal) || !Number.isSafeInteger(proximoTotal)) {
+            return distribuicaoDespesasIndisponivel("Um valor ou total de despesas ultrapassa o limite seguro em centavos.");
+        }
+        totais.set(transacao.classificacao, subtotal);
+        totalCentavos = proximoTotal;
+    }
+    const classificacoes = Object.entries(CLASSIFICACOES_DESPESAS).map(([id, definicao]) => ({
+        id, ...definicao, totalCentavos: totais.get(id),
+        // Não arredondar aqui: a futura interface decide a precisão de apresentação.
+        percentual: totalCentavos === 0 ? 0 : (totais.get(id) / totalCentavos) * 100
+    }));
+    return { disponivel: true, motivo: totalCentavos === 0 ? "Nenhuma despesa no período até a data atual." : "",
+        vazio: totalCentavos === 0, mesInicial, mesFinal, totalCentavos, classificacoes };
+}
+
+// Entrada da aplicação: sempre usa as coleções completas e os bloqueios existentes.
+function obterDistribuicaoDespesas(tipo = "atual", mesInicial = null, mesFinal = null, hoje = obterDataLocal()) {
+    if (colecoesBloqueadas.has("transacoes") || colecoesBloqueadas.has("contas")) {
+        return distribuicaoDespesasIndisponivel("Dados de transações ou seus vínculos indisponíveis nesta sessão.");
+    }
+    if (!validarColecao(transacoes, validarTransacao) || !validarColecao(contas, validarConta)
+        || !validarVinculosTransacoes(transacoes, contas)) {
+        return distribuicaoDespesasIndisponivel("Não foi possível validar as transações e seus vínculos.");
+    }
+    const periodo = definirPeriodoDespesas(tipo, mesInicial, mesFinal, hoje);
+    if (!periodo.disponivel) return distribuicaoDespesasIndisponivel(periodo.motivo);
+    return prepararDistribuicaoDespesas(transacoes, periodo.mesInicial, periodo.mesFinal, hoje);
+}
+
+function configurarGraficoDistribuicao(classificacoes) {
+    return {
+        type: "doughnut",
+        data: { labels: classificacoes.map((item) => item.nome), datasets: [{
+            data: classificacoes.map((item) => item.totalCentavos / 100),
+            backgroundColor: classificacoes.map((item) => item.cor), borderWidth: 2, borderColor: "#ffffff"
+        }] },
+        options: { responsive: true, maintainAspectRatio: false, animation: false, cutout: "65%",
+            plugins: { legend: { display: false }, tooltip: { callbacks: {
+                label: (contexto) => {
+                    const item = classificacoes[contexto.dataIndex];
+                    return `${item.nome}: ${formatadorMoeda.format(item.totalCentavos / 100)} (${formatarPercentualDistribuicao(item.percentual)})`;
+                }
+            } } }
+        }
+    };
+}
+
+function formatarPercentualDistribuicao(percentual) {
+    return `${percentual.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
+}
+
+function formatarPeriodoDistribuicao(mesInicial, mesFinal) {
+    const nomes = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+    const formatar = (mes) => `${nomes[Number(mes.slice(5, 7)) - 1]} de ${mes.slice(0, 4)}`;
+    return mesInicial === mesFinal ? formatar(mesInicial) : `${formatar(mesInicial)} — ${formatar(mesFinal)}`;
+}
+
+function limparGraficoDistribuicao() {
+    const canvas = document.getElementById("grafico-distribuicao");
+    document.getElementById("area-distribuicao").hidden = true;
+    try {
+        const instancia = graficoDistribuicao || window.Chart?.getChart?.(canvas);
+        if (instancia) instancia.destroy();
+    } catch (erro) {
+        // O canvas permanece oculto mesmo se a biblioteca falhar durante a limpeza.
+    }
+    graficoDistribuicao = null;
+}
+
+function atualizarDistribuicaoDespesas() {
+    const tipo = document.getElementById("periodo-distribuicao").value;
+    const inicial = document.getElementById("mes-inicial-distribuicao");
+    const final = document.getElementById("mes-final-distribuicao");
+    const estado = document.getElementById("estado-distribuicao");
+    const total = document.getElementById("total-distribuicao");
+    const intervalo = document.getElementById("intervalo-distribuicao");
+    const legenda = document.getElementById("legenda-distribuicao");
+    document.getElementById("meses-distribuicao").hidden = tipo !== "personalizado";
+    limparErroCampo(inicial);
+    limparErroCampo(final);
+    let periodo = definirPeriodoDespesas(tipo, inicial.value, final.value);
+    if (tipo === "personalizado") {
+        if (!dataValida(`${inicial.value}-01`)) mostrarErro(inicial, "Selecione um mês inicial válido.");
+        if (!dataValida(`${final.value}-01`)) mostrarErro(final, "Selecione um mês final válido.");
+        if (dataValida(`${inicial.value}-01`) && dataValida(`${final.value}-01`) && !periodo.disponivel) {
+            mostrarErro(inicial.value > final.value ? final : inicial, periodo.motivo);
+        }
+    }
+    const distribuicao = periodo.disponivel
+        ? obterDistribuicaoDespesas(tipo, inicial.value, final.value)
+        : distribuicaoDespesasIndisponivel(periodo.motivo);
+    legenda.replaceChildren();
+    total.hidden = !distribuicao.disponivel;
+    document.getElementById("valor-total-distribuicao").textContent = distribuicao.disponivel
+        ? formatadorMoeda.format(distribuicao.totalCentavos / 100) : "";
+    intervalo.textContent = periodo.disponivel
+        ? formatarPeriodoDistribuicao(periodo.mesInicial, periodo.mesFinal) : "";
+    let mensagem = !distribuicao.disponivel ? `Distribuição indisponível. ${distribuicao.motivo}`
+        : distribuicao.vazio ? distribuicao.motivo : "";
+    if (!mensagem) {
+        const itens = distribuicao.classificacoes.filter((item) => item.totalCentavos > 0);
+        itens.forEach((item) => {
+            const linha = document.createElement("li");
+            const cor = document.createElement("span");
+            cor.classList.add("cor-classificacao");
+            cor.style.backgroundColor = item.cor;
+            cor.setAttribute("aria-hidden", "true");
+            const texto = document.createElement("span");
+            texto.classList.add("nome-classificacao");
+            texto.append(cor, `${item.nome}:`);
+            const valor = document.createElement("span");
+            valor.classList.add("valor-classificacao");
+            valor.textContent = ` ${formatadorMoeda.format(item.totalCentavos / 100)}`;
+            const percentual = document.createElement("span");
+            percentual.classList.add("percentual-classificacao");
+            percentual.textContent = ` ${formatarPercentualDistribuicao(item.percentual)}`;
+            linha.append(texto, valor, percentual);
+            legenda.appendChild(linha);
+        });
+        if (typeof window.Chart !== "function") {
+            mensagem = "Gráfico indisponível: não foi possível carregar a biblioteca. Os valores estão disponíveis na legenda.";
+        } else {
+            try {
+                document.getElementById("area-distribuicao").hidden = false;
+                const configuracao = configurarGraficoDistribuicao(itens);
+                if (graficoDistribuicao) {
+                    graficoDistribuicao.data = configuracao.data;
+                    graficoDistribuicao.options = configuracao.options;
+                    graficoDistribuicao.update("none");
+                    graficoDistribuicao.resize();
+                } else {
+                    graficoDistribuicao = new window.Chart(document.getElementById("grafico-distribuicao"), configuracao);
+                }
+            } catch (erro) {
+                mensagem = "Gráfico indisponível: não foi possível renderizar a distribuição. Consulte os valores na legenda.";
+            }
+        }
+    }
+    if (mensagem) limparGraficoDistribuicao();
+    estado.textContent = mensagem;
+    estado.hidden = !mensagem;
+}
+
+function formatarMesHistorico(mes) {
+    const nomes = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+    return `${nomes[Number(mes.slice(5, 7)) - 1]}/${mes.slice(0, 4)}`;
+}
+
+// As duas visualizações diferem apenas na densidade de eixos e legenda.
+function configurarGraficoHistorico(historico, compacto = false) {
+    return {
+        type: "line",
+        data: {
+            labels: historico.meses.map((mes) => formatarMesHistorico(mes.mes)),
+            datasets: [
+                { label: "Receitas", data: historico.meses.map((mes) => mes.receitasCentavos / 100),
+                    borderColor: "#16805d", backgroundColor: "#16805d", pointStyle: "circle" },
+                { label: "Despesas", data: historico.meses.map((mes) => mes.despesasCentavos / 100),
+                    borderColor: "#8b5cc7", backgroundColor: "#8b5cc7", borderDash: [5, 3], pointStyle: "rectRot" }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            locale: "pt-BR",
+            interaction: { mode: "index", intersect: false },
+            elements: { line: { borderWidth: 2, tension: 0 }, point: { radius: compacto ? 2 : 3, hoverRadius: 5 } },
+            plugins: {
+                legend: { position: "bottom", labels: { usePointStyle: true, boxWidth: 8, font: { size: compacto ? 11 : 12 } } },
+                tooltip: { callbacks: { label: (contexto) => `${contexto.dataset.label}: ${formatadorMoeda.format(contexto.parsed.y)}` } }
+            },
+            scales: {
+                x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: compacto ? 3 : 6 } },
+                y: { beginAtZero: true, border: { display: false },
+                    grid: { display: !compacto, color: "#edf0f5" },
+                    ticks: { maxTicksLimit: compacto ? 3 : 6, callback: (valor) => formatadorMoeda.format(valor) } }
+            }
+        }
+    };
+}
+
+function renderizarGraficoHistorico(destino, historico) {
+    const area = document.getElementById(`area-historico-${destino}`);
+    const estado = document.getElementById(`estado-historico-${destino}`);
+    const periodo = document.getElementById(`periodo-historico-${destino}`);
+    const descricao = document.getElementById(`dados-historico-${destino}`);
+    const canvas = document.getElementById(`grafico-historico-${destino}`);
+    let mensagem = !historico.disponivel ? `Histórico indisponível. ${historico.motivo}`
+        : historico.vazio ? "Nenhuma transação até a data atual para exibir no histórico."
+        : typeof window.Chart !== "function" ? "Gráfico indisponível: não foi possível carregar a biblioteca. Verifique sua conexão e recarregue a página." : "";
+
+    periodo.textContent = historico.disponivel && !historico.vazio
+        ? `${formatarMesHistorico(historico.meses[0].mes)} — ${formatarMesHistorico(historico.meses.at(-1).mes)}` : "";
+    descricao.textContent = "";
+    if (!mensagem) {
+        area.hidden = false;
+        try {
+            const configuracao = configurarGraficoHistorico(historico, destino === "resumo");
+            if (graficosHistorico[destino]) {
+                graficosHistorico[destino].data = configuracao.data;
+                graficosHistorico[destino].update("none");
+                graficosHistorico[destino].resize();
+            } else {
+                graficosHistorico[destino] = new window.Chart(canvas, configuracao);
+            }
+            descricao.textContent = historico.meses.map((mes) => `${formatarMesHistorico(mes.mes)}: receitas ${formatadorMoeda.format(mes.receitasCentavos / 100)}, despesas ${formatadorMoeda.format(mes.despesasCentavos / 100)}.`).join(" ");
+        } catch (erro) {
+            mensagem = "Gráfico indisponível: não foi possível renderizar o histórico financeiro.";
+        }
+    }
+    if (mensagem) {
+        area.hidden = true;
+        // Também remove instâncias eventualmente registradas por um construtor que falhou.
+        const grafico = graficosHistorico[destino] || window.Chart?.getChart?.(canvas);
+        if (grafico) grafico.destroy();
+        graficosHistorico[destino] = null;
+    }
+    estado.textContent = mensagem;
+    estado.hidden = !mensagem;
+}
+
+function atualizarGraficosHistorico() {
+    const recente = obterHistoricoMensal();
+    // Reutiliza o mesmo resultado para o bloco recente; sem alterar a agregação.
+    if (recente.disponivel) {
+        blocoHistoricoAnalises = recente.vazio ? 0 : Math.min(blocoHistoricoAnalises, recente.totalBlocos - 1);
+    }
+    const analises = blocoHistoricoAnalises === 0 ? recente : obterHistoricoMensal(blocoHistoricoAnalises);
+    renderizarGraficoHistorico("resumo", recente);
+    renderizarGraficoHistorico("analises", analises);
+    const podeNavegar = analises.disponivel && !analises.vazio && typeof window.Chart === "function";
+    document.getElementById("historico-anterior").disabled = !podeNavegar || !analises.temAnterior;
+    document.getElementById("historico-proximo").disabled = !podeNavegar || !analises.temProximo;
+}
+
 function carregarColecao(chave, validarRegistro) {
     try {
         const conteudo = localStorage.getItem(chave);
@@ -648,6 +1013,8 @@ function renderizarTransacoes(tabelaDestino, limite=null, pesquisa="", tipo="tod
 
 function atualizarResumo() {
     atualizarVisualizacoesSaldos();
+    atualizarGraficosHistorico();
+    atualizarDistribuicaoDespesas();
     if (colecoesBloqueadas.has("transacoes")) {
         [valorRecebido, valorDespesas].forEach((campo) => {
             campo.textContent = "Indisponível";
@@ -743,6 +1110,8 @@ function navegarPara(paginaDestino) {
 
         link.classList.toggle("ativo", linkAtivo);
     });
+    if (paginaDestino === "analises" || paginaDestino === "resumo") atualizarGraficosHistorico();
+    if (paginaDestino === "analises") atualizarDistribuicaoDespesas();
 }
 
 function atualizarTabelaCompleta() {
@@ -1355,6 +1724,25 @@ formTransacao.addEventListener("submit", (enviar) => {
     mostrarToast(estavaEditando ? "Transação atualizada." : "Transação criada.", "sucesso");
 });
 
+document.getElementById("historico-anterior").addEventListener("click", () => {
+    const historico = obterHistoricoMensal(blocoHistoricoAnalises);
+    if (!historico.disponivel || !historico.temAnterior) return;
+    blocoHistoricoAnalises++;
+    atualizarGraficosHistorico();
+});
+document.getElementById("historico-proximo").addEventListener("click", () => {
+    if (blocoHistoricoAnalises === 0) return;
+    blocoHistoricoAnalises--;
+    atualizarGraficosHistorico();
+});
+
+const mesAtualDistribuicao = obterDataLocal().slice(0, 7);
+document.getElementById("mes-inicial-distribuicao").value = mesAtualDistribuicao;
+document.getElementById("mes-final-distribuicao").value = mesAtualDistribuicao;
+["periodo-distribuicao", "mes-inicial-distribuicao", "mes-final-distribuicao"].forEach((id) => {
+    document.getElementById(id).addEventListener("change", atualizarDistribuicaoDespesas);
+});
+
 navegarPara("resumo");
 atualizarOpcoesContas();
 renderizarTransacoes(listaTransacoes, 5);
@@ -1364,9 +1752,17 @@ atualizarResumo();
 atualizarBarraAcoes();
 
 // Usa o dia local atualizado ao retornar à aplicação ou restaurar a página.
-window.addEventListener("pageshow", atualizarVisualizacoesSaldos);
+window.addEventListener("pageshow", () => {
+    atualizarVisualizacoesSaldos();
+    atualizarGraficosHistorico();
+    atualizarDistribuicaoDespesas();
+});
 document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") atualizarVisualizacoesSaldos();
+    if (document.visibilityState === "visible") {
+        atualizarVisualizacoesSaldos();
+        atualizarGraficosHistorico();
+        atualizarDistribuicaoDespesas();
+    }
 });
 
 /* RESETAR OS DADOS DE TESTE

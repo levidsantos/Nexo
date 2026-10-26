@@ -8,6 +8,7 @@ Este documento descreve decisões e o estado conhecido do projeto, mas pode esta
 
 ## Tecnologias e estrutura conhecida
 - Frontend: HTML, CSS e JavaScript puro, sem framework.
+- Gráficos: Chart.js 4.5.1, carregado por CDN com versão fixa, antes do script da aplicação; sem ferramentas de build.
 - Persistência atual: `localStorage`.
 - Arquivos principais conhecidos: `frontend/index.html`, `frontend/css/style.css` e `frontend/js/script.js`. Confirme a estrutura real.
 - Versionamento: Git/GitHub. A branch de trabalho do frontend é `frontend`.
@@ -21,7 +22,21 @@ As funcionalidades abaixo foram verificadas no frontend. **Decisões de produto*
 - Tabela de transações recentes, limitada a cinco registros.
 - Botões para adicionar receita e despesa; modal com validações.
 - Lista compacta de até três contas com nomes e saldos atuais, com acesso à página Contas. Sem contas, há um botão para cadastrar a primeira usando o modal existente; dados indisponíveis têm mensagem própria.
-- Histórico/Projeção de Transações ainda não possui gráfico funcional.
+- Card **Histórico financeiro** com gráfico compacto de linhas de receitas e despesas, sempre no período mais recente, sem controles próprios e com link **Ver análises**.
+
+### Análises
+- Página integrada à sidebar e à navegação existente por `data-pagina="analises"`.
+- **Histórico financeiro**: gráfico completo de linhas com legenda, eixo monetário em reais e tooltips em BRL. `prepararHistoricoMensal()` agrega por ano/mês em centavos; `obterHistoricoMensal()` utiliza a coleção completa e respeita bloqueios e vínculos.
+- O histórico começa no primeiro mês com movimentações até hoje, inclui meses intermediários sem movimentos com zero e exclui transações futuras, inclusive posteriores ao dia atual dentro do mesmo mês. O bloco inicial termina no mês local atual; a navegação permite consultar blocos anteriores de até seis meses, com controles desabilitados nos limites.
+- **Distribuição de despesas**: gráfico de rosca com total destacado, legenda textual de nomes, valores em reais e percentuais com uma casa decimal, além de tooltips. Fatias com total zero não são renderizadas.
+- Filtro independente do histórico: mês atual (padrão), mês anterior ou intervalo personalizado inclusivo por mês/ano (`YYYY-MM`, campos `month`). Validar a ordem dos meses e impedir períodos inteiramente futuros; períodos parcialmente futuros consideram somente despesas até hoje.
+- `definirPeriodoDespesas()`, `prepararDistribuicaoDespesas()` e `obterDistribuicaoDespesas()` centralizam período, agregação em centavos e validação. Percentuais permanecem sem arredondamento na camada de dados; a apresentação arredondada pode não somar exatamente 100%.
+- `CLASSIFICACOES_DESPESAS` fixa os identificadores persistidos e suas cores: `Essencial` → Necessidades (`#289568`); `Desnecessario` → Desnecessários (`#DC5252`); `Imprevisto` → Imprevistos (`#E4B044`); `Investimento` → Investimentos (`#E58A45`); `Desejo` → Desejos (`#9164CB`). Não renomear os identificadores armazenados.
+- Despesas elegíveis sem classificação ou com classificação desconhecida tornam a distribuição indisponível, sem descarte silencioso. Isso não altera a validação geral das transações nem impede a apresentação do histórico válido.
+- As análises usam transações completas, sem depender de busca, seleção ou paginação e sem aplicar a referência de saldo das contas. Resultados são derivados, não persistidos, e os registros originais não são modificados; valores e totais fora dos limites seguros em centavos retornam erro.
+- Estados vazios, períodos inválidos, dados indisponíveis e falha do Chart.js têm mensagens próprias; gráficos antigos são removidos quando deixam de ser válidos. Na distribuição, total e legenda válidos continuam disponíveis se apenas a biblioteca falhar; erros de dados não são apresentados como zeros.
+- Gráficos são atualizados após criação, edição e exclusão de transações persistidas, na inicialização, ao navegar às páginas relevantes, em `pageshow` e ao retornar à aba. O bloco do histórico é mantido enquanto válido (limitado aos blocos disponíveis); o filtro da distribuição permanece entre seções, sem persistência no `localStorage`. Alterar esse filtro não atualiza o histórico.
+- Canvases possuem nomes e descrições acessíveis; o histórico tem alternativa textual dos valores e a distribuição tem legenda visível. Controles usam elementos nativos, mensagens por campo e `aria-invalid`. Há ajustes responsivos por largura útil do card, preservando as limitações gerais da sidebar.
 
 ### Transações
 - CRUD de receitas e despesas com IDs UUID e persistência local.
@@ -75,7 +90,7 @@ As funcionalidades abaixo foram verificadas no frontend. **Decisões de produto*
 - Transferências permanecem fora do escopo desta etapa.
 - Não há integração bancária automática nem mecanismo independente de agendamento; datas futuras são registros normais, sujeitos às regras de cálculo acima.
 - Responsividade geral e modo escuro continuam pendentes. Existem ajustes responsivos pontuais, mas a navegação lateral ainda comprime o conteúdo em telas pequenas.
-- Histórico/Projeção permanece sem gráfico funcional. Não presumir implementações de cartões, faturas, parcelamentos ou cálculo de limites de crédito.
+- Não há projeções financeiras: os gráficos mostram somente o histórico até a data local atual. Não presumir implementações de cartões, faturas, parcelamentos ou cálculo de limites de crédito.
 
 ### Segurança da persistência
 - Preservar validações, tratamento de erros e toasts. Confirmar a gravação antes de alterar memória ou interface como se a operação tivesse sido concluída; em caso de falha, preservar formulários e modais abertos.
