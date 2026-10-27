@@ -248,19 +248,26 @@ function validarContaTransacao(contaId) {
         && contas.some((conta) => conta.id === contaId);
 }
 
-function validarVinculosTransacoes(registros, contasCadastradas) {
+function ehMovimentacaoInvestimento(registro) {
+    return registro.tipo === "aporte" || registro.tipo === "resgate";
+}
+
+function validarVinculosTransacoes(registros, contasCadastradas, investimentosCadastrados = []) {
     const idsContas = new Set(contasCadastradas.map((conta) => conta.id));
-    return registros.every((transacao) => idsContas.has(transacao.contaId));
+    const idsInvestimentos = new Set(investimentosCadastrados.map((item) => item.id));
+    return registros.every((transacao) => idsContas.has(transacao.contaId)
+        && (!ehMovimentacaoInvestimento(transacao) || idsInvestimentos.has(transacao.investimentoId)));
 }
 
 function verificarVinculosCarregados() {
     if (colecoesBloqueadas.has("transacoes")) return;
-    if (colecoesBloqueadas.has("contas") || !validarVinculosTransacoes(transacoes, contas)) {
+    const integridade = verificarIntegridadeTransacoes(transacoes, contas, investimentos);
+    if (colecoesBloqueadas.has("contas") || !integridade.disponivel) {
         colecoesBloqueadas.add("transacoes");
         // Não apresentar um histórico parcial nem gravar sobre a coleção original.
         transacoes = [];
-        mostrarToast("Transações indisponíveis: não foi possível confirmar os vínculos com as contas. "
-            + "Há uma conta inexistente ou a coleção de contas está indisponível. "
+        mostrarToast("Transações indisponíveis: não foi possível confirmar os vínculos ou a integridade do capital. "
+            + integridade.motivo + " "
             + "Os dados armazenados foram preservados e as gravações de transações estão bloqueadas nesta sessão.", "erro");
     }
 }
@@ -275,17 +282,31 @@ function dataValida(data) {
 }
 
 function validarTransacao(registro) {
-    return registro !== null && typeof registro === "object" && !Array.isArray(registro)
+    const baseValida = registro !== null && typeof registro === "object" && !Array.isArray(registro)
         && textoPreenchido(registro.id)
-        && ["receita", "despesa"].includes(registro.tipo)
+        && ["receita", "despesa", "aporte", "resgate"].includes(registro.tipo)
         && textoPreenchido(registro.nome)
-        && textoPreenchido(registro.categoria)
-        // O vínculo é verificado somente depois de carregar as duas coleções.
+        // Os vínculos são verificados depois de carregar todas as coleções.
         && textoPreenchido(registro.contaId)
         && Number.isFinite(registro.valor) && registro.valor > 0
-        && dataValida(registro.data)
-        && textoOpcional(registro.pagamento)
-        && textoOpcional(registro.classificacao);
+        && dataValida(registro.data);
+    if (!baseValida) return false;
+    if (!ehMovimentacaoInvestimento(registro)) {
+        // Preserva as regras e o formato já aceitos de receitas e despesas.
+        return textoPreenchido(registro.categoria) && textoOpcional(registro.pagamento)
+            && textoOpcional(registro.classificacao);
+    }
+    return textoPreenchido(registro.investimentoId) && valorInvestimentoValido(registro.valor)
+        && (registro.tipo !== "resgate" || (
+            valorInvestimentoValido(registro.capitalRetirado) && registro.capitalRetirado > 0
+            && valorInvestimentoValido(registro.valorRetiradoInvestimento) && registro.valorRetiradoInvestimento > 0));
+}
+
+// Uso explícito pela futura interface. Nunca normaliza ou regrava registros carregados.
+function prepararMovimentacaoInvestimento(registro) {
+    return registro.tipo === "resgate"
+        ? { ...registro, valorRetiradoInvestimento: registro.valorRetiradoInvestimento ?? registro.valor }
+        : { ...registro };
 }
 
 function validarConta(registro) {
@@ -354,16 +375,91 @@ function saldosIndisponiveis(motivo) {
     };
 }
 
+function capitaisIndisponiveis(motivo) {
+    return { disponivel: false, motivo, capitaisPorInvestimentoCentavos: null };
+}
+
+function calcularCapitaisAplicados(investimentosCadastrados, registros, hoje = obterDataLocal()) {
+    if (!dataValida(hoje) || !validarColecao(investimentosCadastrados, validarInvestimento)
+        || !validarColecao(registros, validarTransacao)) {
+        return capitaisIndisponiveis("Investimentos, transações ou data inválidos para calcular o capital.");
+    }
+    const porId = new Map(investimentosCadastrados.map((item) => [item.id, item]));
+    const movimentosPorDia = new Map(investimentosCadastrados.map((item) => [item.id, new Map()]));
+    for (const registro of registros) {
+        if (!ehMovimentacaoInvestimento(registro)) continue;
+        const investimento = porId.get(registro.investimentoId);
+        if (!investimento) return capitaisIndisponiveis("Há uma movimentação vinculada a um investimento inexistente.");
+        // A base é consolidada ao final da referência. Não conhecemos o capital anterior.
+        if (registro.data <= investimento.dataReferenciaCapital) continue;
+        const dias = movimentosPorDia.get(investimento.id);
+        const totais = dias.get(registro.data) || { aportes: 0, retiradas: 0 };
+        const campo = registro.tipo === "aporte" ? "aportes" : "retiradas";
+        const valor = converterParaCentavos(registro.tipo === "aporte" ? registro.valor : registro.capitalRetirado);
+        const acumulado = totais[campo] + valor;
+        if (!Number.isSafeInteger(valor) || !Number.isSafeInteger(acumulado)) {
+            return capitaisIndisponiveis("Um movimento diário ultrapassa o limite seguro em centavos.");
+        }
+        totais[campo] = acumulado;
+        dias.set(registro.data, totais);
+    }
+    const capitaisPorInvestimentoCentavos = new Map();
+    for (const investimento of investimentosCadastrados) {
+        let capital = converterParaCentavos(investimento.capitalInicial);
+        if (!Number.isSafeInteger(capital)) return capitaisIndisponiveis("Capital inicial fora do limite seguro.");
+        let corrente = capital;
+        // Sem horário, valida-se o fechamento de cada dia, independentemente da ordem do array.
+        const dias = [...movimentosPorDia.get(investimento.id)].sort(([a], [b]) => a.localeCompare(b));
+        for (const [data, totais] of dias) {
+            capital += totais.aportes - totais.retiradas;
+            if (!Number.isSafeInteger(capital) || capital < 0) {
+                return capitaisIndisponiveis(`Capital inconsistente no investimento "${investimento.nome}" em ${data}: saldo negativo ou fora do limite seguro.`);
+            }
+            if (data <= hoje) corrente = capital;
+        }
+        capitaisPorInvestimentoCentavos.set(investimento.id, corrente);
+    }
+    return { disponivel: true, motivo: "", capitaisPorInvestimentoCentavos };
+}
+
+function verificarIntegridadeTransacoes(registros, contasCadastradas, investimentosCadastrados) {
+    if (!validarColecao(registros, validarTransacao) || !validarColecao(contasCadastradas, validarConta)
+        || !validarVinculosTransacoes(registros, contasCadastradas, investimentosCadastrados)) {
+        return { disponivel: false, motivo: "Há dados inválidos ou vínculos com contas/investimentos inexistentes." };
+    }
+    // Uma coleção de investimentos indisponível não invalida receitas/despesas sem esses vínculos.
+    return registros.some(ehMovimentacaoInvestimento)
+        ? calcularCapitaisAplicados(investimentosCadastrados, registros)
+        : { disponivel: true, motivo: "" };
+}
+
+function obterCapitaisAplicados(hoje = obterDataLocal()) {
+    if (["investimentos", "transacoes", "contas"].some((chave) => colecoesBloqueadas.has(chave))) {
+        return capitaisIndisponiveis("Dados necessários ao cálculo de capital indisponíveis nesta sessão.");
+    }
+    const integridade = verificarIntegridadeTransacoes(transacoes, contas, investimentos);
+    if (!integridade.disponivel) return capitaisIndisponiveis(integridade.motivo);
+    return calcularCapitaisAplicados(investimentos, transacoes, hoje);
+}
+
+function movimentoBancarioCentavos(transacao) {
+    const valor = converterParaCentavos(transacao.valor);
+    switch (transacao.tipo) {
+        case "receita": case "resgate": return valor;
+        case "despesa": case "aporte": return -valor;
+        default: return null;
+    }
+}
+
 // Recebe as coleções completas. Todos os valores retornados estão em centavos.
 // O parâmetro hoje permite testar datas sem depender do relógio da execução.
-function calcularSaldos(contasCadastradas, registrosTransacoes, hoje = obterDataLocal()) {
+function calcularSaldos(contasCadastradas, registrosTransacoes, hoje = obterDataLocal(), investimentosCadastrados = []) {
     if (!dataValida(hoje) || !validarColecao(contasCadastradas, validarConta)
         || !validarColecao(registrosTransacoes, validarTransacao)) {
         return saldosIndisponiveis("Dados ou data inválidos para calcular os saldos.");
     }
-    if (!validarVinculosTransacoes(registrosTransacoes, contasCadastradas)) {
-        return saldosIndisponiveis("Há transações vinculadas a contas inexistentes.");
-    }
+    const integridade = verificarIntegridadeTransacoes(registrosTransacoes, contasCadastradas, investimentosCadastrados);
+    if (!integridade.disponivel) return saldosIndisponiveis(integridade.motivo);
 
     const contasPorId = new Map();
     const saldosPorContaCentavos = new Map();
@@ -380,7 +476,7 @@ function calcularSaldos(contasCadastradas, registrosTransacoes, hoje = obterData
         const conta = contasPorId.get(transacao.contaId);
         if (transacao.data <= conta.dataReferencia || transacao.data > hoje) continue;
         const valor = converterParaCentavos(transacao.valor);
-        const movimento = transacao.tipo === "receita" ? valor : -valor;
+        const movimento = movimentoBancarioCentavos(transacao);
         const saldo = saldosPorContaCentavos.get(conta.id) + movimento;
         if (!Number.isSafeInteger(valor) || !Number.isSafeInteger(saldo)) {
             return saldosIndisponiveis("Um movimento ou saldo ultrapassa o limite de cálculo seguro em centavos.");
@@ -413,7 +509,7 @@ function obterSaldosContas(hoje = obterDataLocal()) {
     if (colecoesBloqueadas.has("contas") || colecoesBloqueadas.has("transacoes")) {
         return saldosIndisponiveis("Dados de contas ou transações indisponíveis nesta sessão.");
     }
-    return calcularSaldos(contas, transacoes, hoje);
+    return calcularSaldos(contas, transacoes, hoje, investimentos);
 }
 
 function historicoMensalIndisponivel(motivo) {
@@ -433,6 +529,7 @@ function prepararHistoricoMensal(registros, hoje = obterDataLocal(), bloco = 0) 
     const totaisPorMes = new Map();
     let primeiroIndice = null;
     for (const transacao of registros) {
+        if (transacao.tipo !== "receita" && transacao.tipo !== "despesa") continue;
         if (transacao.data > hoje) continue;
         const ano = Number(transacao.data.slice(0, 4));
         const mes = Number(transacao.data.slice(5, 7));
@@ -479,7 +576,7 @@ function obterHistoricoMensal(bloco = 0, hoje = obterDataLocal()) {
         return historicoMensalIndisponivel("Dados de transações ou seus vínculos indisponíveis nesta sessão.");
     }
     if (!validarColecao(transacoes, validarTransacao) || !validarColecao(contas, validarConta)
-        || !validarVinculosTransacoes(transacoes, contas)) {
+        || !validarVinculosTransacoes(transacoes, contas, investimentos)) {
         return historicoMensalIndisponivel("Não foi possível validar as transações e seus vínculos.");
     }
     return prepararHistoricoMensal(transacoes, hoje, bloco);
@@ -563,7 +660,7 @@ function obterDistribuicaoDespesas(tipo = "atual", mesInicial = null, mesFinal =
         return distribuicaoDespesasIndisponivel("Dados de transações ou seus vínculos indisponíveis nesta sessão.");
     }
     if (!validarColecao(transacoes, validarTransacao) || !validarColecao(contas, validarConta)
-        || !validarVinculosTransacoes(transacoes, contas)) {
+        || !validarVinculosTransacoes(transacoes, contas, investimentos)) {
         return distribuicaoDespesasIndisponivel("Não foi possível validar as transações e seus vínculos.");
     }
     const periodo = definirPeriodoDespesas(tipo, mesInicial, mesFinal, hoje);
@@ -809,11 +906,21 @@ function persistirColecao(chave, registros) {
             + "A alteração não foi confirmada e os dados anteriores foram preservados.", "erro");
         return false;
     }
-    if (chave === "transacoes" && (colecoesBloqueadas.has("contas")
-        || !validarVinculosTransacoes(registros, contas))) {
-        mostrarToast("Não foi possível salvar transações: selecione uma conta cadastrada e disponível. "
-            + "A alteração não foi confirmada.", "erro");
-        return false;
+    if (chave === "transacoes" || chave === "investimentos") {
+        const candidatos = chave === "transacoes" ? registros : transacoes;
+        const investimentosCandidatos = chave === "investimentos" ? registros : investimentos;
+        const dependenciasBloqueadas = chave === "investimentos" && colecoesBloqueadas.has("transacoes")
+            || chave === "transacoes" && colecoesBloqueadas.has("contas")
+            || candidatos.some(ehMovimentacaoInvestimento) && colecoesBloqueadas.has("investimentos");
+        if (dependenciasBloqueadas) {
+            mostrarToast("Não foi possível confirmar os vínculos e o capital: uma coleção necessária está indisponível. A alteração não foi confirmada.", "erro");
+            return false;
+        }
+        const integridade = verificarIntegridadeTransacoes(candidatos, contas, investimentosCandidatos);
+        if (!integridade.disponivel) {
+            mostrarToast(`Não foi possível salvar: ${integridade.motivo} A alteração não foi confirmada.`, "erro");
+            return false;
+        }
     }
     try {
         localStorage.setItem(chave, JSON.stringify(registros));
@@ -917,7 +1024,8 @@ function renderizarTransacoes(tabelaDestino, limite=null, pesquisa="", tipo="tod
             .includes(pesquisa.toLowerCase());
 
         const correspondeTipo = tipo === "todos" || transacao.tipo === tipo;
-        const correspondeCategoria = categoria === "todas" || transacao.categoria.trim() === categoria.trim();
+        const categoriaTransacao = ehMovimentacaoInvestimento(transacao) ? "" : transacao.categoria;
+        const correspondeCategoria = categoria === "todas" || categoriaTransacao.trim() === categoria.trim();
         const correspondeDataInicial = !dataInicial || transacao.data >= dataInicial;
         const correspondeDataFinal = !dataFinal || transacao.data <= dataFinal;
 
@@ -1000,11 +1108,15 @@ function renderizarTransacoes(tabelaDestino, limite=null, pesquisa="", tipo="tod
         });
 
         const celulaNome = document.createElement("td");
-        celulaNome.textContent = transacao.nome;
+        const tipoMovimento = transacao.tipo === "aporte" ? "Aporte" : transacao.tipo === "resgate" ? "Resgate" : "";
+        const investimento = ehMovimentacaoInvestimento(transacao)
+            ? investimentos.find((item) => item.id === transacao.investimentoId) : null;
+        celulaNome.textContent = tipoMovimento
+            ? `${tipoMovimento} · ${transacao.nome} (${investimento?.nome ?? "Investimento indisponível"})` : transacao.nome;
         linha.appendChild(celulaNome);
         
         const celulaCategoria = document.createElement("td");
-        celulaCategoria.textContent = transacao.categoria;
+        celulaCategoria.textContent = ehMovimentacaoInvestimento(transacao) ? "-" : transacao.categoria;
         linha.appendChild(celulaCategoria);
 
         const celulaData = document.createElement("td");
@@ -1014,11 +1126,11 @@ function renderizarTransacoes(tabelaDestino, limite=null, pesquisa="", tipo="tod
         linha.appendChild(celulaData);
 
         const celulaPagamento = document.createElement("td");
-        celulaPagamento.textContent = transacao.pagamento || "-";
+        celulaPagamento.textContent = ehMovimentacaoInvestimento(transacao) ? "-" : transacao.pagamento || "-";
         linha.appendChild(celulaPagamento);
         
         const celulaClassificacao = document.createElement("td");
-        celulaClassificacao.textContent = transacao.classificacao || "-";
+        celulaClassificacao.textContent = ehMovimentacaoInvestimento(transacao) ? "-" : transacao.classificacao || "-";
         linha.appendChild(celulaClassificacao);
 
         const celulaConta = document.createElement("td");
@@ -1027,7 +1139,7 @@ function renderizarTransacoes(tabelaDestino, limite=null, pesquisa="", tipo="tod
         linha.appendChild(celulaConta);
 
         const celulaValor = document.createElement("td");
-        const sinal = transacao.tipo === "despesa" ? "-" : "+";
+        const sinal = movimentoBancarioCentavos(transacao) < 0 ? "-" : "+";
         celulaValor.textContent = `${sinal}${formatadorMoeda.format(transacao.valor)}`;
         celulaValor.classList.add(transacao.tipo);
         linha.appendChild(celulaValor);
@@ -1077,6 +1189,10 @@ function limparSelecao() {
     transacoesSelecionadas = [];
     sincronizarCheckboxes();
     atualizarBarraAcoes();
+}
+
+function selecaoContemMovimentacaoInvestimento() {
+    return transacoes.some((item) => transacoesSelecionadas.includes(item.id) && ehMovimentacaoInvestimento(item));
 }
 
 function atualizarBarraAcoes() {
@@ -1166,7 +1282,8 @@ function atualizarCategorias() {
     const categoriaAtual = filtroCategoria.value;
 
     const categorias = [...new Set(
-        transacoes.map((transacao) => transacao.categoria.trim())
+        transacoes.filter((transacao) => !ehMovimentacaoInvestimento(transacao))
+            .map((transacao) => transacao.categoria.trim())
     )].sort();
 
     filtroCategoria.innerHTML = '<option value="todas">Todas as categorias</option>';
@@ -1558,6 +1675,10 @@ camposFormulario.forEach((campo) => {
 });
 [botaoExcluir, botaoExcluirCompleta].forEach((botao) => { 
     botao.addEventListener("click", () => {
+        if (selecaoContemMovimentacaoInvestimento()) {
+            mostrarToast("A exclusão de aportes e resgates pela interface ainda não está disponível nesta etapa.", "informacao");
+            return;
+        }
         const quantidade = transacoesSelecionadas.length;
 
         if (quantidade === 0) return;
@@ -1574,6 +1695,10 @@ botaoCancelarExclusao.addEventListener("click", () => {
 });
 
 botaoConfirmarExclusao.addEventListener("click", () => {
+    if (selecaoContemMovimentacaoInvestimento()) {
+        mostrarToast("A exclusão de aportes e resgates pela interface ainda não está disponível nesta etapa.", "informacao");
+        return;
+    }
     const quantidade = transacoesSelecionadas.length;
 const transacoesRestantes = transacoes.filter((transacao) => {
     return !transacoesSelecionadas.includes(transacao.id);
@@ -1604,6 +1729,10 @@ const transacoesRestantes = transacoes.filter((transacao) => {
         });
 
         if (!transacao) return;
+        if (ehMovimentacaoInvestimento(transacao)) {
+            mostrarToast("A edição de aportes e resgates ainda não está disponível nesta etapa.", "informacao");
+            return;
+        }
         if (!prepararContasTransacao()) return;
 
         limparErros(formTransacao);
@@ -1667,6 +1796,11 @@ document.addEventListener("keydown", (event) => {
 // evento de envio do formulario
 formTransacao.addEventListener("submit", (enviar) => { 
     enviar.preventDefault();
+    if (!["receita", "despesa"].includes(tipoTransacao)
+        || transacoes.some((item) => item.id === transacaoEmEdicao && ehMovimentacaoInvestimento(item))) {
+        mostrarToast("Este formulário permite somente receitas e despesas nesta etapa.", "informacao");
+        return;
+    }
     limparErros(formTransacao);
     const nome = campoNome.value.trim();
     const valor = Number(campoValor.value);
@@ -1805,9 +1939,17 @@ function fecharModalInvestimento() {
     investimentoEmEdicao = null;
 }
 
-// Ponto único de proteção da exclusão, a ampliar quando existirem movimentações reais.
+// Ponto único de proteção da exclusão, incluindo movimentos históricos e futuros.
 function podeExcluirInvestimento(id) {
     if (!investimentosDisponiveis()) return false;
+    if (colecoesBloqueadas.has("transacoes")) {
+        mostrarToast("Não é possível excluir o investimento: as transações estão indisponíveis e os vínculos não puderam ser verificados.", "erro");
+        return false;
+    }
+    if (transacoes.some((item) => ehMovimentacaoInvestimento(item) && item.investimentoId === id)) {
+        mostrarToast("Este investimento possui aportes ou resgates vinculados e não pode ser excluído, inclusive quando os registros são históricos ou futuros.", "erro");
+        return false;
+    }
     if (!investimentos.some((item) => item.id === id)) {
         mostrarToast("O investimento não está disponível para exclusão.", "erro");
         return false;
