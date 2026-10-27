@@ -28,6 +28,7 @@ const graficosHistorico = { resumo: null, analises: null };
 let graficoDistribuicao = null;
 let transacoes = carregarColecao("transacoes", validarTransacao);
 let contas = carregarColecao("contas", validarConta);
+let investimentos = carregarColecao("investimentos", validarInvestimento);
 verificarVinculosCarregados();
 const listaTransacoes = document.getElementById("lista-transacoes");
 const listaTransacoesCompleta = document.getElementById("lista-transacoes-completa");
@@ -306,6 +307,30 @@ function validarColecao(registros, validarRegistro) {
         ids.add(registro.id);
     }
     return true;
+}
+
+function valorInvestimentoValido(valor) {
+    if (!Number.isFinite(valor) || valor < 0) return false;
+    const centavos = converterParaCentavos(valor);
+    return Number.isSafeInteger(centavos)
+        && Math.abs(valor - centavos / 100) <= Number.EPSILON * Math.max(1, valor);
+}
+
+function validarInvestimento(registro) {
+    if (registro === null || typeof registro !== "object" || Array.isArray(registro)) return false;
+    const hoje = obterDataLocal();
+    const instante = typeof registro.atualizadoEm === "string" ? new Date(registro.atualizadoEm) : null;
+    return typeof registro.id === "string"
+        && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(registro.id)
+        && textoPreenchido(registro.nome) && textoPreenchido(registro.tipo)
+        && textoOpcional(registro.instituicao)
+        && valorInvestimentoValido(registro.capitalInicial) && valorInvestimentoValido(registro.valorInformado)
+        && dataValida(registro.dataReferenciaCapital) && registro.dataReferenciaCapital <= hoje
+        && dataValida(registro.dataReferenciaValor) && registro.dataReferenciaValor <= hoje
+        && instante !== null && Number.isFinite(instante.getTime())
+        && instante.toISOString() === registro.atualizadoEm
+        && textoOpcional(registro.observacoes)
+        && (registro.observacoes == null || registro.observacoes.length <= 500);
 }
 
 function obterDataLocal(data = new Date()) {
@@ -777,7 +802,8 @@ function persistirColecao(chave, registros) {
         return false;
     }
     const validarRegistro = chave === "contas" ? validarConta
-        : chave === "transacoes" ? validarTransacao : null;
+        : chave === "transacoes" ? validarTransacao
+        : chave === "investimentos" ? validarInvestimento : null;
     if (!validarRegistro || !validarColecao(registros, validarRegistro)) {
         mostrarToast("Não foi possível salvar: a coleção contém dados incompatíveis com o modelo atual. "
             + "A alteração não foi confirmada e os dados anteriores foram preservados.", "erro");
@@ -869,6 +895,7 @@ function fecharModal(modal) {
     const destino = podeReceberFoco(focoAnteriorModal) ? focoAnteriorModal
         : document.getElementById("pagina-transacoes").classList.contains("ativa") ? campoPesquisa
         : document.getElementById("pagina-contas").classList.contains("ativa") ? botaoNovaConta
+        : document.getElementById("pagina-investimentos").classList.contains("ativa") ? document.getElementById("novo-investimento")
         : addReceita;
     destino.focus();
     focoAnteriorModal = null;
@@ -1616,6 +1643,9 @@ document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && modalAtivo === modalExclusaoConta) {
         fecharModalExclusaoConta();
     }
+    if (event.key === "Escape" && modalAtivo === document.getElementById("modal-exclusao-investimento")) {
+        fecharExclusaoInvestimento();
+    }
     if (event.key === "Tab" && modalAtivo) {
         const campos = [...modalAtivo.querySelectorAll(
             'button, input, select, textarea, a[href], [tabindex]:not([tabindex="-1"])'
@@ -1723,6 +1753,186 @@ formTransacao.addEventListener("submit", (enviar) => {
     fecharModalTransacao();
     mostrarToast(estavaEditando ? "Transação atualizada." : "Transação criada.", "sucesso");
 });
+
+let investimentoEmEdicao = null;
+let investimentoEmExclusao = null;
+const formInvestimento = document.getElementById("form-investimento");
+const modalInvestimento = document.getElementById("modal-investimento");
+const modalExclusaoInvestimento = document.getElementById("modal-exclusao-investimento");
+const camposInvestimento = {
+    nome: document.getElementById("nome-investimento"),
+    tipo: document.getElementById("tipo-investimento"),
+    instituicao: document.getElementById("instituicao-investimento"),
+    capital: document.getElementById("capital-investimento"),
+    valor: document.getElementById("valor-investimento"),
+    referencia: document.getElementById("referencia-investimento"),
+    observacoes: document.getElementById("observacoes-investimento")
+};
+
+function investimentosDisponiveis() {
+    if (!colecoesBloqueadas.has("investimentos")) return true;
+    mostrarToast("Investimentos indisponíveis. As gravações estão bloqueadas e os dados armazenados foram preservados.", "erro");
+    return false;
+}
+
+function abrirModalInvestimento(id = null) {
+    if (!investimentosDisponiveis()) return;
+    const investimento = id === null ? null : investimentos.find((item) => item.id === id);
+    if (id !== null && !investimento) {
+        mostrarToast("O investimento não está disponível para edição.", "erro");
+        return;
+    }
+    formInvestimento.reset();
+    limparErros(formInvestimento);
+    investimentoEmEdicao = id;
+    document.getElementById("titulo-modal-investimento").textContent = investimento ? "Editar investimento" : "Adicionar investimento";
+    document.getElementById("salvar-investimento").textContent = investimento ? "Salvar alterações" : "Salvar investimento";
+    camposInvestimento.nome.value = investimento?.nome ?? "";
+    camposInvestimento.tipo.value = investimento?.tipo ?? "";
+    camposInvestimento.instituicao.value = investimento?.instituicao ?? "";
+    camposInvestimento.capital.value = investimento?.capitalInicial ?? "";
+    camposInvestimento.valor.value = investimento?.valorInformado ?? "";
+    camposInvestimento.referencia.max = obterDataLocal();
+    camposInvestimento.referencia.value = investimento?.dataReferenciaCapital ?? obterDataLocal();
+    camposInvestimento.observacoes.value = investimento?.observacoes ?? "";
+    abrirModal(modalInvestimento, camposInvestimento.nome);
+}
+
+function fecharModalInvestimento() {
+    fecharModal(modalInvestimento);
+    formInvestimento.reset();
+    limparErros(formInvestimento);
+    investimentoEmEdicao = null;
+}
+
+// Ponto único de proteção da exclusão, a ampliar quando existirem movimentações reais.
+function podeExcluirInvestimento(id) {
+    if (!investimentosDisponiveis()) return false;
+    if (!investimentos.some((item) => item.id === id)) {
+        mostrarToast("O investimento não está disponível para exclusão.", "erro");
+        return false;
+    }
+    return true;
+}
+
+function solicitarExclusaoInvestimento(id) {
+    if (!podeExcluirInvestimento(id)) return;
+    investimentoEmExclusao = id;
+    const investimento = investimentos.find((item) => item.id === id);
+    document.getElementById("mensagem-exclusao-investimento").textContent = `Deseja excluir o investimento "${investimento.nome}"? Esta ação não poderá ser desfeita.`;
+    abrirModal(modalExclusaoInvestimento, document.getElementById("cancelar-exclusao-investimento"));
+}
+
+function fecharExclusaoInvestimento() {
+    fecharModal(modalExclusaoInvestimento);
+    investimentoEmExclusao = null;
+}
+
+function renderizarInvestimentos() {
+    const lista = document.getElementById("lista-investimentos");
+    lista.replaceChildren();
+    if (colecoesBloqueadas.has("investimentos") || investimentos.length === 0) {
+        const mensagem = document.createElement("p");
+        mensagem.classList.add("mensagem-vazia");
+        mensagem.textContent = colecoesBloqueadas.has("investimentos")
+            ? "Dados de investimentos indisponíveis. Gravações bloqueadas nesta sessão; o conteúdo armazenado foi preservado."
+            : "Nenhum investimento cadastrado. Use Novo investimento para cadastrar o primeiro.";
+        lista.appendChild(mensagem);
+        return;
+    }
+    investimentos.forEach((investimento) => {
+        const item = document.createElement("article");
+        item.classList.add("item-investimento");
+        const nome = document.createElement("h3");
+        nome.textContent = investimento.nome;
+        const detalhes = document.createElement("p");
+        detalhes.textContent = [investimento.tipo, investimento.instituicao].filter(Boolean).join(" · ");
+        const valores = document.createElement("dl");
+        [["Capital inicial", investimento.capitalInicial], ["Valor informado", investimento.valorInformado]].forEach(([rotulo, valor]) => {
+            const grupo = document.createElement("div");
+            const termo = document.createElement("dt");
+            termo.textContent = rotulo;
+            const descricao = document.createElement("dd");
+            descricao.textContent = formatadorMoeda.format(valor);
+            grupo.append(termo, descricao);
+            valores.appendChild(grupo);
+        });
+        const acoes = document.createElement("div");
+        acoes.classList.add("acoes-investimento");
+        [["Editar", abrirModalInvestimento], ["Excluir", solicitarExclusaoInvestimento]].forEach(([rotulo, acao]) => {
+            const botao = document.createElement("button");
+            botao.type = "button";
+            botao.textContent = rotulo;
+            botao.setAttribute("aria-label", `${rotulo} investimento ${investimento.nome}`);
+            if (rotulo === "Excluir") botao.classList.add("btn-excluir");
+            botao.addEventListener("click", () => acao(investimento.id));
+            acoes.appendChild(botao);
+        });
+        item.append(nome, detalhes, valores, acoes);
+        lista.appendChild(item);
+    });
+}
+
+formInvestimento.addEventListener("submit", (evento) => {
+    evento.preventDefault();
+    limparErros(formInvestimento);
+    if (!investimentosDisponiveis()) return;
+    const campos = camposInvestimento;
+    let valido = true;
+    const erro = (campo, mensagem) => { mostrarErro(campo, mensagem); valido = false; };
+    if (!campos.nome.value.trim()) erro(campos.nome, "Informe o nome do investimento.");
+    if (!campos.tipo.value.trim()) erro(campos.tipo, "Informe o tipo do investimento ou escolha uma sugestão.");
+    [campos.capital, campos.valor].forEach((campo) => {
+        if (campo.value === "" || !valorInvestimentoValido(Number(campo.value)) || !campo.validity.valid) {
+            erro(campo, "Informe um valor não negativo, em centavos e dentro do limite numérico seguro.");
+        }
+    });
+    const referencia = campos.referencia.value;
+    if (!dataValida(referencia) || referencia > obterDataLocal() || !campos.referencia.validity.valid) {
+        erro(campos.referencia, "Informe uma data válida, igual ou anterior a hoje.");
+    }
+    if (campos.observacoes.value.length > 500) erro(campos.observacoes, "Use no máximo 500 caracteres.");
+    if (!valido) { focarPrimeiroErro(formInvestimento); return; }
+    const editando = investimentoEmEdicao !== null;
+    const anterior = editando ? investimentos.find((item) => item.id === investimentoEmEdicao) : null;
+    if (editando && !anterior) { mostrarToast("O investimento em edição não está disponível.", "erro"); return; }
+    const valorInformado = Number(campos.valor.value);
+    const atualizouValor = !anterior || anterior.valorInformado !== valorInformado || anterior.dataReferenciaValor !== referencia;
+    const registro = {
+        id: anterior ? anterior.id : crypto.randomUUID(),
+        nome: campos.nome.value.trim(), tipo: campos.tipo.value.trim(), instituicao: campos.instituicao.value.trim(),
+        capitalInicial: Number(campos.capital.value), dataReferenciaCapital: referencia,
+        valorInformado, dataReferenciaValor: referencia,
+        atualizadoEm: atualizouValor ? new Date().toISOString() : anterior.atualizadoEm,
+        observacoes: campos.observacoes.value.trim()
+    };
+    const proximos = editando ? investimentos.map((item) => item.id === anterior.id ? registro : item) : [...investimentos, registro];
+    if (!persistirColecao("investimentos", proximos)) return;
+    investimentos = proximos;
+    renderizarInvestimentos();
+    fecharModalInvestimento();
+    mostrarToast(editando ? "Investimento atualizado." : "Investimento cadastrado.", "sucesso");
+});
+document.getElementById("novo-investimento").addEventListener("click", () => abrirModalInvestimento());
+document.getElementById("fechar-investimento").addEventListener("click", fecharModalInvestimento);
+document.getElementById("cancelar-investimento").addEventListener("click", fecharModalInvestimento);
+Object.values(camposInvestimento).filter((campo) => campo.id !== "instituicao-investimento").forEach((campo) => {
+    campo.addEventListener("input", () => limparErroCampo(campo));
+});
+document.getElementById("cancelar-exclusao-investimento").addEventListener("click", fecharExclusaoInvestimento);
+modalExclusaoInvestimento.addEventListener("click", (evento) => {
+    if (evento.target === modalExclusaoInvestimento) fecharExclusaoInvestimento();
+});
+document.getElementById("confirmar-exclusao-investimento").addEventListener("click", () => {
+    if (investimentoEmExclusao === null || !podeExcluirInvestimento(investimentoEmExclusao)) return;
+    const proximos = investimentos.filter((item) => item.id !== investimentoEmExclusao);
+    if (!persistirColecao("investimentos", proximos)) return;
+    investimentos = proximos;
+    renderizarInvestimentos();
+    fecharExclusaoInvestimento();
+    mostrarToast("Investimento excluído.", "sucesso");
+});
+renderizarInvestimentos();
 
 document.getElementById("historico-anterior").addEventListener("click", () => {
     const historico = obterHistoricoMensal(blocoHistoricoAnalises);
