@@ -1099,14 +1099,24 @@ td.despesa {
 .item-investimento dt { font-size: 13px; color: #6b7280; }
 .item-investimento dd { margin: 4px 0 0; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .acoes-investimento { display: flex; flex-wrap: wrap; gap: 8px; }
-#modal-investimento .modal { box-sizing: border-box; width: min(calc(100% - 32px), 568px); max-height: calc(100dvh - 32px); }
+#modal-investimento .modal,
+#modal-movimentacao .modal { box-sizing: border-box; width: min(calc(100% - 32px), 568px); max-height: calc(100dvh - 32px); }
 #modal-exclusao-investimento .modal-confirmacao { box-sizing: border-box; max-width: calc(100% - 32px); }
-#form-investimento textarea { box-sizing: border-box; width: 100%; padding: 11px 12px; border: 1px solid #d7d1db; border-radius: 8px; background: #fff; color: #1c1427; font: inherit; resize: vertical; }
-#form-investimento textarea:focus { outline: 2px solid #a163f1; outline-offset: 2px; }
-#form-investimento textarea.invalido { border-color: #c0392b; }
-#form-investimento small:not(.erro-campo) { color: #6b7280; font-size: 0.8rem; line-height: 1.5; }
-#form-investimento .erro-campo:empty { display: none; }
-#form-investimento .form-actions { flex-wrap: wrap; gap: 8px; }
+#form-investimento textarea,
+#form-movimentacao textarea { box-sizing: border-box; width: 100%; padding: 11px 12px; border: 1px solid #d7d1db; border-radius: 8px; background: #fff; color: #1c1427; font: inherit; resize: vertical; }
+#form-investimento textarea:focus,
+#form-movimentacao textarea:focus { outline: 2px solid #a163f1; outline-offset: 2px; }
+#form-investimento textarea.invalido,
+#form-movimentacao textarea.invalido { border-color: #c0392b; }
+#form-investimento small:not(.erro-campo),
+#form-movimentacao small:not(.erro-campo) { color: #6b7280; font-size: 0.8rem; line-height: 1.5; }
+#form-investimento .erro-campo:empty,
+#form-movimentacao .erro-campo:empty { display: none; }
+#form-investimento .form-actions,
+#form-movimentacao .form-actions { flex-wrap: wrap; gap: 8px; }
+
+/* Movimentações reutilizam os campos e o diálogo já usados nos investimentos. */
+.acoes-movimentacoes { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
 
 #notificacoes {
     position: fixed;

@@ -297,6 +297,8 @@ function validarTransacao(registro) {
             && textoOpcional(registro.classificacao);
     }
     return textoPreenchido(registro.investimentoId) && valorInvestimentoValido(registro.valor)
+        && textoOpcional(registro.observacoes)
+        && (registro.observacoes == null || registro.observacoes.length <= 500)
         && (registro.tipo !== "resgate" || (
             valorInvestimentoValido(registro.capitalRetirado) && registro.capitalRetirado > 0
             && valorInvestimentoValido(registro.valorRetiradoInvestimento) && registro.valorRetiradoInvestimento > 0));
@@ -1112,7 +1114,10 @@ function renderizarTransacoes(tabelaDestino, limite=null, pesquisa="", tipo="tod
         const investimento = ehMovimentacaoInvestimento(transacao)
             ? investimentos.find((item) => item.id === transacao.investimentoId) : null;
         celulaNome.textContent = tipoMovimento
-            ? `${tipoMovimento} · ${transacao.nome} (${investimento?.nome ?? "Investimento indisponível"})` : transacao.nome;
+            ? transacao.nome === `${tipoMovimento} - ${investimento?.nome}`
+                ? `${tipoMovimento} · ${investimento.nome}`
+                : `${tipoMovimento} · ${transacao.nome} (${investimento?.nome ?? "Investimento indisponível"})`
+            : transacao.nome;
         linha.appendChild(celulaNome);
         
         const celulaCategoria = document.createElement("td");
@@ -1189,10 +1194,6 @@ function limparSelecao() {
     transacoesSelecionadas = [];
     sincronizarCheckboxes();
     atualizarBarraAcoes();
-}
-
-function selecaoContemMovimentacaoInvestimento() {
-    return transacoes.some((item) => transacoesSelecionadas.includes(item.id) && ehMovimentacaoInvestimento(item));
 }
 
 function atualizarBarraAcoes() {
@@ -1675,10 +1676,6 @@ camposFormulario.forEach((campo) => {
 });
 [botaoExcluir, botaoExcluirCompleta].forEach((botao) => { 
     botao.addEventListener("click", () => {
-        if (selecaoContemMovimentacaoInvestimento()) {
-            mostrarToast("A exclusão de aportes e resgates pela interface ainda não está disponível nesta etapa.", "informacao");
-            return;
-        }
         const quantidade = transacoesSelecionadas.length;
 
         if (quantidade === 0) return;
@@ -1695,10 +1692,6 @@ botaoCancelarExclusao.addEventListener("click", () => {
 });
 
 botaoConfirmarExclusao.addEventListener("click", () => {
-    if (selecaoContemMovimentacaoInvestimento()) {
-        mostrarToast("A exclusão de aportes e resgates pela interface ainda não está disponível nesta etapa.", "informacao");
-        return;
-    }
     const quantidade = transacoesSelecionadas.length;
 const transacoesRestantes = transacoes.filter((transacao) => {
     return !transacoesSelecionadas.includes(transacao.id);
@@ -1716,6 +1709,7 @@ const transacoesRestantes = transacoes.filter((transacao) => {
     atualizarBarraAcoes();
 
     fecharModal(modalExclusao);
+    renderizarInvestimentos();
     mostrarToast(quantidade === 1 ? "Transação excluída." : `${quantidade} transações excluídas.`, "sucesso");
 });
 [botaoEditar, botaoEditarCompleta].forEach((botao) => {
@@ -1730,7 +1724,7 @@ const transacoesRestantes = transacoes.filter((transacao) => {
 
         if (!transacao) return;
         if (ehMovimentacaoInvestimento(transacao)) {
-            mostrarToast("A edição de aportes e resgates ainda não está disponível nesta etapa.", "informacao");
+            abrirModalMovimentacao(transacao.tipo, transacao.investimentoId, transacao.id);
             return;
         }
         if (!prepararContasTransacao()) return;
@@ -2001,7 +1995,9 @@ function renderizarInvestimentos() {
         });
         const acoes = document.createElement("div");
         acoes.classList.add("acoes-investimento");
-        [["Editar", abrirModalInvestimento], ["Excluir", solicitarExclusaoInvestimento]].forEach(([rotulo, acao]) => {
+        [["Aporte", (id) => abrirModalMovimentacao("aporte", id)],
+            ["Resgate", (id) => abrirModalMovimentacao("resgate", id)],
+            ["Editar", abrirModalInvestimento], ["Excluir", solicitarExclusaoInvestimento]].forEach(([rotulo, acao]) => {
             const botao = document.createElement("button");
             botao.type = "button";
             botao.textContent = rotulo;
@@ -2075,6 +2071,139 @@ document.getElementById("confirmar-exclusao-investimento").addEventListener("cli
     mostrarToast("Investimento excluído.", "sucesso");
 });
 renderizarInvestimentos();
+
+const modalMovimentacao = document.getElementById("modal-movimentacao");
+const formMovimentacao = document.getElementById("form-movimentacao");
+const camposMovimentacao = Object.fromEntries(
+    ["investimento", "conta", "valor", "capital", "baixa", "data", "observacoes"]
+        .map((nome) => [nome, document.getElementById(`${nome}-movimentacao`)]));
+let tipoMovimentacao = "aporte";
+let movimentacaoEmEdicao = null;
+
+function podeMovimentarInvestimentos() {
+    if (["transacoes", "contas", "investimentos"].some((chave) => colecoesBloqueadas.has(chave))) {
+        mostrarToast("Não é possível movimentar: contas, investimentos ou transações estão indisponíveis. Os dados armazenados foram preservados.", "erro");
+        return false;
+    }
+    if (!contas.length || !investimentos.length) {
+        mostrarToast("Cadastre pelo menos uma conta e um investimento antes de registrar aportes ou resgates.", "informacao");
+        return false;
+    }
+    return true;
+}
+
+function abrirModalMovimentacao(tipo, investimentoId = null, id = null) {
+    if (!["aporte", "resgate"].includes(tipo) || !podeMovimentarInvestimentos()) return;
+    const registro = id === null ? null : transacoes.find((item) => item.id === id && item.tipo === tipo);
+    if (id !== null && !registro) {
+        mostrarToast("A movimentação não está disponível para edição.", "erro");
+        return;
+    }
+    formMovimentacao.reset();
+    limparErros(formMovimentacao);
+    tipoMovimentacao = tipo;
+    movimentacaoEmEdicao = id;
+    const resgate = tipo === "resgate";
+    document.getElementById("titulo-modal-movimentacao").textContent = `${registro ? "Editar" : "Adicionar"} ${tipo}`;
+    document.getElementById("salvar-movimentacao").textContent = registro ? "Salvar alterações" : `Salvar ${tipo}`;
+    document.getElementById("rotulo-investimento-movimentacao").textContent = `Investimento de ${resgate ? "origem" : "destino"}`;
+    document.getElementById("rotulo-conta-movimentacao").textContent = `Conta de ${resgate ? "destino" : "origem"}`;
+    document.getElementById("rotulo-valor-movimentacao").textContent = resgate ? "Valor recebido" : "Valor do aporte";
+    document.getElementById("campos-resgate").classList.toggle("hidden", !resgate);
+    camposMovimentacao.capital.required = resgate;
+    camposMovimentacao.capital.disabled = !resgate;
+    camposMovimentacao.baixa.disabled = !resgate;
+    for (const [nome, colecao] of [["investimento", investimentos], ["conta", contas]]) {
+        const select = camposMovimentacao[nome];
+        select.replaceChildren(new Option("Selecione...", ""));
+        colecao.forEach((item) => select.add(new Option(item.nome, item.id)));
+    }
+    camposMovimentacao.investimento.value = registro?.investimentoId ?? investimentoId ?? "";
+    camposMovimentacao.conta.value = registro?.contaId ?? "";
+    camposMovimentacao.valor.value = registro?.valor ?? "";
+    camposMovimentacao.capital.value = registro?.capitalRetirado ?? "";
+    camposMovimentacao.baixa.value = registro?.valorRetiradoInvestimento ?? "";
+    camposMovimentacao.data.value = registro?.data ?? obterDataLocal();
+    camposMovimentacao.observacoes.value = registro?.observacoes ?? "";
+    abrirModal(modalMovimentacao, camposMovimentacao.investimento);
+}
+
+function fecharModalMovimentacao() {
+    fecharModal(modalMovimentacao);
+    formMovimentacao.reset();
+    limparErros(formMovimentacao);
+    movimentacaoEmEdicao = null;
+}
+
+formMovimentacao.addEventListener("submit", (evento) => {
+    evento.preventDefault();
+    limparErros(formMovimentacao);
+    if (!podeMovimentarInvestimentos()) return;
+    const campos = camposMovimentacao;
+    let valido = true;
+    const erro = (campo, mensagem) => { mostrarErro(campo, mensagem); valido = false; };
+    const investimento = investimentos.find((item) => item.id === campos.investimento.value);
+    if (!investimento) erro(campos.investimento, "Selecione um investimento cadastrado.");
+    if (!validarContaTransacao(campos.conta.value)) erro(campos.conta, "Selecione uma conta cadastrada.");
+    const monetarios = [campos.valor];
+    if (tipoMovimentacao === "resgate") {
+        monetarios.push(campos.capital);
+        if (campos.baixa.value !== "") monetarios.push(campos.baixa);
+    }
+    for (const campo of monetarios) {
+        if (campo.value === "" || !valorInvestimentoValido(Number(campo.value))
+            || Number(campo.value) <= 0 || !campo.validity.valid) {
+            erro(campo, "Informe um valor positivo em centavos, dentro do limite permitido.");
+        }
+    }
+    if (!dataValida(campos.data.value) || !campos.data.validity.valid) erro(campos.data, "Selecione uma data válida.");
+    if (campos.observacoes.value.length > 500) erro(campos.observacoes, "Use até 500 caracteres.");
+    if (!valido) { focarPrimeiroErro(formMovimentacao); return; }
+    const anterior = movimentacaoEmEdicao === null ? null
+        : transacoes.find((item) => item.id === movimentacaoEmEdicao && item.tipo === tipoMovimentacao);
+    if (movimentacaoEmEdicao !== null && !anterior) {
+        mostrarToast("A movimentação em edição não está disponível.", "erro");
+        return;
+    }
+    const registro = prepararMovimentacaoInvestimento({
+        ...anterior,
+        id: anterior?.id ?? crypto.randomUUID(),
+        tipo: tipoMovimentacao,
+        nome: `${tipoMovimentacao === "aporte" ? "Aporte" : "Resgate"} - ${investimento.nome}`,
+        investimentoId: investimento.id,
+        contaId: campos.conta.value,
+        valor: Number(campos.valor.value),
+        data: campos.data.value,
+        observacoes: campos.observacoes.value.trim(),
+        ...(tipoMovimentacao === "resgate" ? {
+            capitalRetirado: Number(campos.capital.value),
+            valorRetiradoInvestimento: campos.baixa.value === "" ? null : Number(campos.baixa.value)
+        } : {})
+    });
+    const candidatos = anterior ? transacoes.map((item) => item.id === anterior.id ? registro : item)
+        : [...transacoes, registro];
+    // A persistência valida também a sequência futura completa, antes de qualquer confirmação.
+    if (!persistirColecao("transacoes", candidatos)) return;
+    transacoes = candidatos;
+    limparSelecao();
+    atualizarCategorias();
+    renderizarTransacoes(listaTransacoes, 5);
+    atualizarTabelaCompleta();
+    atualizarResumo();
+    renderizarInvestimentos();
+    fecharModalMovimentacao();
+    mostrarToast(anterior ? "Movimentação atualizada." : "Movimentação registrada.", "sucesso");
+});
+document.querySelectorAll("[data-movimentacao]").forEach((botao) => {
+    botao.addEventListener("click", () => abrirModalMovimentacao(botao.dataset.movimentacao));
+});
+document.getElementById("fechar-movimentacao").addEventListener("click", fecharModalMovimentacao);
+document.getElementById("cancelar-movimentacao").addEventListener("click", fecharModalMovimentacao);
+// Como no cadastro de investimentos, fundo e Escape não descartam o formulário.
+Object.values(camposMovimentacao).forEach((campo) => {
+    campo.addEventListener("input", () => limparErroCampo(campo));
+    campo.addEventListener("change", () => limparErroCampo(campo));
+});
 
 document.getElementById("historico-anterior").addEventListener("click", () => {
     const historico = obterHistoricoMensal(blocoHistoricoAnalises);
