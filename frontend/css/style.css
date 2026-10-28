@@ -1100,6 +1100,7 @@ td.despesa {
 .item-investimento dd { margin: 4px 0 0; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .acoes-investimento { display: flex; flex-wrap: wrap; gap: 8px; }
 #modal-investimento .modal,
+#modal-valor-investimento .modal,
 #modal-movimentacao .modal { box-sizing: border-box; width: min(calc(100% - 32px), 568px); max-height: calc(100dvh - 32px); }
 #modal-exclusao-investimento .modal-confirmacao { box-sizing: border-box; max-width: calc(100% - 32px); }
 #form-investimento textarea,
@@ -1117,6 +1118,33 @@ td.despesa {
 
 /* Movimentações reutilizam os campos e o diálogo já usados nos investimentos. */
 .acoes-movimentacoes { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+
+.totais-investimentos { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 16px; }
+#pagina-investimentos { container-type: inline-size; min-width: 0; }
+.totais-investimentos .secao-investimentos { margin-bottom: 0; min-width: 0; }
+.totais-investimentos span, .ajuda-investimentos { font-size: 13px; color: #64748b; line-height: 1.6; }
+.totais-investimentos h2 { margin: 8px 0 0; font-size: 28px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.ajuda-investimentos { margin: 12px 0 20px; }
+.item-investimento .referencia-investimento, .item-investimento .aviso-investimento,
+.item-investimento .acoes-investimento { flex-basis: 100%; }
+.item-investimento .aviso-investimento { color: #b33b3b; }
+.aviso-investimento:empty { display: none; }
+.lista-historico-investimentos { list-style: none; padding: 0; margin: 0; }
+.lista-historico-investimentos li { padding: 16px 0; border-top: 1px solid #edf0f5; overflow-wrap: anywhere; }
+.lista-historico-investimentos p { margin: 6px 0; font-size: 13px; line-height: 1.6; }
+.lista-historico-investimentos summary { cursor: pointer; font-size: 13px; }
+.confirmacao-retroativa { line-height: 1.5; }
+.modal .confirmacao-retroativa input { width: auto; margin-right: 8px; }
+#ajuda-valor-manual { color: #64748b; font-size: 13px; line-height: 1.6; }
+@container (max-width: 500px) {
+    .totais-investimentos .secao-investimentos { padding: 12px; }
+    .totais-investimentos h2 { font-size: 22px; }
+    .cabecalho-investimentos h1, .secao-investimentos h2 { overflow-wrap: anywhere; }
+    .item-investimento { padding: 12px; }
+    .item-investimento dl { margin-left: 0; min-width: 0; }
+    .item-investimento dl > div { min-width: 0; }
+    .acoes-investimento button { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+}
 
 #notificacoes {
     position: fixed;

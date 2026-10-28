@@ -323,12 +323,22 @@
                         <h1 id="titulo-investimentos">Investimentos</h1>
                         <p>Cadastre seus investimentos e mantenha os valores informados atualizados.</p>
                     </header>
+                    <div class="totais-investimentos" aria-label="Totais da carteira">
+                        <div class="secao-investimentos"><span>Capital aplicado</span><h2 id="total-capital-investimentos">Indisponível</h2></div>
+                        <div class="secao-investimentos"><span>Valor estimado</span><h2 id="total-valor-investimentos">Indisponível</h2></div>
+                    </div>
+                    <p class="ajuda-investimentos">Estimativa baseada no último valor manual e nas movimentações até hoje, sem atualização de mercado. Não compõe o saldo disponível das contas.</p>
                     <section class="secao-investimentos" aria-labelledby="titulo-lista-investimentos">
                         <div class="secao-investimentos-header">
                             <h2 id="titulo-lista-investimentos">Meus investimentos</h2>
                             <button type="button" id="novo-investimento">+ Novo investimento</button>
                         </div>
                         <div id="lista-investimentos"></div>
+                    </section>
+                    <section class="secao-investimentos" aria-labelledby="titulo-historico-investimentos">
+                        <h2 id="titulo-historico-investimentos">Movimentações de investimentos</h2>
+                        <p class="ajuda-investimentos">Perspectiva da posição: aportes aumentam (+) e resgates reduzem (−) o investimento. Inclui registros históricos e futuros; somente os elegíveis afetam os valores atuais.</p>
+                        <div id="historico-investimentos"></div>
                     </section>
                 </section>
             </main>
@@ -587,11 +597,17 @@
                     <small class="erro-campo" id="erro-valor-investimento"></small>
                 </div>
                 <div class="form-group">
-                    <label for="referencia-investimento">Data de referência</label>
+                    <label for="referencia-investimento">Data de referência do capital</label>
                     <input type="date" id="referencia-investimento" required aria-describedby="ajuda-investimento erro-referencia-investimento">
-                    <small id="ajuda-investimento">Referência do capital inicial e do valor informado. Este cadastro não movimenta suas contas.</small>
+                    <small id="ajuda-investimento">Posição consolidada ao final de cada referência. Este cadastro não movimenta suas contas.</small>
                     <small class="erro-campo" id="erro-referencia-investimento"></small>
                 </div>
+                <div class="form-group">
+                    <label for="referencia-valor-investimento">Data de referência do valor informado</label>
+                    <input type="date" id="referencia-valor-investimento" required aria-describedby="erro-referencia-valor-investimento">
+                    <small class="erro-campo" id="erro-referencia-valor-investimento"></small>
+                </div>
+                <label id="aviso-retroativo-investimento" class="confirmacao-retroativa hidden"><input type="checkbox" id="confirmar-retroativo-investimento"> Confirmo substituir a referência por uma data anterior. Todas as movimentações posteriores serão reaplicadas ao valor informado; não haverá histórico da avaliação substituída.</label>
                 <div class="form-group">
                     <label for="observacoes-investimento">Observações (opcional)</label>
                     <textarea id="observacoes-investimento" maxlength="500" rows="3" aria-describedby="ajuda-observacoes-investimento erro-observacoes-investimento"></textarea>
@@ -601,6 +617,32 @@
                 <div class="form-actions">
                     <button type="button" id="cancelar-investimento">Cancelar</button>
                     <button type="submit" id="salvar-investimento">Salvar investimento</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div id="modal-valor-investimento" class="modal-overlay hidden">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="titulo-valor-investimento" aria-describedby="ajuda-valor-manual" tabindex="-1">
+            <div class="modal-header">
+                <h2 id="titulo-valor-investimento">Atualizar valor</h2>
+                <button type="button" id="fechar-valor-investimento" class="close-modal" aria-label="Fechar atualização de valor">&#10060;</button>
+            </div>
+            <p id="ajuda-valor-manual">O valor substitui a avaliação anterior e representa a posição ao final da data informada. Movimentações dessa data não serão reaplicadas. Capital e contas não são alterados.</p>
+            <form id="form-valor-investimento" novalidate>
+                <div class="form-group">
+                    <label for="valor-manual-investimento">Valor da posição</label>
+                    <input type="number" id="valor-manual-investimento" min="0" step="0.01" required aria-describedby="erro-valor-manual-investimento">
+                    <small class="erro-campo" id="erro-valor-manual-investimento"></small>
+                </div>
+                <div class="form-group">
+                    <label for="data-valor-manual">Data do valor informado</label>
+                    <input type="date" id="data-valor-manual" required aria-describedby="erro-data-valor-manual">
+                    <small class="erro-campo" id="erro-data-valor-manual"></small>
+                </div>
+                <label id="aviso-retroativo-manual" class="confirmacao-retroativa hidden"><input type="checkbox" id="confirmar-retroativo-manual"> Confirmo substituir a referência por uma data anterior. Todas as movimentações posteriores serão reaplicadas ao novo valor; a avaliação anterior não será mantida.</label>
+                <div class="form-actions">
+                    <button type="button" id="cancelar-valor-investimento">Cancelar</button>
+                    <button type="submit">Salvar valor</button>
                 </div>
             </form>
         </div>
