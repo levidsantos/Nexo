@@ -288,7 +288,7 @@ function validarTransacao(registro) {
         && textoPreenchido(registro.nome)
         // Os vínculos são verificados depois de carregar todas as coleções.
         && textoPreenchido(registro.contaId)
-        && Number.isFinite(registro.valor) && registro.valor > 0
+        && Number.isFinite(registro.valor) && valorMonetarioValido(registro.valor) && registro.valor > 0
         && dataValida(registro.data);
     if (!baseValida) return false;
     if (!ehMovimentacaoInvestimento(registro)) {
@@ -316,8 +316,9 @@ function validarConta(registro) {
         && textoPreenchido(registro.id)
         && textoPreenchido(registro.nome)
         && ["corrente", "poupanca", "reserva", "carteira"].includes(registro.tipo)
-        && Number.isFinite(registro.saldoInicial) && registro.saldoInicial >= 0
+        && Number.isFinite(registro.saldoInicial) && valorMonetarioValido(registro.saldoInicial)
         && dataValida(registro.dataReferencia)
+        && registro.dataReferencia <= obterDataLocal()
         && typeof registro.incluirNoSaldoDisponivel === "boolean"
         && textoOpcional(registro.instituicao);
 }
@@ -333,10 +334,11 @@ function validarColecao(registros, validarRegistro) {
 }
 
 function valorInvestimentoValido(valor) {
-    if (!Number.isFinite(valor) || valor < 0) return false;
-    const centavos = converterParaCentavos(valor);
-    return Number.isSafeInteger(centavos)
-        && Math.abs(valor - centavos / 100) <= Number.EPSILON * Math.max(1, valor);
+    return Number.isFinite(valor) && valorMonetarioValido(valor);
+}
+
+function valorMonetarioValido(valor) {
+    return Number.isSafeInteger(converterParaCentavos(valor));
 }
 
 function validarInvestimento(registro) {
@@ -364,7 +366,25 @@ function obterDataLocal(data = new Date()) {
 }
 
 function converterParaCentavos(valor) {
-    return Math.round((valor + Number.EPSILON) * 100);
+    if ((typeof valor !== "number" && typeof valor !== "string")
+        || String(valor).trim() === "" || !Number.isFinite(Number(valor)) || Number(valor) < 0) return NaN;
+    // Opera sobre dígitos decimais, sem arredondar frações de centavo.
+    const lerDecimal = (texto) => {
+        const partes = /^[-+]?(\d*)(?:\.(\d*))?(?:e([-+]?\d+))?$/i.exec(texto);
+        if (!partes || !(partes[1] + (partes[2] || "")).length) return NaN;
+        let digitos = (partes[1] + (partes[2] || "")).replace(/^0+/, "");
+        if (!digitos) return 0;
+        let deslocamento = 2 + Number(partes[3] || 0) - (partes[2] || "").length;
+        const semZerosFinais = digitos.replace(/0+$/, "");
+        deslocamento += digitos.length - semZerosFinais.length;
+        digitos = semZerosFinais;
+        if (deslocamento < 0 || digitos.length + deslocamento > 16) return NaN;
+        const centavos = Number(digitos + "0".repeat(deslocamento));
+        return Number.isSafeInteger(centavos) ? centavos : NaN;
+    };
+    const centavos = lerDecimal(String(valor).trim());
+    // A entrada do formulário também precisa sobreviver ao armazenamento como Number.
+    return centavos === lerDecimal(String(Number(valor))) ? centavos : NaN;
 }
 
 function saldosIndisponiveis(motivo) {
@@ -739,7 +759,7 @@ function configurarGraficoDistribuicao(classificacoes) {
             plugins: { legend: { display: false }, tooltip: { callbacks: {
                 label: (contexto) => {
                     const item = classificacoes[contexto.dataIndex];
-                    return `${item.nome}: ${formatadorMoeda.format(item.totalCentavos / 100)} (${formatarPercentualDistribuicao(item.percentual)})`;
+                    return `${item.nome}: ${formatarCentavos(item.totalCentavos)} (${formatarPercentualDistribuicao(item.percentual)})`;
                 }
             } } }
         }
@@ -756,16 +776,23 @@ function formatarPeriodoDistribuicao(mesInicial, mesFinal) {
     return mesInicial === mesFinal ? formatar(mesInicial) : `${formatar(mesInicial)} — ${formatar(mesFinal)}`;
 }
 
+function destruirInstanciaGrafico(canvas, instancia = null) {
+    try {
+        const grafico = instancia || window.Chart?.getChart?.(canvas);
+        if (grafico) grafico.destroy();
+        return true;
+    } catch (erro) {
+        // A falha visual não pode interromper operações já persistidas.
+        return false;
+    }
+}
+
 function limparGraficoDistribuicao() {
     const canvas = document.getElementById("grafico-distribuicao");
     document.getElementById("area-distribuicao").hidden = true;
-    try {
-        const instancia = graficoDistribuicao || window.Chart?.getChart?.(canvas);
-        if (instancia) instancia.destroy();
-    } catch (erro) {
-        // O canvas permanece oculto mesmo se a biblioteca falhar durante a limpeza.
-    }
+    const instancia = graficoDistribuicao;
     graficoDistribuicao = null;
+    destruirInstanciaGrafico(canvas, instancia);
 }
 
 function atualizarDistribuicaoDespesas() {
@@ -793,7 +820,7 @@ function atualizarDistribuicaoDespesas() {
     legenda.replaceChildren();
     total.hidden = !distribuicao.disponivel;
     document.getElementById("valor-total-distribuicao").textContent = distribuicao.disponivel
-        ? formatadorMoeda.format(distribuicao.totalCentavos / 100) : "";
+        ? formatarCentavos(distribuicao.totalCentavos) : "";
     intervalo.textContent = periodo.disponivel
         ? formatarPeriodoDistribuicao(periodo.mesInicial, periodo.mesFinal) : "";
     let mensagem = !distribuicao.disponivel ? `Distribuição indisponível. ${distribuicao.motivo}`
@@ -811,7 +838,7 @@ function atualizarDistribuicaoDespesas() {
             texto.append(cor, `${item.nome}:`);
             const valor = document.createElement("span");
             valor.classList.add("valor-classificacao");
-            valor.textContent = ` ${formatadorMoeda.format(item.totalCentavos / 100)}`;
+            valor.textContent = ` ${formatarCentavos(item.totalCentavos)}`;
             const percentual = document.createElement("span");
             percentual.classList.add("percentual-classificacao");
             percentual.textContent = ` ${formatarPercentualDistribuicao(item.percentual)}`;
@@ -830,7 +857,9 @@ function atualizarDistribuicaoDespesas() {
                     graficoDistribuicao.update("none");
                     graficoDistribuicao.resize();
                 } else {
-                    graficoDistribuicao = new window.Chart(document.getElementById("grafico-distribuicao"), configuracao);
+                    const canvas = document.getElementById("grafico-distribuicao");
+                    if (!destruirInstanciaGrafico(canvas)) throw new Error("Não foi possível liberar o gráfico anterior.");
+                    graficoDistribuicao = new window.Chart(canvas, configuracao);
                 }
             } catch (erro) {
                 mensagem = "Gráfico indisponível: não foi possível renderizar a distribuição. Consulte os valores na legenda.";
@@ -869,7 +898,7 @@ function configurarGraficoHistorico(historico, compacto = false) {
             elements: { line: { borderWidth: 2, tension: 0 }, point: { radius: compacto ? 2 : 3, hoverRadius: 5 } },
             plugins: {
                 legend: { position: "bottom", labels: { usePointStyle: true, boxWidth: 8, font: { size: compacto ? 11 : 12 } } },
-                tooltip: { callbacks: { label: (contexto) => `${contexto.dataset.label}: ${formatadorMoeda.format(contexto.parsed.y)}` } }
+                tooltip: { callbacks: { label: (contexto) => `${contexto.dataset.label}: ${formatarCentavos(historico.meses[contexto.dataIndex][contexto.datasetIndex === 0 ? "receitasCentavos" : "despesasCentavos"])}` } }
             },
             scales: {
                 x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: compacto ? 3 : 6 } },
@@ -900,12 +929,15 @@ function renderizarGraficoHistorico(destino, historico) {
             const configuracao = configurarGraficoHistorico(historico, destino === "resumo");
             if (graficosHistorico[destino]) {
                 graficosHistorico[destino].data = configuracao.data;
+                // O tooltip monetário deve usar os centavos do período atualizado.
+                graficosHistorico[destino].options = configuracao.options;
                 graficosHistorico[destino].update("none");
                 graficosHistorico[destino].resize();
             } else {
+                if (!destruirInstanciaGrafico(canvas)) throw new Error("Não foi possível liberar o gráfico anterior.");
                 graficosHistorico[destino] = new window.Chart(canvas, configuracao);
             }
-            descricao.textContent = historico.meses.map((mes) => `${formatarMesHistorico(mes.mes)}: receitas ${formatadorMoeda.format(mes.receitasCentavos / 100)}, despesas ${formatadorMoeda.format(mes.despesasCentavos / 100)}.`).join(" ");
+            descricao.textContent = historico.meses.map((mes) => `${formatarMesHistorico(mes.mes)}: receitas ${formatarCentavos(mes.receitasCentavos)}, despesas ${formatarCentavos(mes.despesasCentavos)}.`).join(" ");
         } catch (erro) {
             mensagem = "Gráfico indisponível: não foi possível renderizar o histórico financeiro.";
         }
@@ -913,9 +945,9 @@ function renderizarGraficoHistorico(destino, historico) {
     if (mensagem) {
         area.hidden = true;
         // Também remove instâncias eventualmente registradas por um construtor que falhou.
-        const grafico = graficosHistorico[destino] || window.Chart?.getChart?.(canvas);
-        if (grafico) grafico.destroy();
+        const grafico = graficosHistorico[destino];
         graficosHistorico[destino] = null;
+        destruirInstanciaGrafico(canvas, grafico);
     }
     estado.textContent = mensagem;
     estado.hidden = !mensagem;
@@ -947,6 +979,7 @@ function carregarColecao(chave, validarRegistro) {
     } catch (erro) {
         colecoesBloqueadas.add(chave);
         mostrarToast(`Os dados de ${chave} estão indisponíveis: não foi possível lê-los ou validá-los. `
+            + (chave === "contas" ? "A referência do saldo deve ser válida e não posterior a hoje. " : "")
             + "O conteúdo armazenado não foi alterado. As gravações desta coleção estão bloqueadas nesta sessão.", "erro");
         return [];
     }
@@ -1071,6 +1104,16 @@ const formatadorMoeda = new Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL"
 });
+
+function formatarCentavos(centavos) {
+    if (!Number.isSafeInteger(centavos)) return "Indisponível";
+    // Evita perder o último centavo ao dividir totais elevados por 100 como Number.
+    const inteiro = BigInt(centavos);
+    const fracao = String(inteiro < 0n ? -(inteiro % 100n) : inteiro % 100n).padStart(2, "0");
+    const partes = formatadorMoeda.formatToParts(inteiro / 100n);
+    const texto = partes.map((parte) => parte.type === "fraction" ? fracao : parte.value).join("");
+    return inteiro < 0n && inteiro > -100n ? `-${texto}` : texto;
+}
 
 function renderizarTransacoes(tabelaDestino, limite=null, pesquisa="", tipo="todos", categoria="todas", dataInicial="", dataFinal="") {
     tabelaDestino.innerHTML = "";
@@ -1213,6 +1256,20 @@ function renderizarTransacoes(tabelaDestino, limite=null, pesquisa="", tipo="tod
     })
 }
 
+function calcularTotaisResumo(registros) {
+    if (!validarColecao(registros, validarTransacao)) return { receitasCentavos: null, despesasCentavos: null };
+    const totais = { receitasCentavos: 0, despesasCentavos: 0 };
+    for (const transacao of registros) {
+        if (transacao.tipo !== "receita" && transacao.tipo !== "despesa") continue;
+        const campo = transacao.tipo === "receita" ? "receitasCentavos" : "despesasCentavos";
+        if (totais[campo] === null) continue;
+        const valor = converterParaCentavos(transacao.valor);
+        const total = totais[campo] + valor;
+        totais[campo] = Number.isSafeInteger(valor) && Number.isSafeInteger(total) ? total : null;
+    }
+    return totais;
+}
+
 function atualizarResumo() {
     atualizarVisualizacoesSaldos();
     atualizarGraficosHistorico();
@@ -1223,23 +1280,9 @@ function atualizarResumo() {
         });
         return;
     }
-    const receitas = transacoes.reduce((acumulador, transacao) => {
-        if (transacao.tipo === "receita") {
-            return acumulador + transacao.valor;
-        }
-        return acumulador;
-    }, 0);
-
-    const despesas = transacoes.reduce((acumulador, transacao) => {
-        if (transacao.tipo === "despesa") {
-            return acumulador + transacao.valor;
-        }
-        return acumulador;
-    }, 0);
-
-
-    valorRecebido.textContent = formatadorMoeda.format(receitas);
-    valorDespesas.textContent = formatadorMoeda.format(despesas);
+    const { receitasCentavos, despesasCentavos } = calcularTotaisResumo(transacoes);
+    valorRecebido.textContent = formatarCentavos(receitasCentavos);
+    valorDespesas.textContent = formatarCentavos(despesasCentavos);
 }
 
 function sincronizarCheckboxes() {
@@ -1383,6 +1426,7 @@ function abrirModalConta(contaId = null) {
     campoTipoConta.value = conta ? conta.tipo : "";
     campoInstituicaoConta.value = conta ? conta.instituicao ?? "" : "";
     campoSaldoInicial.value = conta ? conta.saldoInicial : "";
+    campoDataReferencia.max = obterDataLocal();
     campoDataReferencia.value = conta ? conta.dataReferencia : obterDataLocal();
     campoIncluirNoSaldoDisponivel.checked = conta ? conta.incluirNoSaldoDisponivel : true;
     // Na edição, a opção salva prevalece sobre sugestões baseadas no tipo.
@@ -1508,7 +1552,7 @@ function renderizarContas(saldos) {
 
         const saldo = document.createElement("strong");
         saldo.textContent = saldos.disponivel
-            ? formatadorMoeda.format(saldos.saldosPorContaCentavos.get(conta.id) / 100)
+            ? formatarCentavos(saldos.saldosPorContaCentavos.get(conta.id))
             : "Saldo indisponível";
 
         const acoes = document.createElement("div");
@@ -1533,9 +1577,9 @@ function renderizarContas(saldos) {
 function atualizarVisualizacoesSaldos() {
     const saldos = obterSaldosContas();
     saldoTotalContas.textContent = saldos.disponivel
-        ? formatadorMoeda.format(saldos.saldoTotalCentavos / 100) : "Indisponível";
+        ? formatarCentavos(saldos.saldoTotalCentavos) : "Indisponível";
     valorSaldo.textContent = saldos.disponivel
-        ? formatadorMoeda.format(saldos.saldoDisponivelCentavos / 100) : "Indisponível";
+        ? formatarCentavos(saldos.saldoDisponivelCentavos) : "Indisponível";
     renderizarContas(saldos);
     renderizarContasResumo(saldos);
 }
@@ -1566,7 +1610,7 @@ function renderizarContasResumo(saldos) {
         const nome = document.createElement("span");
         nome.textContent = conta.nome;
         const saldo = document.createElement("strong");
-        saldo.textContent = formatadorMoeda.format(saldos.saldosPorContaCentavos.get(conta.id) / 100);
+        saldo.textContent = formatarCentavos(saldos.saldosPorContaCentavos.get(conta.id));
         item.append(nome, saldo);
         itens.appendChild(item);
     });
@@ -1621,13 +1665,13 @@ formConta.addEventListener("submit", (evento) => {
         mostrarErro(campoTipoConta, "Selecione um tipo de conta.");
         formularioValido = false;
     }
-    if (valorInformado === "" || !Number.isFinite(saldoInicial) || saldoInicial < 0
+    if (valorInformado === "" || !valorMonetarioValido(valorInformado)
         || !campoSaldoInicial.validity.valid) {
-        mostrarErro(campoSaldoInicial, "Informe um saldo igual ou maior que zero, em centavos.");
+        mostrarErro(campoSaldoInicial, "Informe um saldo não negativo, em centavos e dentro do limite seguro.");
         formularioValido = false;
     }
-    if (!dataValida(dataReferencia) || !campoDataReferencia.validity.valid) {
-        mostrarErro(campoDataReferencia, "Selecione uma data de referência válida.");
+    if (!dataValida(dataReferencia) || dataReferencia > obterDataLocal() || !campoDataReferencia.validity.valid) {
+        mostrarErro(campoDataReferencia, "Informe uma data válida, igual ou anterior a hoje.");
         formularioValido = false;
     }
     if (!formularioValido) {
@@ -1869,8 +1913,8 @@ formTransacao.addEventListener("submit", (enviar) => {
         mostrarErro(campoNome, "Informe o nome da transação.");
         formularioValido = false;
     }
-    if (!Number.isFinite(valor) || valor <= 0 || !campoValor.validity.valid) {
-        mostrarErro(campoValor, "Informe um valor de pelo menos R$ 0,01, em centavos.");
+    if (!valorMonetarioValido(campoValor.value) || valor <= 0 || !campoValor.validity.valid) {
+        mostrarErro(campoValor, "Informe um valor positivo, em centavos e dentro do limite seguro.");
         formularioValido = false;
     }
     if (categoria.trim() === "") {
@@ -2032,9 +2076,9 @@ function renderizarInvestimentos() {
     const acompanhamento = obterAcompanhamentoInvestimentos();
     const { capitais, valores: estimativas, totalCapitalCentavos } = acompanhamento;
     document.getElementById("total-capital-investimentos").textContent = totalCapitalCentavos === null
-        ? "Indisponível" : formatadorMoeda.format(totalCapitalCentavos / 100);
+        ? "Indisponível" : formatarCentavos(totalCapitalCentavos);
     document.getElementById("total-valor-investimentos").textContent = estimativas.disponivel
-        ? formatadorMoeda.format(estimativas.totalValorCentavos / 100) : "Indisponível";
+        ? formatarCentavos(estimativas.totalValorCentavos) : "Indisponível";
     renderizarHistoricoInvestimentos();
     const lista = document.getElementById("lista-investimentos");
     lista.replaceChildren();
@@ -2063,7 +2107,7 @@ function renderizarInvestimentos() {
             const termo = document.createElement("dt");
             termo.textContent = rotulo;
             const descricao = document.createElement("dd");
-            descricao.textContent = valor === null ? "Indisponível" : formatadorMoeda.format(valor / 100);
+            descricao.textContent = formatarCentavos(valor);
             grupo.append(termo, descricao);
             valores.appendChild(grupo);
         });
@@ -2103,7 +2147,7 @@ formInvestimento.addEventListener("submit", (evento) => {
     if (!campos.nome.value.trim()) erro(campos.nome, "Informe o nome do investimento.");
     if (!campos.tipo.value.trim()) erro(campos.tipo, "Informe o tipo do investimento ou escolha uma sugestão.");
     [campos.capital, campos.valor].forEach((campo) => {
-        if (campo.value === "" || !valorInvestimentoValido(Number(campo.value)) || !campo.validity.valid) {
+        if (campo.value === "" || !valorMonetarioValido(campo.value) || !campo.validity.valid) {
             erro(campo, "Informe um valor não negativo, em centavos e dentro do limite numérico seguro.");
         }
     });
@@ -2139,6 +2183,9 @@ formInvestimento.addEventListener("submit", (evento) => {
     if (!persistirColecao("investimentos", proximos)) return;
     investimentos = proximos;
     renderizarInvestimentos();
+    // Resolve os nomes atuais pelos IDs, preservando os registros e o estado da listagem.
+    renderizarTransacoes(listaTransacoes, 5);
+    atualizarTabelaCompleta();
     fecharModalInvestimento();
     mostrarToast(editando ? "Investimento atualizado." : "Investimento cadastrado.", "sucesso");
 });
@@ -2210,7 +2257,7 @@ formValorInvestimento.addEventListener("submit", (evento) => {
     const anterior = investimentos.find((item) => item.id === investimentoEmAtualizacao);
     if (!investimentosDisponiveis() || !anterior) return;
     let valido = true;
-    if (campoValorManual.value === "" || !valorInvestimentoValido(Number(campoValorManual.value)) || !campoValorManual.validity.valid) {
+    if (campoValorManual.value === "" || !valorMonetarioValido(campoValorManual.value) || !campoValorManual.validity.valid) {
         mostrarErro(campoValorManual, "Informe um valor não negativo, em centavos e dentro do limite seguro.");
         valido = false;
     }
@@ -2374,7 +2421,7 @@ formMovimentacao.addEventListener("submit", (evento) => {
         if (campos.baixa.value !== "") monetarios.push(campos.baixa);
     }
     for (const campo of monetarios) {
-        if (campo.value === "" || !valorInvestimentoValido(Number(campo.value))
+        if (campo.value === "" || !valorMonetarioValido(campo.value)
             || Number(campo.value) <= 0 || !campo.validity.valid) {
             erro(campo, "Informe um valor positivo em centavos, dentro do limite permitido.");
         }
