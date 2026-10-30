@@ -39,16 +39,19 @@
                 <div id="pagina-resumo" class="pagina ativa">
                     <section class="resumo">
                         <div class="card card-recebido">
-                            <span>Recebido</span>
-                            <h3 id="valor-recebido">R$ 0,00</h3>
+                            <span>Receitas registradas</span>
+                            <h3 id="valor-recebido" aria-describedby="ajuda-receitas">R$ 0,00</h3>
+                            <p id="ajuda-receitas" class="periodo-historico ajuda-indicador">Todo o histórico, inclusive datas futuras.</p>
                         </div>
                         <div class="card card-despesa">
-                            <span>Despesas</span>
-                            <h3 id="valor-despesas">R$ 0,00</h3>
+                            <span>Despesas registradas</span>
+                            <h3 id="valor-despesas" aria-describedby="ajuda-despesas">R$ 0,00</h3>
+                            <p id="ajuda-despesas" class="periodo-historico ajuda-indicador">Todo o histórico, inclusive datas futuras.</p>
                         </div>
                         <div class="card card-saldo">
                             <span>Saldo disponível</span>
-                            <h3 id="valor-saldo">R$ 0,00</h3>
+                            <h3 id="valor-saldo" aria-describedby="ajuda-saldo-disponivel">R$ 0,00</h3>
+                            <p id="ajuda-saldo-disponivel" class="periodo-historico ajuda-indicador">Contas marcadas para inclusão, até hoje.</p>
                         </div>
                     </section>
 
@@ -233,7 +236,8 @@
                         <section class="resumo-contas">
                             <div class="card-conta-resumo">
                                 <span>Saldo total</span>
-                                <h2 id="saldo-total-contas">R$ 0,00</h2>
+                                <h2 id="saldo-total-contas" aria-describedby="ajuda-saldo-total">R$ 0,00</h2>
+                                <p id="ajuda-saldo-total" class="periodo-historico ajuda-indicador">Todas as contas, até hoje.</p>
                             </div>
 
                         </section>
@@ -324,10 +328,10 @@
                         <p>Cadastre seus investimentos e mantenha os valores informados atualizados.</p>
                     </header>
                     <div class="totais-investimentos" aria-label="Totais da carteira">
-                        <div class="secao-investimentos"><span>Capital aplicado</span><h2 id="total-capital-investimentos">Indisponível</h2></div>
-                        <div class="secao-investimentos"><span>Valor estimado</span><h2 id="total-valor-investimentos">Indisponível</h2></div>
+                        <div class="secao-investimentos"><span>Capital aplicado</span><h2 id="total-capital-investimentos" aria-describedby="ajuda-capital-aplicado">Indisponível</h2><p id="ajuda-capital-aplicado" class="periodo-historico ajuda-indicador">Capital inicial e movimentações de capital após a referência, até hoje.</p></div>
+                        <div class="secao-investimentos"><span>Valor estimado</span><h2 id="total-valor-investimentos" aria-describedby="ajuda-estimativa-investimentos">Indisponível</h2></div>
                     </div>
-                    <p class="ajuda-investimentos">Estimativa baseada no último valor manual e nas movimentações até hoje, sem atualização de mercado. Não compõe o saldo disponível das contas.</p>
+                    <p id="ajuda-estimativa-investimentos" class="ajuda-investimentos">Último valor informado manualmente, ajustado pelas movimentações posteriores à referência e até hoje. Sem cotação automática; não compõe o saldo disponível das contas.</p>
                     <section class="secao-investimentos" aria-labelledby="titulo-lista-investimentos">
                         <div class="secao-investimentos-header">
                             <h2 id="titulo-lista-investimentos">Meus investimentos</h2>
@@ -388,7 +392,7 @@
                     </div>
 
                     <div class="form-group campo-classificacao">
-                        <label for="classificacao">Classificação</label>
+                        <label for="classificacao">Classificação (obrigatória para despesas)</label>
                         <select id="classificacao" name="classificacao" aria-describedby="erro-classificacao">
                             <option value="">Selecione...</option>
                             <option value="Essencial">Essencial / Necessidade</option>
@@ -507,14 +511,16 @@
                         required
                         aria-describedby="ajuda-saldo-inicial-conta erro-data-referencia-conta"
                     >
-                    <small class="ajuda-campo" id="ajuda-saldo-inicial-conta">Saldo existente ao final da data de referência. Movimentações dessa data ou anteriores já estão consideradas e não serão aplicadas novamente.</small>
+                    <small class="ajuda-campo" id="ajuda-saldo-inicial-conta">Saldo existente ao final dessa data. Movimentações dessa data ou anteriores já estão incluídas e não serão aplicadas novamente.</small>
                     <small class="erro-campo" id="erro-data-referencia-conta"></small>
                 </div>
 
                 <label class="opcao-saldo-disponivel" for="incluir-saldo-disponivel">
-                    <input type="checkbox" id="incluir-saldo-disponivel" name="incluirNoSaldoDisponivel" checked>
+                    <input type="checkbox" id="incluir-saldo-disponivel" name="incluirNoSaldoDisponivel" checked aria-describedby="ajuda-inclusao-saldo">
                     <span>Incluir no saldo disponível</span>
                 </label>
+
+                <small class="ajuda-campo" id="ajuda-inclusao-saldo">Define se esta conta entra no Saldo disponível do Resumo; o Saldo total sempre a inclui.</small>
 
                 <div class="modal-footer">
                     <button type="button" id="cancelar-modal-conta">
@@ -592,19 +598,19 @@
                     <small class="erro-campo" id="erro-capital-investimento"></small>
                 </div>
                 <div class="form-group">
-                    <label for="valor-investimento">Valor atual informado</label>
-                    <input type="number" id="valor-investimento" min="0" step="0.01" required aria-describedby="erro-valor-investimento">
+                    <label for="valor-investimento">Valor informado manualmente</label>
+                    <input type="number" id="valor-investimento" min="0" step="0.01" required aria-describedby="ajuda-investimento erro-valor-investimento">
                     <small class="erro-campo" id="erro-valor-investimento"></small>
                 </div>
                 <div class="form-group">
                     <label for="referencia-investimento">Data de referência do capital</label>
                     <input type="date" id="referencia-investimento" required aria-describedby="ajuda-investimento erro-referencia-investimento">
-                    <small id="ajuda-investimento">Posição consolidada ao final de cada referência. Este cadastro não movimenta suas contas.</small>
+                    <small id="ajuda-investimento">Informe capital e valor da posição ao final das respectivas datas de referência. O cadastro não movimenta suas contas.</small>
                     <small class="erro-campo" id="erro-referencia-investimento"></small>
                 </div>
                 <div class="form-group">
                     <label for="referencia-valor-investimento">Data de referência do valor informado</label>
-                    <input type="date" id="referencia-valor-investimento" required aria-describedby="erro-referencia-valor-investimento">
+                    <input type="date" id="referencia-valor-investimento" required aria-describedby="ajuda-investimento erro-referencia-valor-investimento">
                     <small class="erro-campo" id="erro-referencia-valor-investimento"></small>
                 </div>
                 <label id="aviso-retroativo-investimento" class="confirmacao-retroativa hidden"><input type="checkbox" id="confirmar-retroativo-investimento"> Confirmo substituir a referência por uma data anterior. Todas as movimentações posteriores serão reaplicadas ao valor informado; não haverá histórico da avaliação substituída.</label>
@@ -630,12 +636,12 @@
             <p id="ajuda-valor-manual">O valor substitui a avaliação anterior e representa a posição ao final da data informada. Movimentações dessa data não serão reaplicadas. Capital e contas não são alterados.</p>
             <form id="form-valor-investimento" novalidate>
                 <div class="form-group">
-                    <label for="valor-manual-investimento">Valor da posição</label>
+                    <label for="valor-manual-investimento">Valor informado manualmente</label>
                     <input type="number" id="valor-manual-investimento" min="0" step="0.01" required aria-describedby="erro-valor-manual-investimento">
                     <small class="erro-campo" id="erro-valor-manual-investimento"></small>
                 </div>
                 <div class="form-group">
-                    <label for="data-valor-manual">Data do valor informado</label>
+                    <label for="data-valor-manual">Data de referência do valor</label>
                     <input type="date" id="data-valor-manual" required aria-describedby="erro-data-valor-manual">
                     <small class="erro-campo" id="erro-data-valor-manual"></small>
                 </div>

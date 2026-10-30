@@ -960,6 +960,10 @@ td.despesa {
     font-size: 0.85rem;
 }
 
+.ajuda-indicador {
+    margin: 8px 0 0;
+}
+
 .texto-acessivel {
     position: absolute;
     width: 1px;

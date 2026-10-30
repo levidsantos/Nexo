@@ -99,6 +99,7 @@ addReceita.addEventListener("click", () => {
     modalTitle.textContent = "Adicionar Receita";
     botaoSalvarTransacao.textContent = "Salvar";
     campoClassificacao.classList.add("hidden");
+    selectClassificacao.required = false;
     campoPagamento.classList.add("hidden");
     tipoTransacao = "receita";
     
@@ -113,6 +114,7 @@ addDespesa.addEventListener("click", () => {
     modalTitle.textContent = "Adicionar Despesa";
     botaoSalvarTransacao.textContent = "Salvar";
     campoClassificacao.classList.remove("hidden");
+    selectClassificacao.required = true;
     campoPagamento.classList.remove("hidden");
     tipoTransacao = "despesa";
 
@@ -292,7 +294,8 @@ function validarTransacao(registro) {
         && dataValida(registro.data);
     if (!baseValida) return false;
     if (!ehMovimentacaoInvestimento(registro)) {
-        // Preserva as regras e o formato já aceitos de receitas e despesas.
+        // Na leitura e nos cálculos, preserva despesas antigas sem classificação.
+        // Novas despesas e alterações têm validação adicional na gravação.
         return textoPreenchido(registro.categoria) && textoOpcional(registro.pagamento)
             && textoOpcional(registro.classificacao);
     }
@@ -671,6 +674,22 @@ const CLASSIFICACOES_DESPESAS = Object.freeze({
     Desejo: Object.freeze({ nome: "Desejos", cor: "#9164CB" })
 });
 
+function classificacaoDespesaValida(classificacao) {
+    return typeof classificacao === "string" && Object.hasOwn(CLASSIFICACOES_DESPESAS, classificacao);
+}
+
+// Retratos dos registros carregados: não são flags nem migrações no localStorage.
+const despesasLegadasSemClassificacao = new Map(transacoes
+    .filter((registro) => registro.tipo === "despesa" && !classificacaoDespesaValida(registro.classificacao))
+    .map((registro) => [registro.id, JSON.stringify(registro)]));
+
+function validarTransacaoParaGravacao(registro) {
+    if (!validarTransacao(registro)) return false;
+    return registro.tipo !== "despesa" || classificacaoDespesaValida(registro.classificacao)
+        // A coleção inteira é gravada: apenas legados integralmente inalterados são preservados.
+        || despesasLegadasSemClassificacao.get(registro.id) === JSON.stringify(registro);
+}
+
 function distribuicaoDespesasIndisponivel(motivo) {
     return { disponivel: false, motivo, vazio: null, mesInicial: null, mesFinal: null,
         totalCentavos: null, classificacoes: null };
@@ -992,7 +1011,7 @@ function persistirColecao(chave, registros) {
         return false;
     }
     const validarRegistro = chave === "contas" ? validarConta
-        : chave === "transacoes" ? validarTransacao
+        : chave === "transacoes" ? validarTransacaoParaGravacao
         : chave === "investimentos" ? validarInvestimento : null;
     if (!validarRegistro || !validarColecao(registros, validarRegistro)) {
         mostrarToast("Não foi possível salvar: a coleção contém dados incompatíveis com o modelo atual. "
@@ -1016,7 +1035,15 @@ function persistirColecao(chave, registros) {
         }
     }
     try {
+        const legadosMantidos = chave === "transacoes" ? new Set(registros
+            .filter((registro) => despesasLegadasSemClassificacao.get(registro.id) === JSON.stringify(registro))
+            .map((registro) => registro.id)) : null;
         localStorage.setItem(chave, JSON.stringify(registros));
+        if (legadosMantidos) {
+            for (const id of despesasLegadasSemClassificacao.keys()) {
+                if (!legadosMantidos.has(id)) despesasLegadasSemClassificacao.delete(id);
+            }
+        }
         return true;
     } catch (erro) {
         mostrarToast(`Não foi possível salvar ${chave}. A alteração não foi confirmada. `
@@ -1847,9 +1874,11 @@ const transacoesRestantes = transacoes.filter((transacao) => {
         botaoSalvarTransacao.textContent = "Salvar Alterações";
 
         if (transacao.tipo === "receita") {
+            selectClassificacao.required = false;
             campoClassificacao.classList.add("hidden");
             campoPagamento.classList.add("hidden");
         } else {
+            selectClassificacao.required = true;
             campoClassificacao.classList.remove("hidden");
             campoPagamento.classList.remove("hidden");
         }
@@ -1922,6 +1951,11 @@ formTransacao.addEventListener("submit", (enviar) => {
     }
     if (categoria.trim() === "") {
         mostrarErro(campoCategoria, "Informe uma categoria.");
+        formularioValido = false;
+    }
+
+    if (tipoTransacao === "despesa" && !classificacaoDespesaValida(classificacao)) {
+        mostrarErro(selectClassificacao, "Selecione uma classificação válida para a despesa.");
         formularioValido = false;
     }
 
@@ -2104,7 +2138,7 @@ function renderizarInvestimentos() {
         const valores = document.createElement("dl");
         const posicao = estimativas.valoresPorInvestimento?.get(investimento.id);
         const capital = capitais.disponivel ? capitais.capitaisPorInvestimentoCentavos.get(investimento.id) : null;
-        [["Capital aplicado", capital], [posicao?.ajustado ? "Valor estimado" : "Valor informado",
+        [["Capital aplicado", capital], [posicao?.ajustado ? "Valor estimado" : "Valor informado manualmente",
             posicao?.disponivel ? posicao.valorCentavos : null]].forEach(([rotulo, valor]) => {
             const grupo = document.createElement("div");
             const termo = document.createElement("dt");
@@ -2116,7 +2150,8 @@ function renderizarInvestimentos() {
         });
         const referencia = document.createElement("p");
         referencia.classList.add("referencia-investimento");
-        referencia.textContent = `Último valor informado: ${formatadorMoeda.format(investimento.valorInformado)} em ${formatarDataInvestimento(investimento.dataReferenciaValor)}.`;
+        const dataAtualizacao = obterDataLocal(new Date(investimento.atualizadoEm));
+        referencia.textContent = `Valor informado manualmente: ${formatadorMoeda.format(investimento.valorInformado)} · Referência: ${formatarDataInvestimento(investimento.dataReferenciaValor)} · Atualização manual: ${formatarDataInvestimento(dataAtualizacao)}.`;
         const aviso = document.createElement("p");
         aviso.classList.add("aviso-investimento");
         aviso.textContent = posicao && !posicao.disponivel ? posicao.motivo
