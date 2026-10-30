@@ -20,7 +20,7 @@
                     <li><a href="#transacoes" data-pagina="transacoes">Transações</a></li>
                     <li><a href="#" data-pagina="contas">Contas</a></li>
                     <li><a href="#analises" data-pagina="analises">Análises</a></li>
-                    <li><a href="#" data-pagina="investimentos">Investimentos</a></li>
+                    <li><a href="#investimentos" data-pagina="investimentos">Investimentos</a></li>
                 </ul>
             </nav>
         </aside>
@@ -39,16 +39,19 @@
                 <div id="pagina-resumo" class="pagina ativa">
                     <section class="resumo">
                         <div class="card card-recebido">
-                            <span>Recebido</span>
-                            <h3 id="valor-recebido">R$ 0,00</h3>
+                            <span>Receitas registradas</span>
+                            <h3 id="valor-recebido" aria-describedby="ajuda-receitas">R$ 0,00</h3>
+                            <p id="ajuda-receitas" class="periodo-historico ajuda-indicador">Todo o histórico, inclusive datas futuras.</p>
                         </div>
                         <div class="card card-despesa">
-                            <span>Despesas</span>
-                            <h3 id="valor-despesas">R$ 0,00</h3>
+                            <span>Despesas registradas</span>
+                            <h3 id="valor-despesas" aria-describedby="ajuda-despesas">R$ 0,00</h3>
+                            <p id="ajuda-despesas" class="periodo-historico ajuda-indicador">Todo o histórico, inclusive datas futuras.</p>
                         </div>
                         <div class="card card-saldo">
                             <span>Saldo disponível</span>
-                            <h3 id="valor-saldo">R$ 0,00</h3>
+                            <h3 id="valor-saldo" aria-describedby="ajuda-saldo-disponivel">R$ 0,00</h3>
+                            <p id="ajuda-saldo-disponivel" class="periodo-historico ajuda-indicador">Contas marcadas para inclusão, até hoje.</p>
                         </div>
                     </section>
 
@@ -124,6 +127,10 @@
                 <div id="pagina-transacoes" class="pagina">
                     <div class="card">
                         <h1>Transações</h1>
+                        <div class="acoes-movimentacoes" aria-label="Movimentações de investimentos">
+                            <button type="button" data-movimentacao="aporte">+ Aporte</button>
+                            <button type="button" data-movimentacao="resgate">+ Resgate</button>
+                        </div>
                         <div class="area-pesquisa">
                             <input
                                 type="search"
@@ -136,6 +143,8 @@
                                 <option value="todos">Todas</option>
                                 <option value="receita">Receitas</option>
                                 <option value="despesa">Despesas</option>
+                                <option value="aporte">Aportes</option>
+                                <option value="resgate">Resgates</option>
                             </select>
 
                             <select id="filtro-categoria" aria-label="Filtrar por categoria">
@@ -227,7 +236,8 @@
                         <section class="resumo-contas">
                             <div class="card-conta-resumo">
                                 <span>Saldo total</span>
-                                <h2 id="saldo-total-contas">R$ 0,00</h2>
+                                <h2 id="saldo-total-contas" aria-describedby="ajuda-saldo-total">R$ 0,00</h2>
+                                <p id="ajuda-saldo-total" class="periodo-historico ajuda-indicador">Todas as contas, até hoje.</p>
                             </div>
 
                         </section>
@@ -312,6 +322,29 @@
                         </div>
                     </section>
                 </section>
+                <section id="pagina-investimentos" class="pagina" aria-labelledby="titulo-investimentos">
+                    <header class="cabecalho-investimentos">
+                        <h1 id="titulo-investimentos">Investimentos</h1>
+                        <p>Cadastre seus investimentos e mantenha os valores informados atualizados.</p>
+                    </header>
+                    <div class="totais-investimentos" aria-label="Totais da carteira">
+                        <div class="secao-investimentos"><span>Capital aplicado</span><h2 id="total-capital-investimentos" aria-describedby="ajuda-capital-aplicado">Indisponível</h2><p id="ajuda-capital-aplicado" class="periodo-historico ajuda-indicador">Capital inicial e movimentações de capital após a referência, até hoje.</p></div>
+                        <div class="secao-investimentos"><span>Valor estimado</span><h2 id="total-valor-investimentos" aria-describedby="ajuda-estimativa-investimentos">Indisponível</h2></div>
+                    </div>
+                    <p id="ajuda-estimativa-investimentos" class="ajuda-investimentos">Último valor informado manualmente, ajustado pelas movimentações posteriores à referência e até hoje. Sem cotação automática; não compõe o saldo disponível das contas.</p>
+                    <section class="secao-investimentos" aria-labelledby="titulo-lista-investimentos">
+                        <div class="secao-investimentos-header">
+                            <h2 id="titulo-lista-investimentos">Meus investimentos</h2>
+                            <button type="button" id="novo-investimento">+ Novo investimento</button>
+                        </div>
+                        <div id="lista-investimentos"></div>
+                    </section>
+                    <section class="secao-investimentos" aria-labelledby="titulo-historico-investimentos">
+                        <h2 id="titulo-historico-investimentos">Movimentações de investimentos</h2>
+                        <p class="ajuda-investimentos">Perspectiva da posição: aportes aumentam (+) e resgates reduzem (−) o investimento. Inclui registros históricos e futuros; somente os elegíveis afetam os valores atuais.</p>
+                        <div id="historico-investimentos"></div>
+                    </section>
+                </section>
             </main>
         </div>
 
@@ -359,7 +392,7 @@
                     </div>
 
                     <div class="form-group campo-classificacao">
-                        <label for="classificacao">Classificação</label>
+                        <label for="classificacao">Classificação (obrigatória para despesas)</label>
                         <select id="classificacao" name="classificacao" aria-describedby="erro-classificacao">
                             <option value="">Selecione...</option>
                             <option value="Essencial">Essencial / Necessidade</option>
@@ -478,14 +511,16 @@
                         required
                         aria-describedby="ajuda-saldo-inicial-conta erro-data-referencia-conta"
                     >
-                    <small class="ajuda-campo" id="ajuda-saldo-inicial-conta">Saldo existente ao final da data de referência. Movimentações dessa data ou anteriores já estão consideradas e não serão aplicadas novamente.</small>
+                    <small class="ajuda-campo" id="ajuda-saldo-inicial-conta">Saldo existente ao final dessa data. Movimentações dessa data ou anteriores já estão incluídas e não serão aplicadas novamente.</small>
                     <small class="erro-campo" id="erro-data-referencia-conta"></small>
                 </div>
 
                 <label class="opcao-saldo-disponivel" for="incluir-saldo-disponivel">
-                    <input type="checkbox" id="incluir-saldo-disponivel" name="incluirNoSaldoDisponivel" checked>
+                    <input type="checkbox" id="incluir-saldo-disponivel" name="incluirNoSaldoDisponivel" checked aria-describedby="ajuda-inclusao-saldo">
                     <span>Incluir no saldo disponível</span>
                 </label>
+
+                <small class="ajuda-campo" id="ajuda-inclusao-saldo">Define se esta conta entra no Saldo disponível do Resumo; o Saldo total sempre a inclui.</small>
 
                 <div class="modal-footer">
                     <button type="button" id="cancelar-modal-conta">
@@ -529,6 +564,155 @@
             <div class="acoes-confirmacao">
                 <button type="button" id="cancelar-exclusao-conta">Cancelar</button>
                 <button type="button" id="confirmar-exclusao-conta" class="btn-excluir">Sim, excluir conta</button>
+            </div>
+        </div>
+    </div>
+    <div id="modal-investimento" class="modal-overlay hidden">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="titulo-modal-investimento" tabindex="-1">
+            <div class="modal-header">
+                <h2 id="titulo-modal-investimento">Adicionar investimento</h2>
+                <button type="button" id="fechar-investimento" aria-label="Fechar modal de investimento" class="close-modal">&#10060;</button>
+            </div>
+            <form id="form-investimento" novalidate>
+                <div class="form-group">
+                    <label for="nome-investimento">Nome do investimento</label>
+                    <input id="nome-investimento" required aria-describedby="erro-nome-investimento">
+                    <small class="erro-campo" id="erro-nome-investimento"></small>
+                </div>
+                <div class="form-group">
+                    <label for="tipo-investimento">Tipo</label>
+                    <input id="tipo-investimento" list="tipos-investimento" required aria-describedby="erro-tipo-investimento">
+                    <datalist id="tipos-investimento">
+                        <option value="Renda Fixa"></option><option value="Renda Variável"></option>
+                        <option value="Ações"></option><option value="Fundos"></option><option value="ETF"></option>
+                    </datalist>
+                    <small class="erro-campo" id="erro-tipo-investimento"></small>
+                </div>
+                <div class="form-group">
+                    <label for="instituicao-investimento">Instituição (opcional)</label>
+                    <input id="instituicao-investimento">
+                </div>
+                <div class="form-group">
+                    <label for="capital-investimento">Capital aplicado inicial</label>
+                    <input type="number" id="capital-investimento" min="0" step="0.01" required aria-describedby="ajuda-investimento erro-capital-investimento">
+                    <small class="erro-campo" id="erro-capital-investimento"></small>
+                </div>
+                <div class="form-group">
+                    <label for="valor-investimento">Valor informado manualmente</label>
+                    <input type="number" id="valor-investimento" min="0" step="0.01" required aria-describedby="ajuda-investimento erro-valor-investimento">
+                    <small class="erro-campo" id="erro-valor-investimento"></small>
+                </div>
+                <div class="form-group">
+                    <label for="referencia-investimento">Data de referência do capital</label>
+                    <input type="date" id="referencia-investimento" required aria-describedby="ajuda-investimento erro-referencia-investimento">
+                    <small id="ajuda-investimento">Informe capital e valor da posição ao final das respectivas datas de referência. O cadastro não movimenta suas contas.</small>
+                    <small class="erro-campo" id="erro-referencia-investimento"></small>
+                </div>
+                <div class="form-group">
+                    <label for="referencia-valor-investimento">Data de referência do valor informado</label>
+                    <input type="date" id="referencia-valor-investimento" required aria-describedby="ajuda-investimento erro-referencia-valor-investimento">
+                    <small class="erro-campo" id="erro-referencia-valor-investimento"></small>
+                </div>
+                <label id="aviso-retroativo-investimento" class="confirmacao-retroativa hidden"><input type="checkbox" id="confirmar-retroativo-investimento"> Confirmo substituir a referência por uma data anterior. Todas as movimentações posteriores serão reaplicadas ao valor informado; não haverá histórico da avaliação substituída.</label>
+                <div class="form-group">
+                    <label for="observacoes-investimento">Observações (opcional)</label>
+                    <textarea id="observacoes-investimento" maxlength="500" rows="3" aria-describedby="ajuda-observacoes-investimento erro-observacoes-investimento"></textarea>
+                    <small id="ajuda-observacoes-investimento">Máximo de 500 caracteres.</small>
+                    <small class="erro-campo" id="erro-observacoes-investimento"></small>
+                </div>
+                <div class="form-actions">
+                    <button type="button" id="cancelar-investimento">Cancelar</button>
+                    <button type="submit" id="salvar-investimento">Salvar investimento</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div id="modal-valor-investimento" class="modal-overlay hidden">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="titulo-valor-investimento" aria-describedby="ajuda-valor-manual" tabindex="-1">
+            <div class="modal-header">
+                <h2 id="titulo-valor-investimento">Atualizar valor</h2>
+                <button type="button" id="fechar-valor-investimento" class="close-modal" aria-label="Fechar atualização de valor">&#10060;</button>
+            </div>
+            <p id="ajuda-valor-manual">O valor substitui a avaliação anterior e representa a posição ao final da data informada. Movimentações dessa data não serão reaplicadas. Capital e contas não são alterados.</p>
+            <form id="form-valor-investimento" novalidate>
+                <div class="form-group">
+                    <label for="valor-manual-investimento">Valor informado manualmente</label>
+                    <input type="number" id="valor-manual-investimento" min="0" step="0.01" required aria-describedby="erro-valor-manual-investimento">
+                    <small class="erro-campo" id="erro-valor-manual-investimento"></small>
+                </div>
+                <div class="form-group">
+                    <label for="data-valor-manual">Data de referência do valor</label>
+                    <input type="date" id="data-valor-manual" required aria-describedby="erro-data-valor-manual">
+                    <small class="erro-campo" id="erro-data-valor-manual"></small>
+                </div>
+                <label id="aviso-retroativo-manual" class="confirmacao-retroativa hidden"><input type="checkbox" id="confirmar-retroativo-manual"> Confirmo substituir a referência por uma data anterior. Todas as movimentações posteriores serão reaplicadas ao novo valor; a avaliação anterior não será mantida.</label>
+                <div class="form-actions">
+                    <button type="button" id="cancelar-valor-investimento">Cancelar</button>
+                    <button type="submit">Salvar valor</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div id="modal-movimentacao" class="modal-overlay hidden">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="titulo-modal-movimentacao" tabindex="-1">
+            <div class="modal-header">
+                <h2 id="titulo-modal-movimentacao">Adicionar aporte</h2>
+                <button type="button" id="fechar-movimentacao" class="close-modal" aria-label="Fechar movimentação">&#10060;</button>
+            </div>
+            <form id="form-movimentacao" novalidate>
+                <div class="form-group">
+                    <label for="investimento-movimentacao" id="rotulo-investimento-movimentacao">Investimento de destino</label>
+                    <select id="investimento-movimentacao" required aria-describedby="erro-investimento-movimentacao"></select>
+                    <small class="erro-campo" id="erro-investimento-movimentacao"></small>
+                </div>
+                <div class="form-group">
+                    <label for="conta-movimentacao" id="rotulo-conta-movimentacao">Conta de origem</label>
+                    <select id="conta-movimentacao" required aria-describedby="erro-conta-movimentacao"></select>
+                    <small class="erro-campo" id="erro-conta-movimentacao"></small>
+                </div>
+                <div class="form-group">
+                    <label for="valor-movimentacao" id="rotulo-valor-movimentacao">Valor do aporte</label>
+                    <input type="number" id="valor-movimentacao" min="0.01" step="0.01" required aria-describedby="erro-valor-movimentacao">
+                    <small class="erro-campo" id="erro-valor-movimentacao"></small>
+                </div>
+                <div id="campos-resgate" class="hidden">
+                    <div class="form-group">
+                        <label for="capital-movimentacao">Capital retirado</label>
+                        <input type="number" id="capital-movimentacao" min="0.01" step="0.01" aria-describedby="ajuda-capital-movimentacao erro-capital-movimentacao">
+                        <small id="ajuda-capital-movimentacao">Parcela do dinheiro originalmente aplicado que está sendo retirada; não é necessariamente o valor recebido.</small>
+                        <small class="erro-campo" id="erro-capital-movimentacao"></small>
+                    </div>
+                    <div class="form-group">
+                        <label for="baixa-movimentacao">Valor retirado do investimento (opcional)</label>
+                        <input type="number" id="baixa-movimentacao" min="0.01" step="0.01" aria-describedby="ajuda-baixa-movimentacao erro-baixa-movimentacao">
+                        <small id="ajuda-baixa-movimentacao">Preencha se impostos ou taxas fizerem a redução da posição diferir do valor recebido. Em branco, será usado o valor recebido.</small>
+                        <small class="erro-campo" id="erro-baixa-movimentacao"></small>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="data-movimentacao">Data</label>
+                    <input type="date" id="data-movimentacao" required aria-describedby="erro-data-movimentacao">
+                    <small class="erro-campo" id="erro-data-movimentacao"></small>
+                </div>
+                <div class="form-group">
+                    <label for="observacoes-movimentacao">Observações (opcional)</label>
+                    <textarea id="observacoes-movimentacao" rows="3" maxlength="500" aria-describedby="erro-observacoes-movimentacao"></textarea>
+                    <small class="erro-campo" id="erro-observacoes-movimentacao"></small>
+                </div>
+                <div class="form-actions">
+                    <button type="button" id="cancelar-movimentacao">Cancelar</button>
+                    <button type="submit" id="salvar-movimentacao">Salvar aporte</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div id="modal-exclusao-investimento" class="modal-overlay hidden">
+        <div class="modal-confirmacao" role="dialog" aria-modal="true" aria-labelledby="titulo-exclusao-investimento" aria-describedby="mensagem-exclusao-investimento" tabindex="-1">
+            <h2 id="titulo-exclusao-investimento">Excluir investimento?</h2>
+            <p id="mensagem-exclusao-investimento"></p>
+            <div class="acoes-confirmacao">
+                <button type="button" id="cancelar-exclusao-investimento">Cancelar</button>
+                <button type="button" id="confirmar-exclusao-investimento" class="btn-excluir">Sim, excluir investimento</button>
             </div>
         </div>
     </div>
