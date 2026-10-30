@@ -1,9 +1,52 @@
+/* Valores atuais: esta base não aplica uma nova paleta nem altera medidas. */
+:root {
+    /* Superfícies e textos */
+    --cor-fundo: #f3f6fb;
+    --cor-superficie: #ffffff;
+    --cor-texto: #20242a;
+    --cor-texto-inverso: #ffffff;
+    --cor-texto-auxiliar: #6b7280;
+    --cor-texto-secundario: #64748b;
+    --cor-texto-campo: #1c1427;
+    --cor-texto-controle: #26202a;
+    --cor-texto-titulo: #27202a;
+    --cor-texto-formulario: #374151;
+
+    /* Bordas e superfícies interativas */
+    --cor-superficie-interativa: #faf8fc;
+    --cor-borda: #edf0f5;
+    --cor-borda-campo: #d7d1db;
+    --cor-borda-botao: #f4f5f7;
+    --cor-borda-hover: #d5cbe1;
+
+    /* Destaque e estados semânticos */
+    --cor-destaque: #a163f1;
+    --cor-receita: #28d166;
+    --cor-sucesso: #28d166;
+    --cor-despesa: #c91f1f;
+    --cor-erro: #c0392b;
+    --cor-texto-vazio: #a894b8;
+
+    /* Elevação e foco */
+    --sombra-interativa: 0 2px 8px rgba(30, 55, 90, 0.144);
+    --sombra-foco: 0 0 0 3px rgba(161, 99, 241, 0.12);
+
+    /* Raios e espaçamentos compartilhados */
+    --raio-controle: 8px;
+    --raio-painel: 12px;
+    --raio-item: 10px;
+    --espaco-2: 8px;
+    --espaco-3: 12px;
+    --espaco-4: 16px;
+    --espaco-6: 24px;
+}
+
 body {
     margin: 0;
     font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 
     'Open Sans', 'Helvetica Neue', sans-serif;
-    background: #f3f6fb;
-    color: #20242a;
+    background: var(--cor-fundo);
+    color: var(--cor-texto);
 }
 
 .container {
@@ -28,8 +71,8 @@ body {
     flex:1;
     margin-bottom: 30px;
     padding: 15px;
-    background: #ffffff;
-    border: 1px solid #edf0f5;
+    background: var(--cor-superficie);
+    border: 1px solid var(--cor-borda);
     border-radius: 14px;
     box-shadow: 0 2px 8px rgba(30, 55, 90, 0.082);
 }
@@ -46,7 +89,7 @@ body {
     margin: 0;
     font-size: 20px;
     font-weight: 650;
-    color: #20242a;
+    color: var(--cor-texto);
 }
 
 .content {
@@ -59,8 +102,8 @@ body {
 
 .sidebar {
     padding: 0px 20px 5px 0px;
-    background: #fff;
-    border-right: 2px solid #edf0f5;
+    background: var(--cor-superficie);
+    border-right: 2px solid var(--cor-borda);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -78,16 +121,16 @@ body {
     display: block;
     position: relative;
     padding: 10px 6px;
-    border-radius: 8px;
+    border-radius: var(--raio-controle);
     text-decoration: none;
-    color: #20242a;
+    color: var(--cor-texto);
     font-weight: 500;
     transition:
         background-color 0.2s ease,
         color 0.2s ease;
 }
 .sidebar a:hover {
-    background: #ffffff;
+    background: var(--cor-superficie);
     color: #19141e;
 }
 .sidebar a.ativo {
@@ -105,7 +148,7 @@ body {
     width: 3px;
     height: 60%;
 
-    background: #a163f1;
+    background: var(--cor-destaque);
     border-radius: 0 4px 4px 0;
 
     opacity: 0;
@@ -136,23 +179,23 @@ body {
     padding: 5px 28px;
     gap: 15px;
     height: 65px;
-    background: #fff;
-    border-bottom: 2px solid #edf0f5;
+    background: var(--cor-superficie);
+    border-bottom: 2px solid var(--cor-borda);
 }
 button {
     height: 30px;
     background: transparent;
-    border: 1px solid #f4f5f7;
-    box-shadow: 0 2px 8px rgba(30, 55, 90, 0.144);
+    border: 1px solid var(--cor-borda-botao);
+    box-shadow: var(--sombra-interativa);
     font-weight: 600;
-    border-radius: 8px;
-    color: #6b7280;
+    border-radius: var(--raio-controle);
+    color: var(--cor-texto-auxiliar);
     font-size: 1rem;
     transition: background 0.2s, color 0.2s;
 }
 button:hover {
     background: #f4f1f7ef;
-    color: #26202a;
+    color: var(--cor-texto-controle);
     cursor:pointer;
 }
 /* =========================
@@ -178,17 +221,17 @@ button:hover {
 .transacoes-header a {
     text-decoration: none;
     background: transparent;
-    border: 1px solid #f4f5f7;
+    border: 1px solid var(--cor-borda-botao);
     border-radius: 7px;
-    color: #20242a;
+    color: var(--cor-texto);
     font-weight: 500;
     padding: 4px;
-    box-shadow: 0 2px 8px rgba(30, 55, 90, 0.144);
+    box-shadow: var(--sombra-interativa);
     transition: background 0.2s, color 0.2s;
 }
 .transacoes-header a:hover {
     background: #f5f3f6;
-    color: #1c1427;
+    color: var(--cor-texto-campo);
 }
 
 table {
@@ -226,7 +269,7 @@ tbody tr:hover {
     width: min(90%, 520px);
     max-height: 90vh;
     overflow-y: auto;
-    background: #fff;
+    background: var(--cor-superficie);
     border-radius: 16px;
     padding: 24px;
     box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
@@ -256,9 +299,9 @@ tbody tr:hover {
     width: 36px;
     height: 36px;
     border: none;
-    border-radius: 8px;
+    border-radius: var(--raio-controle);
     background: transparent;
-    color: #6b7280;
+    color: var(--cor-texto-auxiliar);
     font-size: 1rem;
     cursor: pointer;
     transition: background 0.2s, color 0.2s;
@@ -266,7 +309,7 @@ tbody tr:hover {
 
 .close-modal:hover {
     background: #f5f3f6;
-    color: #1c1427;
+    color: var(--cor-texto-campo);
 }
 
 /* =========================
@@ -276,12 +319,12 @@ tbody tr:hover {
 .modal form {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--espaco-2);
 }
 
 .modal label {
     margin-top: 8px;
-    color: #374151;
+    color: var(--cor-texto-formulario);
     font-size: 0.9rem;
     font-weight: 600;
 }
@@ -295,10 +338,10 @@ tbody tr:hover {
     width: 100%;
     box-sizing: border-box;
     padding: 11px 12px;
-    border: 1px solid #d7d1db;
-    border-radius: 8px;
-    background: #fff;
-    color: #1c1427;
+    border: 1px solid var(--cor-borda-campo);
+    border-radius: var(--raio-controle);
+    background: var(--cor-superficie);
+    color: var(--cor-texto-campo);
     font-size: 0.95rem;
     outline: none;
     transition: border-color 0.2s, box-shadow 0.2s;
@@ -310,13 +353,13 @@ tbody tr:hover {
 
 .modal input:focus,
 .modal select:focus {
-    border-color: #a163f1;
-    box-shadow: 0 0 0 3px rgba(161, 99, 241, 0.12);
+    border-color: var(--cor-destaque);
+    box-shadow: var(--sombra-foco);
 }
 
 .modal input.invalido:focus,
 .modal select.invalido:focus {
-    border-color: #c0392b;
+    border-color: var(--cor-erro);
     box-shadow: 0 0 0 3px rgba(192, 57, 43, 0.12);
 }
 
@@ -336,7 +379,7 @@ tbody tr:hover {
 .form-actions button {
     padding: 10px 18px;
     border: none;
-    border-radius: 8px;
+    border-radius: var(--raio-controle);
     font-size: 0.75rem;
     font-weight: 600;
     cursor: pointer;
@@ -353,8 +396,8 @@ tbody tr:hover {
 }
 
 .form-actions button[type="submit"] {
-    background: #a163f1;
-    color: #fff;
+    background: var(--cor-destaque);
+    color: var(--cor-texto-inverso);
 }
 
 .form-actions button[type="submit"]:hover {
@@ -368,14 +411,14 @@ tbody tr:hover {
 }
 .erro-campo {
     display: block;
-    color: #c0392b;
+    color: var(--cor-erro);
     font-size: 0.8rem;
     margin-top: 4px;
 }
 
 .modal input.invalido,
 .modal select.invalido {
-    border-color: #c0392b;
+    border-color: var(--cor-erro);
 }
 
 #form-conta .erro-campo:empty {
@@ -383,7 +426,7 @@ tbody tr:hover {
 }
 
 #form-conta .ajuda-campo {
-    color: #6b7280;
+    color: var(--cor-texto-auxiliar);
     font-size: 0.8rem;
     line-height: 1.5;
 }
@@ -391,7 +434,7 @@ tbody tr:hover {
 .modal .opcao-saldo-disponivel {
     display: flex;
     align-items: flex-start;
-    gap: 8px;
+    gap: var(--espaco-2);
     margin: 8px 0;
     cursor: pointer;
 }
@@ -400,7 +443,7 @@ tbody tr:hover {
     display: flex;
     justify-content: flex-end;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: var(--espaco-2);
     margin-top: 8px;
 }
 
@@ -410,11 +453,11 @@ tbody tr:hover {
     height: 16px;
     padding: 0;
     margin: 2px 0 0;
-    accent-color: #a163f1;
+    accent-color: var(--cor-destaque);
 }
 
 #incluir-saldo-disponivel:focus-visible {
-    outline: 2px solid #a163f1;
+    outline: 2px solid var(--cor-destaque);
     outline-offset: 3px;
     box-shadow: none;
 }
@@ -428,12 +471,12 @@ tbody tr:hover {
 }
 
 td.receita {
-    color: #28d166;
+    color: var(--cor-receita);
     font-weight: 600;
 }
 
 td.despesa {
-    color: #c91f1f;
+    color: var(--cor-despesa);
     font-weight: 600;
 }
 
@@ -513,9 +556,9 @@ td.despesa {
     transform: translateY(-6px);
 
     border: 1px solid #f2f4f7;
-    border-radius: 8px;
-    background-color: #ffffff;
-    box-shadow: 0 2px 8px rgba(30, 55, 90, 0.144);
+    border-radius: var(--raio-controle);
+    background-color: var(--cor-texto-inverso);
+    box-shadow: var(--sombra-interativa);
 
     transition:
         opacity 0.2s ease,
@@ -533,29 +576,29 @@ td.despesa {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
+    gap: var(--espaco-3);
     padding: 10px 14px;
 }
 
 .botoes-acoes {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--espaco-2);
 }
 .botoes-acoes button {
     padding: 7px 12px;
     font-size: 0.85rem;
     font-weight: 550;
-    border-radius: 8px;
+    border-radius: var(--raio-controle);
 }
 
 .btn-excluir {
-    background-color: #c91f1f;
+    background-color: var(--cor-despesa);
     color: #f0e7e7;
 }
 .btn-excluir:hover {
     background-color: #a91b1b;
-    color: #fff;
+    color: var(--cor-texto-inverso);
 }
 .botoes-acoes button:disabled {
     opacity: 0.4;
@@ -578,10 +621,10 @@ td.despesa {
     box-sizing: border-box;
     min-width: 0;
     padding: 11px 14px;
-    background: #faf8fc;
+    background: var(--cor-superficie-interativa);
     border: 1px solid #e7e2f0;
-    border-radius: 8px;
-    color: #26202a;
+    border-radius: var(--raio-controle);
+    color: var(--cor-texto-controle);
     font: inherit;
     font-size: 14px;
     outline: none;
@@ -635,27 +678,31 @@ td.despesa {
 /* Hover */
 .area-pesquisa input:hover,
 .area-pesquisa select:hover {
-    border-color: #d5cbe1;
+    border-color: var(--cor-borda-hover);
 }
 
 /* Foco */
 .area-pesquisa input:focus,
 .area-pesquisa select:focus {
-    background: #ffffff;
-    border-color: #a163f1;
-    box-shadow: 0 0 0 3px rgba(161, 99, 241, 0.12);
+    background: var(--cor-superficie);
+    border-color: var(--cor-destaque);
+    box-shadow: var(--sombra-foco);
 }
 
 /* Nenhum resultado */
 .area-pesquisa input.invalido {
-    border-color: #c0392b;
+    border-color: var(--cor-erro);
+}
+
+.mensagem-sem-resultados,
+.mensagem-vazia {
+    padding: 36px 16px;
+    text-align: center;
+    color: var(--cor-texto-vazio);
+    font-size: 14px;
 }
 
 .mensagem-sem-resultados {
-    padding: 36px 16px;
-    text-align: center;
-    color: #a894b8;
-    font-size: 14px;
     font-weight: 400;
 }
 /* =========================
@@ -667,7 +714,7 @@ td.despesa {
     align-items: center;
     justify-content: space-between;
     margin-top: 16px;
-    gap: 12px;
+    gap: var(--espaco-3);
 }
 
 #info-paginacao {
@@ -677,15 +724,15 @@ td.despesa {
 
 .botoes-paginacao {
     display: flex;
-    gap: 8px;
+    gap: var(--espaco-2);
 }
 
 .botoes-paginacao button {
     padding: 4px 14px;
-    background: #ffffff;
+    background: var(--cor-superficie);
     border: 1px solid #e9e2f0;
-    border-radius: 8px;
-    color: #26202a;
+    border-radius: var(--raio-controle);
+    color: var(--cor-texto-controle);
     font: inherit;
     font-size: 13px;
     font-weight: 500;
@@ -696,8 +743,8 @@ td.despesa {
 }
 
 .botoes-paginacao button:hover:not(:disabled) {
-    background: #faf8fc;
-    border-color: #d5cbe1;
+    background: var(--cor-superficie-interativa);
+    border-color: var(--cor-borda-hover);
 }
 
 .botoes-paginacao button:disabled {
@@ -711,7 +758,7 @@ td.despesa {
 .modal-confirmacao {
     width: min(90%, 420px);
     padding: 24px;
-    background-color: #fff;
+    background-color: var(--cor-texto-inverso);
     border-radius: 12px;
     box-shadow: 0 12px 35px rgba(0, 0, 0, 0.12);
 }
@@ -722,7 +769,7 @@ td.despesa {
 }
 
 .modal-confirmacao p {
-    color: #64748b;
+    color: var(--cor-texto-secundario);
     line-height: 1.6;
     margin-bottom: 24px;
 }
@@ -736,7 +783,7 @@ td.despesa {
     padding: 6px 14px;
     font-size: 0.9rem;
     font-weight: 550;
-    border-radius: 8px;
+    border-radius: var(--raio-controle);
 }
 
 /* =========================
@@ -767,7 +814,7 @@ td.despesa {
 .cabecalho-investimentos h1 {
     font-size: 24px;
     font-weight: 700;
-    color: #27202a;
+    color: var(--cor-texto-titulo);
 }
 
 .cabecalho-contas p,
@@ -781,10 +828,10 @@ td.despesa {
 
 /* Resumo */
 .card-resumo {
-    background: #ffffff;
+    background: var(--cor-superficie);
     box-shadow: 0 2px 8px rgba(73, 30, 90, 0.082);
     border: 1px solid #f2edf5;
-    border-radius: 12px;
+    border-radius: var(--raio-painel);
     padding: 10px 20px 10px 20px;
     margin-bottom: 20px;
 }
@@ -799,7 +846,7 @@ td.despesa {
 .card-conta-resumo {
     box-shadow: 0 2px 8px rgba(73, 30, 90, 0.068);
     border: 1px solid #f1edf583;
-    border-radius: 12px;
+    border-radius: var(--raio-painel);
     padding: 10px 0px 5px 20px;
 }
 
@@ -812,17 +859,17 @@ td.despesa {
     margin-top: 12px;
     font-size: 26px;
     font-weight: 600;
-    color: #26202a;
+    color: var(--cor-texto-controle);
 }
 
 /* Seções */
 
 .secao-contas,
 .secao-investimentos {
-    background: #ffffff;
+    background: var(--cor-superficie);
     box-shadow: 0 2px 8px rgba(55, 30, 90, 0.082);
     border: 1px solid #f0e5fc;
-    border-radius: 12px;
+    border-radius: var(--raio-painel);
     padding: 15px 20px 15px 20px;
     margin-bottom: 24px;
 }
@@ -832,7 +879,7 @@ td.despesa {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 16px;
+    gap: var(--espaco-4);
     margin-bottom: 20px;
 }
 
@@ -840,7 +887,7 @@ td.despesa {
 .secao-investimentos-header h2 {
     font-size: 18px;
     font-weight: 600;
-    color: #27202a;
+    color: var(--cor-texto-titulo);
 }
 
 /* Botões */
@@ -848,9 +895,9 @@ td.despesa {
 #btn-nova-conta,
 #novo-investimento {
     padding: 4px 10px;
-    background: #ffffff;
+    background: var(--cor-superficie);
     border: 1px solid #f7f1fd;
-    border-radius: 8px;
+    border-radius: var(--raio-controle);
     color: #25202a;
     font: inherit;
     font-size: 13px;
@@ -861,28 +908,23 @@ td.despesa {
 
 #btn-nova-conta:hover,
 #novo-investimento:hover {
-    background: #faf8fc;
+    background: var(--cor-superficie-interativa);
     border-color: #e0c9ff;
 }
 
 /* Estados vazios */
 
-.mensagem-vazia {
-    padding: 36px 16px;
-    text-align: center;
-    font-size: 14px;
-    color: #a894b8;
-}
+
 
 .item-conta {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 16px;
+    gap: var(--espaco-4);
 
     padding: 18px 16px;
-    border: 1px solid #edf0f5;
-    border-radius: 10px;
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio-item);
 
     margin-bottom: 10px;
 }
@@ -890,24 +932,24 @@ td.despesa {
 .item-conta h3 {
     font-size: 15px;
     font-weight: 600;
-    color: #20242a;
+    color: var(--cor-texto);
 }
 
 .item-conta p {
     font-size: 13px;
-    color: #64748b;
+    color: var(--cor-texto-secundario);
 }
 
 .item-conta strong {
     margin-left: auto;
     font-size: 16px;
-    color: #20242a;
+    color: var(--cor-texto);
 }
 
 .acoes-conta {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: var(--espaco-2);
 }
 
 .lista-contas-resumo {
@@ -945,7 +987,8 @@ td.despesa {
     margin-bottom: 16px;
 }
 
-.controles-historico button {
+.controles-historico button,
+#contas-resumo button {
     height: auto;
     min-height: 30px;
 }
@@ -956,7 +999,7 @@ td.despesa {
 }
 
 .periodo-historico {
-    color: #6b7280;
+    color: var(--cor-texto-auxiliar);
     font-size: 0.85rem;
 }
 
@@ -985,7 +1028,7 @@ td.despesa {
     width: 220px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: var(--espaco-3);
 }
 
 .filtros-distribuicao > .form-group { width: 100%; min-width: 0; }
@@ -994,7 +1037,7 @@ td.despesa {
     width: 100%;
     min-width: 0;
     flex-direction: column;
-    gap: 12px;
+    gap: var(--espaco-3);
 }
 #meses-distribuicao .form-group { min-width: 0; }
 .filtros-distribuicao label { display: block; margin-bottom: 6px; }
@@ -1003,15 +1046,15 @@ td.despesa {
     box-sizing: border-box;
     width: 100%;
     padding: 8px;
-    border: 1px solid #edf0f5;
-    border-radius: 8px;
-    background: #fff;
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio-controle);
+    background: var(--cor-superficie);
     color: inherit;
     font: inherit;
 }
 .filtros-distribuicao .invalido { border-color: #DC5252; }
 #total-distribuicao { margin: 0 244px 12px 0; }
-#total-distribuicao > span { display: block; color: #6b7280; font-size: 14px; }
+#total-distribuicao > span { display: block; color: var(--cor-texto-auxiliar); font-size: 14px; }
 #valor-total-distribuicao { display: block; margin-top: 6px; font-size: 28px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .conteudo-distribuicao {
     display: grid;
@@ -1030,12 +1073,12 @@ td.despesa {
     align-items: center;
     gap: 8px 16px;
     padding: 10px 0;
-    border-bottom: 1px solid #edf0f5;
+    border-bottom: 1px solid var(--cor-borda);
 }
 .nome-classificacao { overflow-wrap: anywhere; }
 .valor-classificacao,
 .percentual-classificacao { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.percentual-classificacao { color: #6b7280; }
+.percentual-classificacao { color: var(--cor-texto-auxiliar); }
 .cor-classificacao { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 8px; }
 
 /* Mensagens podem crescer: nesses estados os filtros voltam ao fluxo normal. */
@@ -1046,7 +1089,7 @@ td.despesa {
 }
 
 @container (max-width: 700px) {
-    .conteudo-distribuicao { grid-template-columns: minmax(0, 460px); justify-content: center; gap: 24px; }
+    .conteudo-distribuicao { grid-template-columns: minmax(0, 460px); justify-content: center; gap: var(--espaco-6); }
     .area-grafico-distribuicao { width: min(220px, 100%); height: min(220px, 100cqi); }
 }
 @container (max-width: 850px) {
@@ -1071,10 +1114,7 @@ td.despesa {
     .area-grafico-compacta { height: 200px; }
 }
 
-#contas-resumo button {
-    height: auto;
-    min-height: 30px;
-}
+
 
 .lista-contas-resumo li {
     display: flex;
@@ -1082,7 +1122,7 @@ td.despesa {
     justify-content: space-between;
     gap: 8px 16px;
     padding: 12px 0;
-    border-bottom: 1px solid #edf0f5;
+    border-bottom: 1px solid var(--cor-borda);
 }
 
 .lista-contas-resumo span,
@@ -1096,37 +1136,37 @@ td.despesa {
 ========================= */
 
 .secao-investimentos-header { flex-wrap: wrap; }
-.item-investimento { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 20px; padding: 18px 16px; border: 1px solid #edf0f5; border-radius: 10px; margin-bottom: 10px; }
+.item-investimento { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 20px; padding: 18px 16px; border: 1px solid var(--cor-borda); border-radius: var(--raio-item); margin-bottom: 10px; }
 .item-investimento h3 { margin: 0; font-size: 15px; overflow-wrap: anywhere; min-width: 0; }
-.item-investimento p { margin: 0; color: #64748b; font-size: 13px; overflow-wrap: anywhere; min-width: 0; }
+.item-investimento p { margin: 0; color: var(--cor-texto-secundario); font-size: 13px; overflow-wrap: anywhere; min-width: 0; }
 .item-investimento dl { display: flex; flex-wrap: wrap; gap: 12px 24px; margin: 0 0 0 auto; }
-.item-investimento dt { font-size: 13px; color: #6b7280; }
+.item-investimento dt { font-size: 13px; color: var(--cor-texto-auxiliar); }
 .item-investimento dd { margin: 4px 0 0; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.acoes-investimento { display: flex; flex-wrap: wrap; gap: 8px; }
+.acoes-investimento { display: flex; flex-wrap: wrap; gap: var(--espaco-2); }
 #modal-investimento .modal,
 #modal-valor-investimento .modal,
 #modal-movimentacao .modal { box-sizing: border-box; width: min(calc(100% - 32px), 568px); max-height: calc(100dvh - 32px); }
 #modal-exclusao-investimento .modal-confirmacao { box-sizing: border-box; max-width: calc(100% - 32px); }
 #form-investimento textarea,
-#form-movimentacao textarea { box-sizing: border-box; width: 100%; padding: 11px 12px; border: 1px solid #d7d1db; border-radius: 8px; background: #fff; color: #1c1427; font: inherit; resize: vertical; }
+#form-movimentacao textarea { box-sizing: border-box; width: 100%; padding: 11px 12px; border: 1px solid var(--cor-borda-campo); border-radius: var(--raio-controle); background: var(--cor-superficie); color: var(--cor-texto-campo); font: inherit; resize: vertical; }
 #form-investimento textarea:focus,
-#form-movimentacao textarea:focus { outline: 2px solid #a163f1; outline-offset: 2px; }
+#form-movimentacao textarea:focus { outline: 2px solid var(--cor-destaque); outline-offset: 2px; }
 #form-investimento textarea.invalido,
-#form-movimentacao textarea.invalido { border-color: #c0392b; }
+#form-movimentacao textarea.invalido { border-color: var(--cor-erro); }
 #form-investimento small:not(.erro-campo),
-#form-movimentacao small:not(.erro-campo) { color: #6b7280; font-size: 0.8rem; line-height: 1.5; }
+#form-movimentacao small:not(.erro-campo) { color: var(--cor-texto-auxiliar); font-size: 0.8rem; line-height: 1.5; }
 #form-investimento .erro-campo:empty,
 #form-movimentacao .erro-campo:empty { display: none; }
 #form-investimento .form-actions,
-#form-movimentacao .form-actions { flex-wrap: wrap; gap: 8px; }
+#form-movimentacao .form-actions { flex-wrap: wrap; gap: var(--espaco-2); }
 
 /* Movimentações reutilizam os campos e o diálogo já usados nos investimentos. */
-.acoes-movimentacoes { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+.acoes-movimentacoes { display: flex; flex-wrap: wrap; gap: var(--espaco-2); margin: 16px 0; }
 
-.totais-investimentos { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 16px; }
+.totais-investimentos { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: var(--espaco-4); }
 #pagina-investimentos { container-type: inline-size; min-width: 0; }
 .totais-investimentos .secao-investimentos { margin-bottom: 0; min-width: 0; }
-.totais-investimentos span, .ajuda-investimentos { font-size: 13px; color: #64748b; line-height: 1.6; }
+.totais-investimentos span, .ajuda-investimentos { font-size: 13px; color: var(--cor-texto-secundario); line-height: 1.6; }
 .totais-investimentos h2 { margin: 8px 0 0; font-size: 28px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .ajuda-investimentos { margin: 12px 0 20px; }
 .item-investimento .referencia-investimento, .item-investimento .aviso-investimento,
@@ -1134,12 +1174,12 @@ td.despesa {
 .item-investimento .aviso-investimento { color: #b33b3b; }
 .aviso-investimento:empty { display: none; }
 .lista-historico-investimentos { list-style: none; padding: 0; margin: 0; }
-.lista-historico-investimentos li { padding: 16px 0; border-top: 1px solid #edf0f5; overflow-wrap: anywhere; }
+.lista-historico-investimentos li { padding: 16px 0; border-top: 1px solid var(--cor-borda); overflow-wrap: anywhere; }
 .lista-historico-investimentos p { margin: 6px 0; font-size: 13px; line-height: 1.6; }
 .lista-historico-investimentos summary { cursor: pointer; font-size: 13px; }
 .confirmacao-retroativa { line-height: 1.5; }
 .modal .confirmacao-retroativa input { width: auto; margin-right: 8px; }
-#ajuda-valor-manual { color: #64748b; font-size: 13px; line-height: 1.6; }
+#ajuda-valor-manual { color: var(--cor-texto-secundario); font-size: 13px; line-height: 1.6; }
 @container (max-width: 500px) {
     .totais-investimentos .secao-investimentos { padding: 12px; }
     .totais-investimentos h2 { font-size: 22px; }
@@ -1182,22 +1222,22 @@ td.despesa {
 .notificacao {
     display: flex;
     align-items: flex-start;
-    gap: 12px;
+    gap: var(--espaco-3);
     padding: 14px;
-    background: #fff;
-    border: 1px solid #edf0f5;
-    border-left: 4px solid #a163f1;
-    border-radius: 10px;
-    box-shadow: 0 2px 8px rgba(30, 55, 90, 0.144);
+    background: var(--cor-superficie);
+    border: 1px solid var(--cor-borda);
+    border-left: 4px solid var(--cor-destaque);
+    border-radius: var(--raio-item);
+    box-shadow: var(--sombra-interativa);
     pointer-events: auto;
 }
 
 .notificacao-sucesso {
-    border-left-color: #28d166;
+    border-left-color: var(--cor-sucesso);
 }
 
 .notificacao-erro {
-    border-left-color: #c0392b;
+    border-left-color: var(--cor-erro);
 }
 
 .notificacao-texto {
@@ -1207,13 +1247,13 @@ td.despesa {
 }
 
 .notificacao .notificacao-titulo {
-    color: #20242a;
+    color: var(--cor-texto);
     font-size: 0.9rem;
 }
 
 .notificacao .notificacao-mensagem {
     margin: 5px 0 0;
-    color: #374151;
+    color: var(--cor-texto-formulario);
     font-size: 0.85rem;
     line-height: 1.5;
 }
@@ -1229,17 +1269,17 @@ td.despesa {
     border: none;
     background: transparent;
     box-shadow: none;
-    color: #6b7280;
+    color: var(--cor-texto-auxiliar);
     cursor: pointer;
 }
 
 .notificacao .fechar-notificacao:hover {
-    background: #faf8fc;
+    background: var(--cor-superficie-interativa);
     color: #703bb4;
 }
 
 .notificacao .fechar-notificacao:focus-visible {
-    outline: 2px solid #a163f1;
+    outline: 2px solid var(--cor-destaque);
     outline-offset: 2px;
 }
 
