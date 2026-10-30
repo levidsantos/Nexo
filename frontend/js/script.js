@@ -1122,9 +1122,12 @@ function renderizarTransacoes(tabelaDestino, limite=null, pesquisa="", tipo="tod
         return b.data.localeCompare(a.data);
     });
     const transacoesFiltradas = transacoesOrdenadas.filter((transacao) => {
+        const investimento = ehMovimentacaoInvestimento(transacao) && !colecoesBloqueadas.has("investimentos")
+            ? investimentos.find((item) => item.id === transacao.investimentoId) : null;
         const correspondePesquisa = transacao.nome
             .toLowerCase()
-            .includes(pesquisa.toLowerCase());
+            .includes(pesquisa.toLowerCase())
+            || (investimento?.nome ?? "").toLowerCase().includes(pesquisa.toLowerCase());
 
         const correspondeTipo = tipo === "todos" || transacao.tipo === tipo;
         const categoriaTransacao = ehMovimentacaoInvestimento(transacao) ? "" : transacao.categoria;
