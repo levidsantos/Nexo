@@ -55,6 +55,7 @@ const paginas = document.querySelectorAll(".pagina")
 const campoPesquisa = document.getElementById("pesquisa-transacoes");
 const filtroTipo = document.getElementById("filtro-tipo");
 const filtroCategoria = document.getElementById("filtro-categoria");
+const filtroClassificacao = document.getElementById("filtro-classificacao");
 const filtroDataInicial = document.getElementById("data-inicial");
 const filtroDataFinal = document.getElementById("data-final");
 const erroFiltroDatas = document.getElementById("erro-filtro-datas");
@@ -674,6 +675,13 @@ const CLASSIFICACOES_DESPESAS = Object.freeze({
     Desejo: Object.freeze({ nome: "Desejos", cor: "#9164CB" })
 });
 
+Object.entries(CLASSIFICACOES_DESPESAS).forEach(([id, definicao]) => {
+    const opcao = document.createElement("option");
+    opcao.value = id;
+    opcao.textContent = definicao.nome;
+    filtroClassificacao.appendChild(opcao);
+});
+
 function classificacaoDespesaValida(classificacao) {
     return typeof classificacao === "string" && Object.hasOwn(CLASSIFICACOES_DESPESAS, classificacao);
 }
@@ -897,7 +905,7 @@ function formatarMesHistorico(mes) {
 
 // As duas visualizações diferem apenas na densidade de eixos e legenda.
 function configurarGraficoHistorico(historico, compacto = false) {
-    return {
+    const configuracao = {
         type: "line",
         data: {
             labels: historico.meses.map((mes) => formatarMesHistorico(mes.mes)),
@@ -927,6 +935,21 @@ function configurarGraficoHistorico(historico, compacto = false) {
             }
         }
     };
+    if (!compacto) {
+        configuracao.options.elements.point.hitRadius = 14;
+        configuracao.options.plugins.legend.labels.color = "#62566f";
+        configuracao.options.plugins.legend.labels.padding = 20;
+        Object.assign(configuracao.options.plugins.tooltip, {
+            backgroundColor: "#302738", padding: 12, cornerRadius: 8,
+            titleFont: { size: 12 }, bodyFont: { size: 12 }
+        });
+        configuracao.options.scales.x.ticks.color = "#6d6278";
+        configuracao.options.scales.x.ticks.font = { size: 11 };
+        configuracao.options.scales.y.ticks.color = "#6d6278";
+        configuracao.options.scales.y.ticks.font = { size: 11 };
+        configuracao.options.scales.y.grid.color = "#eeeaf3";
+    }
+    return configuracao;
 }
 
 function renderizarGraficoHistorico(destino, historico) {
@@ -1142,7 +1165,7 @@ function formatarCentavos(centavos) {
     return inteiro < 0n && inteiro > -100n ? `-${texto}` : texto;
 }
 
-function renderizarTransacoes(tabelaDestino, limite=null, pesquisa="", tipo="todos", categoria="todas", dataInicial="", dataFinal="") {
+function renderizarTransacoes(tabelaDestino, limite=null, pesquisa="", tipo="todos", categoria="todas", dataInicial="", dataFinal="", classificacao="todas") {
     tabelaDestino.innerHTML = "";
     
     const transacoesOrdenadas = transacoes.toSorted((a, b) => {
@@ -1159,10 +1182,12 @@ function renderizarTransacoes(tabelaDestino, limite=null, pesquisa="", tipo="tod
         const correspondeTipo = tipo === "todos" || transacao.tipo === tipo;
         const categoriaTransacao = ehMovimentacaoInvestimento(transacao) ? "" : transacao.categoria;
         const correspondeCategoria = categoria === "todas" || categoriaTransacao.trim() === categoria.trim();
+        const correspondeClassificacao = classificacao === "todas"
+            || (transacao.tipo === "despesa" && transacao.classificacao === classificacao);
         const correspondeDataInicial = !dataInicial || transacao.data >= dataInicial;
         const correspondeDataFinal = !dataFinal || transacao.data <= dataFinal;
 
-        return correspondePesquisa && correspondeTipo && correspondeCategoria && correspondeDataInicial && correspondeDataFinal;;
+        return correspondePesquisa && correspondeTipo && correspondeCategoria && correspondeClassificacao && correspondeDataInicial && correspondeDataFinal;
     });
 
     let transacoesExibidas;
@@ -1183,6 +1208,9 @@ function renderizarTransacoes(tabelaDestino, limite=null, pesquisa="", tipo="tod
 
         // Atualiza os controles
         infoPaginacao.textContent = `Página ${paginaAtual} de ${totalPaginas}`;
+        document.getElementById("total-resultados").textContent = colecoesBloqueadas.has("transacoes")
+            ? "Dados indisponíveis"
+            : `${transacoesFiltradas.length} ${transacoesFiltradas.length === 1 ? "transação" : "transações"}`;
 
         botaoPaginaAnterior.disabled = paginaAtual === 1;
         botaoProximaPagina.disabled = paginaAtual === totalPaginas;
@@ -1205,7 +1233,7 @@ function renderizarTransacoes(tabelaDestino, limite=null, pesquisa="", tipo="tod
 
         linha.appendChild(celula);
         tabelaDestino.appendChild(linha);
-
+        if (tabelaDestino === listaTransacoesCompleta) sincronizarSelecaoPagina();
         return;
     }
 
@@ -1222,7 +1250,14 @@ function renderizarTransacoes(tabelaDestino, limite=null, pesquisa="", tipo="tod
         checkbox.setAttribute("aria-label", `Selecionar ${transacao.nome}`);
         checkbox.checked = transacoesSelecionadas.includes(transacao.id);
 
-        celulaSelecao.appendChild(checkbox);
+        if (tabelaDestino === listaTransacoesCompleta) {
+            const rotuloSelecao = document.createElement("label");
+            rotuloSelecao.className = "alvo-selecao";
+            rotuloSelecao.appendChild(checkbox);
+            celulaSelecao.appendChild(rotuloSelecao);
+        } else {
+            celulaSelecao.appendChild(checkbox);
+        }
         linha.appendChild(celulaSelecao);
 
         checkbox.addEventListener("change", () => {
@@ -1279,11 +1314,33 @@ function renderizarTransacoes(tabelaDestino, limite=null, pesquisa="", tipo="tod
         celulaValor.textContent = `${sinal}${formatadorMoeda.format(transacao.valor)}`;
         celulaValor.classList.add(transacao.tipo);
         linha.appendChild(celulaValor);
-
-
-
+        if (tabelaDestino === listaTransacoesCompleta) {
+            linha.setAttribute("role", "row");
+            const nome = document.createElement("span");
+            nome.className = "nome-transacao";
+            nome.textContent = celulaNome.textContent;
+            const tipo = document.createElement("span");
+            tipo.className = `tipo-transacao tipo-${transacao.tipo}`;
+            tipo.textContent = { receita: "Receita", despesa: "Despesa", aporte: "Aporte", resgate: "Resgate" }[transacao.tipo];
+            celulaNome.replaceChildren(nome, tipo);
+            ["selecionar", "nome", "categoria", "data", "pagamento", "classificacao", "conta", "valor"].forEach((campo, indice) => {
+                linha.children[indice].classList.add(`transacao-${campo}`);
+                linha.children[indice].setAttribute("role", "cell");
+            });
+            [[celulaCategoria, "Categoria"], [celulaPagamento, "Pagamento"], [celulaClassificacao, "Classificação"], [celulaConta, "Conta"]].forEach(([celula, rotulo]) => {
+                const texto = document.createElement("span");
+                texto.textContent = celula.textContent;
+                const label = document.createElement("span");
+                label.className = "rotulo-mobile";
+                label.textContent = rotulo;
+                label.setAttribute("aria-hidden", "true");
+                celula.replaceChildren(label, texto);
+            });
+            linha.classList.toggle("selecionada", checkbox.checked);
+        }
         tabelaDestino.appendChild(linha);
     })
+    if (tabelaDestino === listaTransacoesCompleta) sincronizarSelecaoPagina();
 }
 
 function calcularTotaisResumo(registros) {
@@ -1318,7 +1375,19 @@ function atualizarResumo() {
 function sincronizarCheckboxes() {
     document.querySelectorAll(".checkbox-transacao").forEach((checkbox) => {
         checkbox.checked = transacoesSelecionadas.includes(checkbox.value);
+        checkbox.closest("tr").classList.toggle("selecionada", checkbox.checked);
     });
+    sincronizarSelecaoPagina();
+}
+
+// O controle em lote opera apenas sobre os registros já renderizados nesta página.
+function sincronizarSelecaoPagina() {
+    const controle = document.getElementById("selecionar-pagina");
+    const caixas = [...listaTransacoesCompleta.querySelectorAll(".checkbox-transacao")];
+    const selecionadas = caixas.filter((caixa) => caixa.checked).length;
+    controle.disabled = caixas.length === 0;
+    controle.checked = caixas.length > 0 && selecionadas === caixas.length;
+    controle.indeterminate = selecionadas > 0 && selecionadas < caixas.length;
 }
 
 function limparSelecao() {
@@ -1370,24 +1439,38 @@ function navegarPara(paginaDestino) {
 
     if (!paginaSelecionada) return;
 
-    if (!paginaSelecionada.classList.contains("ativa")) {
+    const mudouPagina = !paginaSelecionada.classList.contains("ativa");
+    if (mudouPagina) {
         limparSelecao();
     }
 
-    paginas.forEach((pagina) => {
-        pagina.classList.remove("ativa");
-    });
-
-    paginaSelecionada.classList.add("ativa");
+    if (mudouPagina) {
+        paginas.forEach((pagina) => {
+            pagina.classList.remove("ativa");
+        });
+        paginaSelecionada.classList.add("ativa");
+    }
 
     linksNavegacao.forEach((link) => {
         const linkAtivo = link.dataset.pagina === paginaDestino;
 
         link.classList.toggle("ativo", linkAtivo);
+        if (link.closest("nav")) {
+            if (linkAtivo) link.setAttribute("aria-current", "page");
+            else link.removeAttribute("aria-current");
+        }
     });
     if (paginaDestino === "analises" || paginaDestino === "resumo") atualizarGraficosHistorico();
     if (paginaDestino === "analises") atualizarDistribuicaoDespesas();
     if (paginaDestino === "investimentos") renderizarInvestimentos();
+    if (mudouPagina) {
+        const titulo = paginaSelecionada.querySelector("h1");
+        if (titulo) {
+            titulo.setAttribute("tabindex", "-1");
+            titulo.focus({ preventScroll: true });
+        }
+        window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    }
 }
 
 function atualizarTabelaCompleta() {
@@ -1408,7 +1491,7 @@ function atualizarTabelaCompleta() {
         }
     });
 
-    renderizarTransacoes(listaTransacoesCompleta, null, pesquisa, tipo, categoria, dataInicial, dataFinal);
+    renderizarTransacoes(listaTransacoesCompleta, null, pesquisa, tipo, categoria, dataInicial, dataFinal, filtroClassificacao.value);
 }
 
 function atualizarCategorias() {
@@ -1599,7 +1682,17 @@ function renderizarContas(saldos) {
         excluir.setAttribute("aria-label", `Excluir conta ${conta.nome}`);
         excluir.addEventListener("click", () => solicitarExclusaoConta(conta.id));
         acoes.append(editar, excluir);
-        item.append(nome, detalhes, saldo, acoes);
+        const rotuloSaldo = document.createElement("span");
+        rotuloSaldo.className = "rotulo-saldo-conta";
+        rotuloSaldo.textContent = "Saldo atual";
+        saldo.className = "saldo-atual-conta";
+        if (saldos.disponivel && saldos.saldosPorContaCentavos.get(conta.id) < 0) saldo.classList.add("saldo-negativo");
+        const inclusao = document.createElement("p");
+        inclusao.className = "inclusao-conta";
+        inclusao.textContent = conta.incluirNoSaldoDisponivel
+            ? "Incluída no saldo disponível" : "Fora do saldo disponível";
+        if (conta.incluirNoSaldoDisponivel) inclusao.classList.add("incluida");
+        item.append(nome, detalhes, rotuloSaldo, saldo, inclusao, acoes);
         listaContas.appendChild(item);
     });
 }
@@ -1697,7 +1790,7 @@ formConta.addEventListener("submit", (evento) => {
     }
     if (valorInformado === "" || !valorMonetarioValido(valorInformado)
         || !campoSaldoInicial.validity.valid) {
-        mostrarErro(campoSaldoInicial, "Informe um saldo não negativo, em centavos e dentro do limite seguro.");
+        mostrarErro(campoSaldoInicial, "Informe um saldo zero ou positivo, com até duas casas decimais, dentro do limite permitido.");
         formularioValido = false;
     }
     if (!dataValida(dataReferencia) || dataReferencia > obterDataLocal() || !campoDataReferencia.validity.valid) {
@@ -1758,8 +1851,20 @@ botaoConfirmarExclusaoConta.addEventListener("click", () => {
 
 // evento campo de pesquisa
 campoPesquisa.addEventListener("input", aplicarFiltros); 
+document.getElementById("selecionar-pagina").addEventListener("change", (evento) => {
+    const selecionar = evento.target.checked;
+    listaTransacoesCompleta.querySelectorAll(".checkbox-transacao").forEach((caixa) => {
+        caixa.checked = selecionar;
+        caixa.dispatchEvent(new Event("change"));
+    });
+});
+document.getElementById("limpar-selecao-completa").addEventListener("click", () => {
+    limparSelecao();
+    document.getElementById("selecionar-pagina").focus();
+});
 filtroTipo.addEventListener("change", aplicarFiltros);
 filtroCategoria.addEventListener("change", aplicarFiltros);
+filtroClassificacao.addEventListener("change", aplicarFiltros);
 filtroDataInicial.addEventListener("change", aplicarFiltros);
 filtroDataFinal.addEventListener("change", aplicarFiltros);
 
@@ -1767,6 +1872,7 @@ botaoLimparFiltros.addEventListener("click", () => {
     campoPesquisa.value = "";
     filtroTipo.value = "todos";
     filtroCategoria.value = "todas";
+    filtroClassificacao.value = "todas";
 
     filtroDataInicial.value = "";
     filtroDataFinal.value = "";
@@ -1806,6 +1912,9 @@ camposFormulario.forEach((campo) => {
     campo.addEventListener("input", () => {
         limparErroCampo(campo);
     });
+});
+selectClassificacao.addEventListener("change", () => {
+    if (classificacaoDespesaValida(selectClassificacao.value)) limparErroCampo(selectClassificacao);
 });
 [botaoExcluir, botaoExcluirCompleta].forEach((botao) => { 
     botao.addEventListener("click", () => {
@@ -1946,7 +2055,7 @@ formTransacao.addEventListener("submit", (enviar) => {
         formularioValido = false;
     }
     if (!valorMonetarioValido(campoValor.value) || valor <= 0 || !campoValor.validity.valid) {
-        mostrarErro(campoValor, "Informe um valor positivo, em centavos e dentro do limite seguro.");
+        mostrarErro(campoValor, "Informe um valor maior que zero, com até duas casas decimais, dentro do limite permitido.");
         formularioValido = false;
     }
     if (categoria.trim() === "") {
@@ -2151,7 +2260,7 @@ function renderizarInvestimentos() {
         const referencia = document.createElement("p");
         referencia.classList.add("referencia-investimento");
         const dataAtualizacao = obterDataLocal(new Date(investimento.atualizadoEm));
-        referencia.textContent = `Valor informado manualmente: ${formatadorMoeda.format(investimento.valorInformado)} · Referência: ${formatarDataInvestimento(investimento.dataReferenciaValor)} · Atualização manual: ${formatarDataInvestimento(dataAtualizacao)}.`;
+        referencia.textContent = `Referência do capital: ${formatarDataInvestimento(investimento.dataReferenciaCapital)} · Valor informado manualmente: ${formatadorMoeda.format(investimento.valorInformado)} · Referência do valor: ${formatarDataInvestimento(investimento.dataReferenciaValor)} · Atualização manual: ${formatarDataInvestimento(dataAtualizacao)}.`;
         const aviso = document.createElement("p");
         aviso.classList.add("aviso-investimento");
         aviso.textContent = posicao && !posicao.disponivel ? posicao.motivo
@@ -2170,7 +2279,17 @@ function renderizarInvestimentos() {
             botao.addEventListener("click", () => acao(investimento.id));
             acoes.appendChild(botao);
         });
-        item.append(nome, detalhes, valores, referencia, aviso, acoes);
+        const identidade = document.createElement("header");
+        identidade.className = "identidade-investimento";
+        identidade.append(nome, detalhes);
+        item.append(identidade, valores, referencia);
+        if (investimento.observacoes) {
+            const nota = document.createElement("p");
+            nota.className = "nota-investimento";
+            nota.textContent = investimento.observacoes;
+            item.appendChild(nota);
+        }
+        item.append(aviso, acoes);
         lista.appendChild(item);
     });
 }
@@ -2186,7 +2305,7 @@ formInvestimento.addEventListener("submit", (evento) => {
     if (!campos.tipo.value.trim()) erro(campos.tipo, "Informe o tipo do investimento ou escolha uma sugestão.");
     [campos.capital, campos.valor].forEach((campo) => {
         if (campo.value === "" || !valorMonetarioValido(campo.value) || !campo.validity.valid) {
-            erro(campo, "Informe um valor não negativo, em centavos e dentro do limite numérico seguro.");
+            erro(campo, "Informe um valor zero ou positivo, com até duas casas decimais, dentro do limite permitido.");
         }
     });
     const referencia = campos.referencia.value;
@@ -2296,7 +2415,7 @@ formValorInvestimento.addEventListener("submit", (evento) => {
     if (!investimentosDisponiveis() || !anterior) return;
     let valido = true;
     if (campoValorManual.value === "" || !valorMonetarioValido(campoValorManual.value) || !campoValorManual.validity.valid) {
-        mostrarErro(campoValorManual, "Informe um valor não negativo, em centavos e dentro do limite seguro.");
+        mostrarErro(campoValorManual, "Informe um valor zero ou positivo, com até duas casas decimais, dentro do limite permitido.");
         valido = false;
     }
     const data = campoDataValorManual.value;
@@ -2353,10 +2472,12 @@ function renderizarHistoricoInvestimentos() {
         const conta = contas.find((registro) => registro.id === movimento.contaId);
         const resgate = movimento.tipo === "resgate";
         const titulo = document.createElement("strong");
+        item.classList.add(resgate ? "movimento-resgate" : "movimento-aporte");
         titulo.textContent = `${resgate ? "Resgate" : "Aporte"} · ${investimento.nome}`;
         const contexto = document.createElement("p");
         contexto.textContent = `${formatarDataInvestimento(movimento.data)} · ${conta.nome}${movimento.data > obterDataLocal() ? " · Data futura" : ""}`;
         const valor = document.createElement("p");
+        valor.className = "valor-movimento-investimento";
         valor.textContent = resgate
             ? `−${formatadorMoeda.format(movimento.valorRetiradoInvestimento)} da posição · Recebido na conta: ${formatadorMoeda.format(movimento.valor)}`
             : `+${formatadorMoeda.format(movimento.valor)} na posição`;
@@ -2461,7 +2582,7 @@ formMovimentacao.addEventListener("submit", (evento) => {
     for (const campo of monetarios) {
         if (campo.value === "" || !valorMonetarioValido(campo.value)
             || Number(campo.value) <= 0 || !campo.validity.valid) {
-            erro(campo, "Informe um valor positivo em centavos, dentro do limite permitido.");
+            erro(campo, "Informe um valor maior que zero, com até duas casas decimais, dentro do limite permitido.");
         }
     }
     if (!dataValida(campos.data.value) || !campos.data.validity.valid) erro(campos.data, "Selecione uma data válida.");

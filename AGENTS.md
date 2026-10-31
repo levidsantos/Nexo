@@ -9,16 +9,23 @@ Este documento descreve decisões e o estado conhecido do projeto, mas pode esta
 ## Tecnologias e estrutura conhecida
 - Frontend: HTML, CSS e JavaScript puro, sem framework.
 - Gráficos: Chart.js 4.5.1, carregado por CDN com versão fixa, antes do script da aplicação; sem ferramentas de build.
-- Persistência atual: `localStorage`.
+- Persistência atual: `localStorage`, nas coleções separadas `contas`, `transacoes` e `investimentos`; os vínculos são verificados depois da leitura das coleções.
 - Arquivos principais conhecidos: `frontend/index.html`, `frontend/css/style.css` e `frontend/js/script.js`. Confirme a estrutura real.
-- Versionamento: Git/GitHub. A branch de trabalho do frontend é `frontend`.
+- Versionamento: Git/GitHub. O redesign base está na branch `experiment/nexo-ui-redesign`; confirmar a branch atual antes de atuar e não trocá-la sem autorização.
 - Backend futuro: Java, Spring Boot e SQL; não introduzir backend nesta fase sem solicitação.
 
 ## Estado conhecido da implementação
 As funcionalidades abaixo foram verificadas no frontend. **Decisões de produto** registra as regras que devem ser preservadas; os recursos pendentes estão em **Limites de escopo e pendências**.
 
+### Estrutura visual e navegação
+- As cinco páginas (Resumo, Transações, Contas, Análises e Investimentos) são seções `.pagina` no mesmo HTML. `navegarPara()` alterna a classe `ativa` usando links com `data-pagina`, sem recarregar o documento; não há roteador nem gerenciamento próprio do histórico do navegador.
+- A mesma navegação aparece como sidebar no desktop e barra inferior fixa até 850 px, com reserva de espaço no conteúdo e suporte às áreas seguras do dispositivo. O destino ativo usa `aria-current="page"`.
+- Trocar efetivamente de seção limpa a seleção, posiciona a janela no topo e foca o `h1` com `tabindex="-1"`. Reativar a seção atual não executa esses efeitos; filtros e paginação permanecem entre seções.
+- A base visual clara com detalhes roxos está ativa por `body.experimento-visual`. O CSS mantém os tokens de `:root`, os tokens `--exp-*` e regras específicas por página sobre os estilos anteriores; preservar a cascata ao alterar estilos compartilhados.
+- Cabeçalhos, cards, indicadores, controles, barras de seleção, modais e toasts reutilizam padrões existentes. A listagem completa de Transações se adapta a registros empilhados no mobile; os modais têm áreas internas roláveis e ações separadas. A tabela recente do Resumo ainda usa rolagem horizontal em telas estreitas.
+
 ### Resumo
-- Os cards de receitas e despesas mostram os totais históricos de transações. O card **Saldo disponível** usa os saldos atuais das contas marcadas para inclusão.
+- Os cards **Receitas registradas** e **Despesas registradas** mostram os totais históricos, inclusive transações futuras, somente dos tipos receita e despesa. A acumulação usa centavos seguros; estouro de limite torna o resultado indisponível. O card **Saldo disponível** usa os saldos atuais das contas marcadas para inclusão, até hoje; os textos de ajuda explicitam essa diferença.
 - Tabela de transações recentes, limitada a cinco registros.
 - Botões para adicionar receita e despesa; modal com validações.
 - Lista compacta de até três contas com nomes e saldos atuais, com acesso à página Contas. Sem contas, há um botão para cadastrar a primeira usando o modal existente; dados indisponíveis têm mensagem própria.
@@ -36,28 +43,42 @@ As funcionalidades abaixo foram verificadas no frontend. **Decisões de produto*
 - As análises usam transações completas, sem depender de busca, seleção ou paginação e sem aplicar a referência de saldo das contas. Resultados são derivados, não persistidos, e os registros originais não são modificados; valores e totais fora dos limites seguros em centavos retornam erro.
 - Estados vazios, períodos inválidos, dados indisponíveis e falha do Chart.js têm mensagens próprias; gráficos antigos são removidos quando deixam de ser válidos. Na distribuição, total e legenda válidos continuam disponíveis se apenas a biblioteca falhar; erros de dados não são apresentados como zeros.
 - Gráficos são atualizados após criação, edição e exclusão de transações persistidas, na inicialização, ao navegar às páginas relevantes, em `pageshow` e ao retornar à aba. O bloco do histórico é mantido enquanto válido (limitado aos blocos disponíveis); o filtro da distribuição permanece entre seções, sem persistência no `localStorage`. Alterar esse filtro não atualiza o histórico.
-- Canvases possuem nomes e descrições acessíveis; o histórico tem alternativa textual dos valores e a distribuição tem legenda visível. Controles usam elementos nativos, mensagens por campo e `aria-invalid`. Há ajustes responsivos por largura útil do card, preservando as limitações gerais da sidebar.
+- Canvases possuem nomes e descrições acessíveis; o histórico tem alternativa textual dos valores e a distribuição tem legenda visível. Controles usam elementos nativos, mensagens por campo e `aria-invalid`. Há ajustes responsivos nos cards, gráficos e filtros, além da navegação inferior mobile.
 
 ### Transações
-- CRUD de receitas e despesas com IDs UUID e persistência local.
-- Modal compartilhado para criação/edição; campos condicionais conforme o tipo.
+- CRUD dos tipos `receita`, `despesa`, `aporte` e `resgate`, com IDs UUID gerados na criação e persistência local. Receitas/despesas compartilham um modal; aportes/resgates usam o modal próprio de movimentações.
 - Seleção de registros, barra contextual, edição de um registro e exclusão com confirmação.
-- Página de listagem completa, busca por nome, filtros por tipo, categoria e datas, e paginação.
+- Página de listagem completa com oito registros por página, busca pelo nome armazenado e pelo nome atual do investimento vinculado, filtros combináveis por tipo, categoria, classificação e datas. Classificação específica retorna somente despesas correspondentes; Limpar filtros restaura todos os controles.
+- O checkbox **Selecionar transações desta página** atua apenas nos registros renderizados, com estado parcial; filtros e mudanças de página limpam a seleção. A seleção individual permanece sincronizada entre as duas tabelas.
 - Navegação entre páginas via `data-pagina`, com destaque da página ativa.
 - As duas tabelas devem permanecer sincronizadas após operações.
 - O formulário exige uma conta cadastrada e lista as contas reais. As transações usam `contaId`; os nomes exibidos são resolvidos pelo ID, preservando vínculos após renomear contas.
+- Novas despesas e edições exigem classificação válida no formulário e na persistência. Despesas antigas sem classificação válida podem ser lidas e preservadas integralmente inalteradas em operações não relacionadas; editá-las exige corrigir o campo. Selecionar uma classificação válida limpa seu erro e `aria-invalid`, sem dispensar a validação no envio.
 
 ### Contas
-- Cadastro e edição compartilham o modal com nome, tipo, instituição opcional, `saldoInicial` não negativo, `dataReferencia` válida e `incluirNoSaldoDisponivel` booleano. A edição preserva o ID UUID original.
+- Cadastro e edição compartilham o modal com nome, tipo, instituição opcional, `saldoInicial` não negativo, `dataReferencia` válida e não posterior ao dia local atual, e `incluirNoSaldoDisponivel` booleano. A edição preserva o ID UUID original. Referências futuras já armazenadas bloqueiam a coleção, sem alteração automática.
 - Tipos suportados: conta corrente (`corrente`), poupança (`poupanca`), reserva (`reserva`) e carteira física (`carteira`).
 - Exclusão com confirmação própria, permitida somente sem transações vinculadas ao ID. Vínculos históricos ou futuros também bloqueiam a exclusão; dados de transações indisponíveis impedem confirmar a ausência de vínculos. A regra é verificada ao abrir e ao confirmar a exclusão.
 - A página mostra o saldo atual individual e o **Saldo total** de todas as contas, mantendo ações de edição e exclusão. Cartões e crédito disponível foram removidos da interface.
 - Contas e transações são coleções separadas no `localStorage`, com validação dos registros e dos vínculos após carregar ambas.
 
+### Investimentos
+- Cadastro, edição e exclusão protegida, com nome e tipo obrigatórios (sugestões e entrada livre), instituição e observações opcionais, `capitalInicial` e `valorInformado` não negativos, inclusive zero. O valor informado pode ser inferior ao capital; observações têm limite de 500 caracteres.
+- `dataReferenciaCapital` e `dataReferenciaValor` são independentes, válidas e não posteriores a hoje. Representam bases ao final de cada data; `atualizadoEm` registra a última atualização manual do valor em ISO. Retroceder a referência do valor na edição ou atualização manual exige confirmação explícita, substitui a avaliação anterior e reaplica movimentos posteriores; não há histórico de avaliações manuais.
+- Aportes e resgates são registros únicos em `transacoes`, associados por `contaId` e `investimentoId`, exibidos na listagem central e no histórico dos investimentos. Aporte reduz a conta e aumenta o investimento. Resgate aumenta a conta pelo `valor` recebido, reduz o capital por `capitalRetirado` e a posição por `valorRetiradoInvestimento` (se omitido no formulário, assume o recebido). Esses valores são positivos e podem ser distintos.
+- `calcularCapitaisAplicados()` deriva o capital a partir da base e dos aportes/resgates posteriores à referência do capital; apresenta a posição até hoje e valida também os fechamentos diários futuros para impedir capital negativo ou fora dos limites seguros.
+- `calcularValoresInvestimentos()` deriva o valor estimado do último `valorInformado`, somando aportes e subtraindo baixas da posição posteriores à referência do valor e até hoje. Não há cotação, juros ou rentabilidade automáticos; estimativas negativas ou fora do limite ficam indisponíveis, sem ajuste silencioso.
+- A página apresenta totais de capital e valor estimado, cards com valores individuais, referências, atualização manual, observações e ações, além do histórico de aportes/resgates (inclusive históricos e futuros). Valores derivados não são persistidos nem integram diretamente o Saldo disponível das contas.
+- Excluir investimento exige ausência de aportes/resgates vinculados, inclusive históricos/futuros, e transações disponíveis; a condição é verificada ao solicitar e confirmar. Renomear resolve a apresentação e a busca pelo ID, sem regravar nomes nas transações.
+- A despesa de classificação `Investimento` continua sendo despesa: não cria investimento/aporte nem é convertida automaticamente. Aportes/resgates ficam fora dos totais de receitas/despesas e dos gráficos atuais.
+
 ### Validação, acessibilidade e persistência
 - Formulários com mensagens por campo, foco no primeiro erro e limpeza de erros; modais com semântica de diálogo, controle de foco e `inert` no conteúdo ao fundo.
+- Formulários usam `novalidate` e validam explicitamente campos e restrições nativas. Os diálogos controlam Tab e restauram o foco ao fechar. Fundo/Escape não descartam formulários; confirmações de exclusão podem ser canceladas por esses meios. Preservar os padrões de fechamento e a rolagem interna.
+- Valores monetários devem ser finitos, ter no máximo duas casas decimais e conversão segura para centavos inteiros, inclusive após serialização como número. `converterParaCentavos()` centraliza essa regra, sem arredondamento silencioso; registros e formulários compartilham a validação. Mensagens dos campos orientam valores em reais com até duas casas decimais, respeitando positivos ou não negativos conforme o campo.
 - Leitura e gravação protegidas do `localStorage`, validação de registros e bloqueio de coleções inválidas, com indicação de dados indisponíveis.
 - Notificações toast para feedback geral; preservar mensagens de validação nos campos e estados persistentes nas páginas.
+- Toasts de sucesso/informação expiram em aproximadamente quatro segundos; erros permanecem até fechar. Há botão de fechamento, prevenção de duplicados, fila e limite de três visíveis, anúncios acessíveis e posicionamento fixo inclusive dentro dos modais.
 - JSON inválido, coleções que não sejam arrays, registros inválidos ou IDs repetidos bloqueiam a coleção. Vínculos inválidos tornam as transações indisponíveis; não corrigir, excluir ou reassociar registros automaticamente.
 - Saldos indisponíveis não devem ser exibidos como zero ou como resultados parciais confiáveis. Falhas de gravação mantêm dados anteriores, campos preenchidos e modais abertos; sucesso só é comunicado após persistir.
 
@@ -67,7 +88,7 @@ As funcionalidades abaixo foram verificadas no frontend. **Decisões de produto*
 
 ### Contas e cálculo de saldos
 - Saldo inicial e data de referência são editáveis; o saldo inicial representa o dinheiro existente **ao final** dessa data.
-- Calcular `saldoAtual = saldoInicial + receitas vinculadas - despesas vinculadas`, considerando somente transações com `data > dataReferencia` e `data <= hoje` (dia atual local).
+- Calcular `saldoAtual = saldoInicial + receitas + resgates recebidos - despesas - aportes`, vinculados à conta e considerando somente transações com `data > dataReferencia` e `data <= hoje` (dia atual local). Cadastrar capital/valor inicial de investimento não desconta novamente da conta.
 - Transações anteriores ou iguais à referência permanecem no histórico, mas não alteram o saldo atual. Recalcular após mudanças na conta ou nas transações, sem depender dos filtros ou da paginação.
 - O saldo calculado pode ser negativo. Não persistir um `saldoAtual` separado no `localStorage` nem implementar ajustes manuais de saldo separados nesta etapa.
 - `calcularSaldos()` centraliza as operações em centavos inteiros, valida limites numéricos seguros e não modifica os objetos recebidos. `obterSaldosContas()` respeita as coleções bloqueadas; `atualizarVisualizacoesSaldos()` compartilha o resultado com Contas e Resumo.
@@ -89,8 +110,9 @@ As funcionalidades abaixo foram verificadas no frontend. **Decisões de produto*
 - Limite de cartão de crédito não é dinheiro disponível na conta e não deve ser somado aos saldos.
 - Transferências permanecem fora do escopo desta etapa.
 - Não há integração bancária automática nem mecanismo independente de agendamento; datas futuras são registros normais, sujeitos às regras de cálculo acima.
-- Responsividade geral e modo escuro continuam pendentes. Existem ajustes responsivos pontuais, mas a navegação lateral ainda comprime o conteúdo em telas pequenas.
+- O redesign base das cinco páginas possui adaptação responsiva e navegação inferior mobile. Refinamentos de densidade, tabelas e ações em telas pequenas continuam pendentes; modo escuro não foi implementado.
 - Não há projeções financeiras: os gráficos mostram somente o histórico até a data local atual. Não presumir implementações de cartões, faturas, parcelamentos ou cálculo de limites de crédito.
+- Próximos refinamentos (não implementados nesta rodada): valores das transações recentes no Resumo mobile, hierarquia das ações de Investimentos, apresentação das referências, possível barra contextual mobile, gráficos, microcopy e consistência visual. Avaliar referências de outros aplicativos; modularização de CSS/JS fica para etapa posterior, sem misturar com correções pontuais.
 
 ### Segurança da persistência
 - Preservar validações, tratamento de erros e toasts. Confirmar a gravação antes de alterar memória ou interface como se a operação tivesse sido concluída; em caso de falha, preservar formulários e modais abertos.
