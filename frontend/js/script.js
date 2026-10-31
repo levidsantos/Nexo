@@ -1314,6 +1314,27 @@ function renderizarTransacoes(tabelaDestino, limite=null, pesquisa="", tipo="tod
         celulaValor.textContent = `${sinal}${formatadorMoeda.format(transacao.valor)}`;
         celulaValor.classList.add(transacao.tipo);
         linha.appendChild(celulaValor);
+        if (tabelaDestino === listaTransacoes) {
+            linha.setAttribute("role", "row");
+            ["selecao", "nome", "categoria", "data", "pagamento", "classificacao", "conta", "valor"].forEach((campo, indice) => {
+                linha.children[indice].classList.add(`recente-${campo}`);
+                linha.children[indice].setAttribute("role", "cell");
+            });
+            const rotuloSelecao = document.createElement("label");
+            rotuloSelecao.className = "selecao-recente";
+            rotuloSelecao.appendChild(checkbox);
+            celulaSelecao.appendChild(rotuloSelecao);
+
+            const categoriaDesktop = document.createElement("span");
+            categoriaDesktop.className = "categoria-recente-desktop";
+            categoriaDesktop.textContent = celulaCategoria.textContent;
+            const contexto = document.createElement("span");
+            contexto.className = "contexto-recente";
+            const tipo = { receita: "Receita", despesa: "Despesa", aporte: "Aporte", resgate: "Resgate" }[transacao.tipo];
+            const complemento = ehMovimentacaoInvestimento(transacao) ? celulaConta.textContent : transacao.categoria;
+            contexto.textContent = `${tipo} · ${complemento}`;
+            celulaCategoria.replaceChildren(categoriaDesktop, contexto);
+        }
         if (tabelaDestino === listaTransacoesCompleta) {
             linha.setAttribute("role", "row");
             const nome = document.createElement("span");
