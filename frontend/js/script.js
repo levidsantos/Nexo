@@ -1357,6 +1357,37 @@ function renderizarTransacoes(tabelaDestino, limite=null, pesquisa="", tipo="tod
                 label.setAttribute("aria-hidden", "true");
                 celula.replaceChildren(label, texto);
             });
+            // A tabela desktop permanece completa; no mobile, agrupa apenas os dados aplicáveis.
+            const complementos = document.createElement("div");
+            complementos.className = "complementos-mobile";
+            const movimentacao = ehMovimentacaoInvestimento(transacao);
+            const dados = movimentacao
+                ? [[transacao.tipo === "aporte" ? "Origem" : "Destino", celulaConta.lastChild.textContent],
+                    ["Investimento", investimento?.nome ?? "Investimento indisponível"]]
+                : [["Categoria", transacao.categoria], ["Conta", celulaConta.lastChild.textContent]];
+            if (transacao.tipo === "despesa") {
+                dados.push(["Classificação", transacao.classificacao], ["Pagamento", transacao.pagamento]);
+            }
+            dados.forEach(([rotulo, valor]) => {
+                if (typeof valor !== "string" || !valor.trim() || valor.trim() === "-") return;
+                const detalhe = document.createElement("span");
+                const label = document.createElement("span");
+                label.className = "rotulo-complemento";
+                label.textContent = `${rotulo}: `;
+                detalhe.append(label, document.createTextNode(valor));
+                complementos.appendChild(detalhe);
+            });
+            celulaCategoria.appendChild(complementos);
+            const tipoData = document.createElement("span");
+            tipoData.className = "tipo-data-mobile";
+            tipoData.textContent = `${tipo.textContent} · `;
+            celulaData.prepend(tipoData);
+            if (transacao.tipo === "resgate") {
+                const recebido = document.createElement("span");
+                recebido.className = "recebido-mobile";
+                recebido.textContent = "Recebido na conta";
+                celulaValor.appendChild(recebido);
+            }
             linha.classList.toggle("selecionada", checkbox.checked);
         }
         tabelaDestino.appendChild(linha);

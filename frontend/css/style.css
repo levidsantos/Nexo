@@ -1956,3 +1956,33 @@ td.despesa {
     #pagina-resumo #lista-transacoes .recente-data { grid-row: 3; }
     #pagina-resumo #lista-transacoes .recente-selecao { grid-row: 1 / 4; }
 }
+
+/* Transações mobile: dados aplicáveis agrupados, sem linhas vazias por tipo. */
+#pagina-transacoes :is(.complementos-mobile, .tipo-data-mobile, .recebido-mobile) { display: none; }
+@media (max-width: 850px) {
+    #pagina-transacoes thead, #pagina-transacoes thead :is(tr, th) { display: block; }
+    #pagina-transacoes #lista-transacoes-completa tr { grid-template-columns: 28px minmax(0, 1fr) minmax(0, .85fr); gap: 6px 10px; padding: 16px; }
+    #pagina-transacoes #lista-transacoes-completa .transacao-selecionar { grid-column: 1; grid-row: 1 / 4; }
+    #pagina-transacoes .alvo-selecao { min-width: 44px; margin-left: -8px; }
+    #pagina-transacoes #lista-transacoes-completa .transacao-nome { grid-column: 2; grid-row: 1; }
+    #pagina-transacoes .transacao-nome .tipo-transacao { display: none; }
+    #pagina-transacoes #lista-transacoes-completa .transacao-valor { grid-column: 3; grid-row: 1; text-align: right; white-space: normal; overflow-wrap: anywhere; }
+    #pagina-transacoes #lista-transacoes-completa .transacao-data { grid-column: 2 / -1; grid-row: 2; text-align: left; white-space: normal; font-size: 12px; }
+    #pagina-transacoes .tipo-data-mobile { display: inline; }
+    #pagina-transacoes #lista-transacoes-completa .transacao-categoria { grid-column: 2 / -1; grid-row: 3; }
+    #pagina-transacoes .transacao-categoria > :not(.complementos-mobile),
+    #pagina-transacoes #lista-transacoes-completa :is(.transacao-pagamento, .transacao-classificacao, .transacao-conta) { display: none; }
+    #pagina-transacoes .complementos-mobile { display: flex; flex-wrap: wrap; gap: 3px 14px; color: #62596d; font-size: 12px; line-height: 1.5; }
+    #pagina-transacoes .complementos-mobile > span { min-width: 0; overflow-wrap: anywhere; }
+    #pagina-transacoes .rotulo-complemento { color: var(--exp-mutado); }
+    #pagina-transacoes .recebido-mobile { display: block; margin-top: 2px; color: #62596d; font-size: 11px; font-weight: 400; letter-spacing: normal; }
+    #pagina-transacoes #lista-transacoes-completa .mensagem-sem-resultados { white-space: normal; overflow-wrap: anywhere; }
+}
+@media (max-width: 520px) {
+    #pagina-transacoes #lista-transacoes-completa tr { grid-template-columns: 28px minmax(0, 1fr); gap: 5px 8px; }
+    #pagina-transacoes #lista-transacoes-completa .transacao-nome { grid-column: 2; }
+    #pagina-transacoes #lista-transacoes-completa .transacao-valor { grid-column: 2; grid-row: 2; text-align: left; }
+    #pagina-transacoes #lista-transacoes-completa .transacao-data { grid-column: 2; grid-row: 3; }
+    #pagina-transacoes #lista-transacoes-completa .transacao-categoria { grid-column: 2; grid-row: 4; }
+    #pagina-transacoes #lista-transacoes-completa .transacao-selecionar { grid-row: 1 / 5; }
+}
