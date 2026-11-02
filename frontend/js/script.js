@@ -61,7 +61,21 @@ const filtroDataFinal = document.getElementById("data-final");
 const erroFiltroDatas = document.getElementById("erro-filtro-datas");
 const botaoLimparFiltros = document.getElementById("limpar-filtros");
 let paginaAtual = 1;
-const transacoesPorPagina = 8;
+const larguraMobileTransacoes = window.matchMedia("(max-width: 850px)");
+let transacoesPorPagina = larguraMobileTransacoes.matches ? 6 : 8;
+const paginaTransacoes = document.getElementById("pagina-transacoes");
+const barraAcoesCompleta = document.getElementById("barra-acoes-completa");
+const barraContextual = document.getElementById("barra-contextual-transacoes");
+const quantidadeContextual = document.getElementById("quantidade-contextual-transacoes");
+const acoesContextuais = new Map([
+    [document.getElementById("editar-selecao-contextual"), botaoEditarCompleta],
+    [document.getElementById("excluir-selecao-contextual"), botaoExcluirCompleta],
+    [document.getElementById("cancelar-selecao-contextual"), document.getElementById("limpar-selecao-completa")]
+]);
+const navegacaoPrincipal = document.querySelector(".sidebar nav");
+let barraSuperiorVisivel = true;
+let observadorBarraSuperior = null;
+let alturaNavegacaoAcoes = 0;
 const infoPaginacao = document.getElementById("info-paginacao");
 const botaoPaginaAnterior = document.getElementById("pagina-anterior");
 const botaoProximaPagina = document.getElementById("proxima-pagina");
@@ -1464,6 +1478,54 @@ function atualizarBarraAcoes() {
     quantidadeSelecionadasCompleta.textContent = texto;
     areaAcoesCompleta.classList.toggle("ativa", quantidade > 0);
     botaoEditarCompleta.disabled = quantidade !== 1;
+    atualizarBarraContextual();
+}
+
+function atualizarBarraContextual() {
+    const temSelecaoMobile = larguraMobileTransacoes.matches && observadorBarraSuperior !== null && transacoesSelecionadas.length > 0
+        && paginaTransacoes.classList.contains("ativa");
+    const flutuante = temSelecaoMobile && !barraSuperiorVisivel;
+    const focoAtual = document.activeElement;
+    let proximoFoco = null;
+    acoesContextuais.forEach((original, contextual) => {
+        contextual.disabled = original.disabled || transacoesSelecionadas.length === 0;
+        if (flutuante && focoAtual === original) proximoFoco = contextual;
+        if (!flutuante && temSelecaoMobile && focoAtual === contextual) proximoFoco = original;
+    });
+    quantidadeContextual.textContent = quantidadeSelecionadasCompleta.textContent;
+    barraAcoesCompleta.classList.toggle("acoes-superiores-ocultas", flutuante);
+    barraAcoesCompleta.inert = flutuante || transacoesSelecionadas.length === 0;
+    if (barraAcoesCompleta.inert) barraAcoesCompleta.setAttribute("aria-hidden", "true");
+    else barraAcoesCompleta.removeAttribute("aria-hidden");
+    barraContextual.classList.toggle("visivel", flutuante);
+    barraContextual.inert = !flutuante;
+    barraContextual.setAttribute("aria-hidden", String(!flutuante));
+    paginaTransacoes.classList.toggle("tem-selecao-mobile", temSelecaoMobile);
+    if (proximoFoco && !modalAtivo && !proximoFoco.disabled) {
+        // Ao trocar a representação focada, não deixa o foco em controles ocultos.
+        [barraAcoesCompleta, barraContextual].forEach((barra) => barra.classList.add("troca-foco-contextual"));
+        proximoFoco.focus({ preventScroll: true });
+        requestAnimationFrame(() => {
+            [barraAcoesCompleta, barraContextual].forEach((barra) => barra.classList.remove("troca-foco-contextual"));
+        });
+    }
+}
+
+function observarBarraSuperior() {
+    if (!("IntersectionObserver" in window)) return; // Mantém a barra superior como alternativa.
+    observadorBarraSuperior?.disconnect();
+    observadorBarraSuperior = null;
+    if (!larguraMobileTransacoes.matches) barraSuperiorVisivel = true;
+    if (larguraMobileTransacoes.matches) {
+        alturaNavegacaoAcoes = Math.ceil(navegacaoPrincipal.getBoundingClientRect().height);
+        paginaTransacoes.style.setProperty("--altura-nav-acoes", `${alturaNavegacaoAcoes}px`);
+        observadorBarraSuperior = new IntersectionObserver(([entrada]) => {
+            barraSuperiorVisivel = entrada.isIntersecting && entrada.intersectionRatio >= .99;
+            atualizarBarraContextual();
+        }, { threshold: [0, .99, 1], rootMargin: `0px 0px -${alturaNavegacaoAcoes + 8}px 0px` });
+        observadorBarraSuperior.observe(areaAcoesCompleta);
+    }
+    atualizarBarraContextual();
 }
 
 function preencherFormulario(transacao) {
@@ -1911,8 +1973,16 @@ document.getElementById("selecionar-pagina").addEventListener("change", (evento)
     });
 });
 document.getElementById("limpar-selecao-completa").addEventListener("click", () => {
+    const veioDaContextual = barraContextual.contains(document.activeElement);
+    const destino = veioDaContextual ? [...listaTransacoesCompleta.querySelectorAll("input"),
+        botaoPaginaAnterior, botaoProximaPagina, campoPesquisa].find((elemento) => {
+        const posicao = elemento.getBoundingClientRect();
+        return !elemento.disabled && posicao.height > 0 && posicao.top >= 0
+            && posicao.bottom <= window.innerHeight - alturaNavegacaoAcoes - 110;
+    }) : null;
     limparSelecao();
-    document.getElementById("selecionar-pagina").focus();
+    if (destino) destino.focus({ preventScroll: true });
+    else document.getElementById("selecionar-pagina").focus();
 });
 filtroTipo.addEventListener("change", aplicarFiltros);
 filtroCategoria.addEventListener("change", aplicarFiltros);
@@ -1945,6 +2015,16 @@ botaoProximaPagina.addEventListener("click", () => {
     paginaAtual++;
     limparSelecao();
     atualizarTabelaCompleta();
+});
+
+larguraMobileTransacoes.addEventListener("change", ({ matches }) => {
+    const primeiroIndice = (paginaAtual - 1) * transacoesPorPagina;
+    transacoesPorPagina = matches ? 6 : 8;
+    paginaAtual = Math.floor(primeiroIndice / transacoesPorPagina) + 1;
+    // A lista visível muda de bloco; o Resumo mantém seus cinco registros e a seleção.
+    if (document.getElementById("pagina-transacoes").classList.contains("ativa")) limparSelecao();
+    atualizarTabelaCompleta();
+    observarBarraSuperior();
 });
 
 // limpar os erros quando o usuario digitar algo nos campos do formulario
@@ -2704,6 +2784,22 @@ document.getElementById("mes-final-distribuicao").value = mesAtualDistribuicao;
 ["periodo-distribuicao", "mes-inicial-distribuicao", "mes-final-distribuicao"].forEach((id) => {
     document.getElementById(id).addEventListener("change", atualizarDistribuicaoDespesas);
 });
+
+acoesContextuais.forEach((original, contextual) => {
+    contextual.addEventListener("click", () => original.click());
+});
+observarBarraSuperior();
+if ("ResizeObserver" in window) {
+    const observadorDimensoesAcoes = new ResizeObserver((entradas) => {
+        for (const entrada of entradas) {
+            if (entrada.target === navegacaoPrincipal && larguraMobileTransacoes.matches
+                && Math.ceil(navegacaoPrincipal.getBoundingClientRect().height) !== alturaNavegacaoAcoes) {
+                observarBarraSuperior();
+            }
+        }
+    });
+    observadorDimensoesAcoes.observe(navegacaoPrincipal);
+}
 
 navegarPara("resumo");
 atualizarOpcoesContas();

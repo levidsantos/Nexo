@@ -188,14 +188,13 @@
                             <div class="transacoes-contagem"><span id="total-resultados" role="status" aria-live="polite"></span><span>Mais recentes primeiro</span></div>
                         </div>
                         <div class="area-acoes" id="area-acoes-completa">
-                            <div class="barra-acoes" id="barra-acoes-completa">
+                            <div class="barra-acoes" id="barra-acoes-completa" role="group" aria-label="Ações das transações selecionadas">
                                 <div class="conteudo-acoes">
                                     <span id="transacoes-selecionadas-completa" role="status" aria-live="polite">
                                         0 transações selecionadas
                                     </span>
 
                                     <div class="botoes-acoes">
-                                        <button type="button" id="limpar-selecao-completa">Cancelar seleção</button>
                                         <button type="button" id="btn-editar-completa" disabled>
                                             Editar
                                         </button>
@@ -203,8 +202,17 @@
                                         <button type="button" id="btn-excluir-completa" class="btn-excluir">
                                             Excluir
                                         </button>
+                                        <button type="button" id="limpar-selecao-completa">Cancelar seleção</button>
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+                        <div id="barra-contextual-transacoes" role="group" aria-label="Ações das transações selecionadas" aria-hidden="true" inert>
+                            <span id="quantidade-contextual-transacoes" role="status" aria-live="polite"></span>
+                            <div class="botoes-acoes">
+                                <button type="button" id="editar-selecao-contextual" disabled>Editar</button>
+                                <button type="button" id="excluir-selecao-contextual" class="btn-excluir" disabled>Excluir</button>
+                                <button type="button" id="cancelar-selecao-contextual">Cancelar seleção</button>
                             </div>
                         </div>
                         <div class="tabela-transacoes">

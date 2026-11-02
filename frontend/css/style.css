@@ -1502,9 +1502,6 @@ td.despesa {
 #pagina-transacoes .barra-acoes { background: #f5f0fc; border: 0; border-radius: 8px; box-shadow: none; }
 #pagina-transacoes .conteudo-acoes { padding: 10px 12px; font-size: 12px; color: #54318f; }
 #pagina-transacoes .botoes-acoes { flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
-#pagina-transacoes #limpar-selecao-completa { background: transparent; border-color: transparent; font-weight: 400; color: #66468f; }
-#pagina-transacoes .btn-excluir { background: #fff; border-color: #e3c7c7; color: #a33333; }
-#pagina-transacoes .btn-excluir:hover { background: #fff0f0; border-color: #bf7777; }
 .tabela-transacoes { padding: 0 24px; overflow-x: auto; scrollbar-width: thin; scrollbar-color: #b8adc8 transparent; }
 #pagina-transacoes table { border-collapse: collapse; table-layout: fixed; min-width: 850px; }
 #pagina-transacoes th { font-size: 11px; font-weight: 550; color: var(--exp-mutado); padding: 12px 8px; border-bottom: 1px solid var(--exp-linha); }
@@ -1985,4 +1982,44 @@ td.despesa {
     #pagina-transacoes #lista-transacoes-completa .transacao-data { grid-column: 2; grid-row: 3; }
     #pagina-transacoes #lista-transacoes-completa .transacao-categoria { grid-column: 2; grid-row: 4; }
     #pagina-transacoes #lista-transacoes-completa .transacao-selecionar { grid-row: 1 / 5; }
+}
+
+/* Ações de seleção: mesma hierarquia no Resumo e na listagem completa. */
+:is(#pagina-resumo, #pagina-transacoes) .conteudo-acoes { flex-wrap: wrap; gap: 10px 12px; color: #62596d; font-size: 12px; }
+:is(#pagina-resumo, #pagina-transacoes) .conteudo-acoes > span { min-width: 0; overflow-wrap: anywhere; }
+:is(#pagina-resumo, #pagina-transacoes) .botoes-acoes { flex-wrap: wrap; gap: 8px; }
+:is(#pagina-resumo, #pagina-transacoes) .botoes-acoes button { box-sizing: border-box; min-height: 44px; height: auto; padding: 8px 12px; border: 1px solid #d9d3e1; border-radius: 8px; background: #fff; color: #38303f; box-shadow: none; font-size: 13px; line-height: 1.3; transition: background-color .16s ease, border-color .16s ease; }
+:is(#pagina-resumo, #pagina-transacoes) .botoes-acoes button:hover:not(:disabled) { background: #f7f5fa; border-color: #b8adc8; }
+:is(#pagina-resumo, #pagina-transacoes) .botoes-acoes .btn-excluir { background: var(--cor-despesa); border-color: var(--cor-despesa); color: #fff; }
+:is(#pagina-resumo, #pagina-transacoes) .botoes-acoes .btn-excluir:hover:not(:disabled) { background: #a91b1b; border-color: #a91b1b; color: #fff; }
+:is(#pagina-resumo, #pagina-transacoes) .botoes-acoes :is(#limpar-selecao-completa, #cancelar-selecao-contextual) { padding-inline: 4px; border-color: transparent; background: transparent; color: #62596d; font-weight: 400; }
+:is(#pagina-resumo, #pagina-transacoes) .botoes-acoes :is(#limpar-selecao-completa, #cancelar-selecao-contextual):hover { background: #f7f5fa; color: var(--exp-roxo); }
+:is(#pagina-resumo, #pagina-transacoes) .botoes-acoes button:focus-visible { outline: 2px solid var(--exp-roxo); outline-offset: 3px; }
+:is(#pagina-resumo, #pagina-transacoes) .botoes-acoes button:disabled { opacity: .4; cursor: not-allowed; }
+@media (prefers-reduced-motion: reduce) {
+    :is(#pagina-resumo, #pagina-transacoes) .botoes-acoes button { transition: none; }
+}
+
+/* A barra superior conserva seu espaço; a apresentação contextual nunca entra no fluxo. */
+#pagina-transacoes #barra-contextual-transacoes { display: none; }
+@media (max-width: 850px) {
+    /* Reserva constante no mobile, inclusive ao cancelar: não depende da barra ou da seleção. */
+    /* Reutiliza a expansão de 250 ms da área de seleção do Resumo. */
+    #pagina-transacoes { padding-bottom: 110px; }
+    html:has(#pagina-transacoes.ativa.tem-selecao-mobile) { scroll-padding-bottom: calc(var(--reserva-navegacao-mobile, 72px) + 126px); }
+    #pagina-transacoes #barra-acoes-completa { transition: opacity .2s ease-out, transform .2s ease-out, visibility 0s linear .2s; }
+    #pagina-transacoes #area-acoes-completa.ativa #barra-acoes-completa { transition-delay: 0s; }
+    #pagina-transacoes #barra-acoes-completa.acoes-superiores-ocultas { opacity: 0; visibility: hidden; pointer-events: none; transition: none; }
+    #pagina-transacoes #barra-contextual-transacoes { display: block; position: fixed; z-index: 35; left: max(12px, env(safe-area-inset-left, 0px)); right: max(12px, env(safe-area-inset-right, 0px)); bottom: calc(var(--altura-nav-acoes, var(--reserva-navegacao-mobile, 72px)) + 8px); max-width: 560px; margin-inline: auto; padding: 8px 10px; box-sizing: border-box; background: var(--exp-papel); border: 1px solid #d9d3e1; border-radius: 12px; opacity: 0; visibility: hidden; pointer-events: none; transform: translateY(6px); transition: opacity .2s ease-out, transform .2s ease-out, visibility 0s linear .2s; }
+    #pagina-transacoes #barra-contextual-transacoes.visivel { opacity: 1; visibility: visible; pointer-events: auto; transform: translateY(0); transition: opacity .2s ease-out, transform .2s ease-out, visibility 0s; }
+    #pagina-transacoes #quantidade-contextual-transacoes { display: block; margin-bottom: 6px; font-size: 12px; line-height: 1.5; color: #62596d; }
+    #pagina-transacoes #barra-contextual-transacoes .botoes-acoes { flex-wrap: nowrap; gap: 6px; }
+    #pagina-transacoes #barra-contextual-transacoes #cancelar-selecao-contextual { margin-left: auto; }
+    #pagina-transacoes #barra-contextual-transacoes.troca-foco-contextual { transition: none; }
+    #pagina-transacoes #barra-acoes-completa.troca-foco-contextual { visibility: visible; opacity: 1; transition: none; }
+    body:has(.modal-overlay:not(.hidden)) #pagina-transacoes #barra-contextual-transacoes { opacity: 0; visibility: hidden; pointer-events: none; transition: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+    #pagina-transacoes #area-acoes-completa { transition: none; }
+    #pagina-transacoes :is(#barra-contextual-transacoes, #barra-acoes-completa) { transition: none !important; transform: none; }
 }
