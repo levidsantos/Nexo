@@ -1834,6 +1834,7 @@ function renderizarContasResumo(saldos) {
         if (saldos.disponivel) {
             const cadastrar = document.createElement("button");
             cadastrar.type = "button";
+            cadastrar.classList.add("btn-primario");
             cadastrar.textContent = "Cadastrar primeira conta";
             cadastrar.addEventListener("click", () => abrirModalConta());
             lista.appendChild(cadastrar);
@@ -2486,6 +2487,7 @@ function renderizarInvestimentos() {
             botao.type = "button";
             botao.textContent = rotulo;
             botao.dataset.acao = chave;
+            if (chave === "atualizar") botao.classList.add("btn-primario");
             botao.setAttribute("aria-label", `${rotulo} investimento ${investimento.nome}`);
             if (rotulo === "Excluir") botao.classList.add("btn-excluir");
             if (restricaoMovimentacao && (chave === "aporte" || chave === "resgate")) {

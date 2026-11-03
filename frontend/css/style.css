@@ -592,14 +592,6 @@ td.despesa {
     border-radius: var(--raio-controle);
 }
 
-.btn-excluir {
-    background-color: var(--cor-despesa);
-    color: #f0e7e7;
-}
-.btn-excluir:hover {
-    background-color: #a91b1b;
-    color: var(--cor-texto-inverso);
-}
 .botoes-acoes button:disabled {
     opacity: 0.4;
     cursor: not-allowed;
@@ -1369,7 +1361,7 @@ td.despesa {
 #pagina-resumo .coluna-selecao { width: 28px; padding-left: 0; }
 #pagina-resumo .checkbox-transacao { width: 16px; height: 16px; }
 #pagina-resumo .mensagem-vazia, #pagina-resumo .mensagem-sem-resultados { padding: 24px 8px; color: var(--exp-mutado); font-size: 13px; line-height: 1.6; }
-#pagina-resumo #contas-resumo button { padding: 8px 12px; height: auto; border: 1px solid #d9cee8; color: var(--exp-roxo); background: #f7f3fc; box-shadow: none; font-size: 13px; }
+#pagina-resumo #contas-resumo button { padding: 8px 12px; height: auto; border-width: 1px; border-style: solid; box-shadow: none; font-size: 13px; }
 #pagina-resumo .barra-acoes { box-shadow: none; border-color: var(--exp-linha); background: #faf8fd; }
 #pagina-resumo .botoes-acoes button { height: auto; min-height: 32px; padding: 6px 12px; box-shadow: none; }
 #pagina-resumo ::selection, #modal-overlay ::selection { background: #e6dcf5; color: #35204e; }
@@ -1484,7 +1476,7 @@ td.despesa {
 #pagina-transacoes .area-pesquisa { display: grid; grid-template-columns: minmax(180px, 1.6fr) minmax(120px, .8fr) minmax(150px, 1fr); align-items: end; gap: 16px; padding: 24px; margin: 0; border-bottom: 1px solid var(--exp-linha); }
 #pagina-transacoes .area-pesquisa > div { min-width: 0; }
 #pagina-transacoes .area-pesquisa label { display: block; font-size: 11px; font-weight: 600; color: #62596d; margin-bottom: 7px; }
-#pagina-transacoes .area-pesquisa :is(input, select) { display: block; width: 100%; min-width: 0; height: 42px; padding: 9px 11px; font: inherit; font-size: 13px; color: var(--exp-tinta); background: #fff; border: 1px solid #cfc8d9; border-radius: 8px; box-shadow: none; caret-color: var(--exp-roxo); }
+#pagina-transacoes .area-pesquisa :is(input, select) { display: block; width: 100%; min-width: 0; height: 42px; padding: 9px 11px; font: inherit; font-size: 13px; color: var(--exp-tinta); background: #fff; border: 1px solid #b0a9bb; border-radius: 8px; box-shadow: none; caret-color: var(--exp-roxo); }
 #pagina-transacoes .area-pesquisa input::placeholder { color: var(--exp-mutado); }
 #pagina-transacoes .entrada-busca { position: relative; }
 #pagina-transacoes .entrada-busca svg { position: absolute; top: 13px; left: 12px; width: 16px; height: 16px; color: var(--exp-mutado); pointer-events: none; }
@@ -1611,13 +1603,11 @@ td.despesa {
 #pagina-contas .acoes-conta { display:flex; justify-content:flex-end; gap:8px; padding-top:18px; margin-top:18px; border-top:1px solid var(--exp-linha); }
 #pagina-contas .acoes-conta button { padding:0 14px; background:white; color:#62566f; border:1px solid #d8d1e0; }
 #pagina-contas .acoes-conta button:hover { background:#f4effb; border-color:#baa8d5; }
-#pagina-contas .acoes-conta .btn-excluir { color:#a43d42; border-color:#ead8da; }
-#pagina-contas .acoes-conta .btn-excluir:hover { background:#fff5f5; border-color:#d7a6aa; }
 #pagina-contas .mensagem-vazia { grid-column:1/-1; margin:0; padding:32px; border:1px solid var(--exp-linha); border-radius:14px; background:white; color:var(--exp-mutado); font-size:13px; line-height:1.6; }
-#pagina-contas button:focus-visible, #modal-conta button:focus-visible, #modal-exclusao-conta button:focus-visible { outline:2px solid var(--exp-roxo); outline-offset:3px; }
+#pagina-contas button:focus-visible, #modal-conta button:focus-visible, #modal-exclusao-conta button:focus-visible, #modal-exclusao button:focus-visible { outline:2px solid var(--exp-roxo); outline-offset:3px; }
 #pagina-contas ::selection, #modal-conta ::selection { background:#e6dcf5; color:#35204e; }
 /* Modal de contas: campos roláveis e ações fora da área de rolagem. */
-.experimento-visual :is(#modal-conta,#modal-exclusao-conta) { padding:24px; box-sizing:border-box; background:rgba(33,27,45,.42); }
+.experimento-visual :is(#modal-conta,#modal-exclusao-conta,#modal-exclusao) { padding:24px; box-sizing:border-box; background:rgba(33,27,45,.42); }
 #modal-conta .modal { display:flex; flex-direction:column; box-sizing:border-box; width:min(100%,600px); max-height:calc(100dvh - 48px); padding:0; border-radius:16px; overflow:hidden; box-shadow:0 24px 80px rgba(30,19,47,.18); }
 #modal-conta .modal-header { margin:0; padding:24px 28px; border-bottom:1px solid var(--exp-linha); flex:0 0 auto; gap:16px; }
 #modal-conta .modal-header h2 { margin:0; font-size:23px; color:var(--exp-tinta); letter-spacing:-.025em; }
@@ -1642,15 +1632,15 @@ td.despesa {
 #modal-conta #incluir-saldo-disponivel:focus-visible { outline:2px solid var(--exp-roxo); outline-offset:3px; }
 #modal-conta #ajuda-inclusao-saldo { grid-column:1/-1; padding-left:28px; }
 #modal-conta .modal-footer { display:flex; flex:0 0 auto; justify-content:flex-end; gap:10px; margin:0; padding:18px 28px; border-top:1px solid var(--exp-linha); background:#fcfbfd; }
-#modal-conta .modal-footer button, #modal-exclusao-conta button { min-height:44px; padding:0 18px; font:inherit; font-size:13px; font-weight:600; border-radius:8px; box-shadow:none; background:white; color:#62566f; border:1px solid #d8d1e0; }
+#modal-conta .modal-footer button, #modal-exclusao-conta button, #modal-exclusao button { min-height:44px; padding:0 18px; font:inherit; font-size:13px; font-weight:600; border-radius:8px; box-shadow:none; background:white; color:#62566f; border:1px solid #d8d1e0; }
 #modal-conta #salvar-conta { background:var(--exp-roxo); border-color:var(--exp-roxo); color:white; }
 #modal-conta #salvar-conta:hover { background:var(--exp-roxo-hover); }
 #modal-conta #cancelar-modal-conta:hover { background:#f1edf6; }
-#modal-exclusao-conta .modal-confirmacao { box-sizing:border-box; width:min(100%,440px); padding:28px; border-radius:16px; box-shadow:0 24px 80px rgba(30,19,47,.18); }
-#modal-exclusao-conta h2 { margin:0 0 12px; font-size:22px; color:var(--exp-tinta); }
-#modal-exclusao-conta p { font-size:13px; line-height:1.6; color:#62566f; overflow-wrap:anywhere; }
-#modal-exclusao-conta .acoes-confirmacao { justify-content:flex-end; gap:10px; margin-top:24px; }
-#modal-exclusao-conta #confirmar-exclusao-conta { background:#a43d42; border-color:#a43d42; color:white; }
+#modal-exclusao-conta .modal-confirmacao, #modal-exclusao .modal-confirmacao { box-sizing:border-box; width:min(100%,440px); padding:28px; border-radius:16px; box-shadow:0 24px 80px rgba(30,19,47,.18); }
+#modal-exclusao-conta h2, #modal-exclusao h2 { margin:0 0 12px; font-size:22px; color:var(--exp-tinta); }
+#modal-exclusao-conta p, #modal-exclusao p { font-size:13px; line-height:1.6; color:#62566f; overflow-wrap:anywhere; }
+#modal-exclusao-conta .acoes-confirmacao, #modal-exclusao .acoes-confirmacao { justify-content:flex-end; gap:10px; margin-top:24px; }
+#modal-exclusao #cancelar-exclusao:hover { background:#f1edf6; }
 @media (max-width:1000px) { #pagina-contas .lista-contas { grid-template-columns:minmax(0,1fr); } }
 @media (max-width:700px) {
  #pagina-contas .contas-abertura { align-items:flex-start; gap:16px; }
@@ -1663,15 +1653,15 @@ td.despesa {
 @media (max-width:520px) {
  #pagina-contas .contas-abertura { flex-direction:column; }
  #pagina-contas #btn-nova-conta { width:100%; }
- .experimento-visual :is(#modal-conta,#modal-exclusao-conta) { padding:12px; }
+ .experimento-visual :is(#modal-conta,#modal-exclusao-conta,#modal-exclusao) { padding:12px; }
  #modal-conta .modal { max-height:calc(100dvh - 24px); }
  #modal-conta .modal-header { padding:20px; }
  #modal-conta .campos-conta { grid-template-columns:minmax(0,1fr); padding:20px; gap:16px; }
  #modal-conta :is(input:not([type=checkbox]),select) { font-size:16px; }
  #modal-conta .modal-footer { padding:16px 20px; }
  #modal-conta .modal-footer button { flex:1; }
- #modal-exclusao-conta .modal-confirmacao { padding:24px; }
- #modal-exclusao-conta .acoes-confirmacao { flex-wrap:wrap; }
+ #modal-exclusao-conta .modal-confirmacao, #modal-exclusao .modal-confirmacao { padding:24px; }
+ #modal-exclusao-conta .acoes-confirmacao, #modal-exclusao .acoes-confirmacao { flex-wrap:wrap; }
 }
 @media (prefers-reduced-motion:reduce) { #pagina-contas button, #modal-conta :is(input,select,button) { transition:none; } }
 /* Navegação única: sidebar no desktop, destinos fixos ao alcance do polegar no mobile. */
@@ -1844,21 +1834,15 @@ td.despesa {
 #pagina-investimentos .acoes-investimento { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px; }
 #pagina-investimentos .rodape-investimento { grid-column:1/-1; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px 20px; padding-top:14px; border-top:1px solid var(--exp-linha); }
 #pagina-investimentos .rodape-investimento :is(.referencia-investimento,.acoes-investimento) { flex-basis:auto; }
-#pagina-investimentos .acoes-investimento [data-acao="atualizar"] { color:#54318f; background:#f4effb; border-color:#dfd3ee; }
-#pagina-investimentos .acoes-investimento [data-acao="atualizar"]:hover { background:#ece3f8; border-color:#baa8d5; }
 #pagina-investimentos .gerenciar-investimento { grid-column:3; grid-row:1; position:relative; justify-self:end; }
 #pagina-investimentos .gerenciar-investimento > summary { display:flex; align-items:center; justify-content:center; gap:8px; min-height:44px; padding:0 10px; box-sizing:border-box; list-style:none; border:1px solid #d8d1e0; border-radius:8px; color:#62566f; background:white; white-space:nowrap; }
 #pagina-investimentos .gerenciar-investimento > summary::-webkit-details-marker { display:none; }
 #pagina-investimentos .gerenciar-investimento > summary::after { content:""; width:5px; height:5px; border-right:1.5px solid currentColor; border-bottom:1.5px solid currentColor; transform:translateY(-2px) rotate(45deg); }
 #pagina-investimentos .gerenciar-investimento[open] > summary::after { transform:translateY(1px) rotate(225deg); }
 #pagina-investimentos .gerenciar-investimento > summary:hover { background:#f7f5fa; border-color:#baa8d5; }
-#pagina-investimentos .acoes-administrativas-investimento { position:absolute; z-index:3; right:0; top:calc(100% + 6px); width:168px; padding:6px; box-sizing:border-box; display:grid; gap:4px; background:white; border:1px solid var(--exp-linha); border-radius:10px; box-shadow:0 8px 24px rgba(33,27,45,.1); }
+#pagina-investimentos .acoes-administrativas-investimento { position:absolute; z-index:3; right:0; top:calc(100% + 6px); width:max(100%,108px); max-width:calc(100vw - 40px); padding:4px; box-sizing:border-box; display:grid; gap:2px; background:white; border:1px solid var(--exp-linha); border-radius:10px; box-shadow:0 8px 24px rgba(33,27,45,.1); }
 #pagina-investimentos .gerenciar-investimento.abre-acima .acoes-administrativas-investimento { top:auto; bottom:calc(100% + 6px); }
-#pagina-investimentos .acoes-administrativas-investimento button { text-align:left; border-color:transparent; }
-#pagina-investimentos .acoes-administrativas-investimento .btn-excluir { color:#a43d42; }
-#pagina-investimentos .acoes-administrativas-investimento .btn-excluir:hover { background:#fff5f5; border-color:#ead8da; }
-#pagina-investimentos .acoes-investimento .btn-excluir { color:#a43d42; border-color:#ead8da; }
-#pagina-investimentos .acoes-investimento .btn-excluir:hover { background:#fff5f5; }
+#pagina-investimentos .acoes-administrativas-investimento button { box-sizing:border-box; width:100%; padding-inline:10px; text-align:left; border-color:transparent; }
 #pagina-investimentos .lista-historico-investimentos { border:1px solid var(--exp-linha); border-radius:14px; overflow:hidden; background:white; }
 #pagina-investimentos .lista-historico-investimentos li { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,.9fr); align-items:start; gap:6px 28px; padding:22px 24px; border-top:1px solid var(--exp-linha); }
 #pagina-investimentos .lista-historico-investimentos li:first-child { border-top:0; }
@@ -1906,7 +1890,6 @@ td.despesa {
 #modal-exclusao-investimento h2 { margin:0 0 12px; color:var(--exp-tinta); font-size:22px; }
 #modal-exclusao-investimento p { font-size:13px; line-height:1.6; color:#62566f; overflow-wrap:anywhere; }
 #modal-exclusao-investimento .acoes-confirmacao { justify-content:flex-end; flex-wrap:wrap; gap:10px; margin-top:24px; }
-#modal-exclusao-investimento #confirmar-exclusao-investimento { color:white; background:#a43d42; border-color:#a43d42; }
 @container (max-width:879px) {
  #pagina-investimentos .totais-investimentos:has(.valor-investimento-extenso) .secao-investimentos + .secao-investimentos { border-left:0; border-top:1px solid var(--exp-linha); }
 }
@@ -2030,8 +2013,6 @@ td.despesa {
 :is(#pagina-resumo, #pagina-transacoes) .botoes-acoes { flex-wrap: wrap; gap: 8px; }
 :is(#pagina-resumo, #pagina-transacoes) .botoes-acoes button { box-sizing: border-box; min-height: 44px; height: auto; padding: 8px 12px; border: 1px solid #d9d3e1; border-radius: 8px; background: #fff; color: #38303f; box-shadow: none; font-size: 13px; line-height: 1.3; transition: background-color .16s ease, border-color .16s ease; }
 :is(#pagina-resumo, #pagina-transacoes) .botoes-acoes button:hover:not(:disabled) { background: #f7f5fa; border-color: #b8adc8; }
-:is(#pagina-resumo, #pagina-transacoes) .botoes-acoes .btn-excluir { background: var(--cor-despesa); border-color: var(--cor-despesa); color: #fff; }
-:is(#pagina-resumo, #pagina-transacoes) .botoes-acoes .btn-excluir:hover:not(:disabled) { background: #a91b1b; border-color: #a91b1b; color: #fff; }
 :is(#pagina-resumo, #pagina-transacoes) .botoes-acoes :is(#limpar-selecao-completa, #cancelar-selecao-contextual) { padding-inline: 4px; border-color: transparent; background: transparent; color: #62596d; font-weight: 400; }
 :is(#pagina-resumo, #pagina-transacoes) .botoes-acoes :is(#limpar-selecao-completa, #cancelar-selecao-contextual):hover { background: #f7f5fa; color: var(--exp-roxo); }
 :is(#pagina-resumo, #pagina-transacoes) .botoes-acoes button:focus-visible { outline: 2px solid var(--exp-roxo); outline-offset: 3px; }
@@ -2063,3 +2044,11 @@ td.despesa {
     #pagina-transacoes #area-acoes-completa { transition: none; }
     #pagina-transacoes :is(#barra-contextual-transacoes, #barra-acoes-completa) { transition: none !important; transform: none; }
 }
+
+/* Variantes de cor: a geometria continua sob responsabilidade de cada componente. */
+.btn-primario { --acao-fundo: var(--exp-roxo); --acao-hover: var(--exp-roxo-hover); }
+.btn-excluir { --acao-fundo: var(--cor-despesa); --acao-hover: #a91b1b; }
+:is(#pagina-resumo, #pagina-transacoes, #pagina-contas, #pagina-investimentos, #modal-exclusao, #modal-exclusao-conta, #modal-exclusao-investimento) button:is(.btn-primario, .btn-excluir) { background: var(--acao-fundo); border-color: var(--acao-fundo); color: #fff; }
+:is(#pagina-resumo, #pagina-transacoes, #pagina-contas, #pagina-investimentos, #modal-exclusao, #modal-exclusao-conta, #modal-exclusao-investimento) button:is(.btn-primario, .btn-excluir):hover:not(:disabled) { background: var(--acao-hover); border-color: var(--acao-hover); color: #fff; }
+:is(#pagina-resumo, #pagina-transacoes, #pagina-contas, #pagina-investimentos, #modal-exclusao, #modal-exclusao-conta, #modal-exclusao-investimento) button:is(.btn-primario, .btn-excluir):focus-visible { outline: 2px solid var(--exp-roxo); outline-offset: 3px; }
+:is(#pagina-resumo, #pagina-transacoes, #pagina-contas, #pagina-investimentos, #modal-exclusao, #modal-exclusao-conta, #modal-exclusao-investimento) button:is(.btn-primario, .btn-excluir):disabled { opacity: .4; cursor: not-allowed; }
