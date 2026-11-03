@@ -27,7 +27,7 @@
                 <span class="topbar-contexto">Organização financeira</span>
                 <div class="topbar-acoes">
                     <button id="add_receita" aria-label="Adicionar receita"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg><span>Receita</span></button>
-                    <button id="add_despesa" aria-label="Adicionar despesa"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg><span>Despesa</span></button>
+                    <button class="btn-primario" id="add_despesa" aria-label="Adicionar despesa"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg><span>Despesa</span></button>
                 </div>
             </header>
 
@@ -255,7 +255,7 @@
                 <section id="pagina-contas" class="pagina" aria-labelledby="titulo-contas">
                     <header class="contas-abertura">
                         <div><h1 id="titulo-contas">Contas</h1><p>Seu dinheiro, organizado por conta.</p></div>
-                        <button type="button" id="btn-nova-conta"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 5v14M5 12h14"/></svg>Nova conta</button>
+                        <button class="btn-primario" type="button" id="btn-nova-conta"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 5v14M5 12h14"/></svg>Nova conta</button>
                     </header>
                     <section class="resumo-contas" aria-label="Saldo de todas as contas">
                         <div class="card-conta-resumo">
@@ -327,7 +327,7 @@
                 <section id="pagina-investimentos" class="pagina" aria-labelledby="titulo-investimentos">
                     <header class="cabecalho-investimentos">
                         <div><h1 id="titulo-investimentos">Investimentos</h1><p>Cadastre seus investimentos e mantenha os valores informados atualizados.</p></div>
-                        <button type="button" id="novo-investimento"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 5v14M5 12h14"/></svg>Novo investimento</button>
+                        <button class="btn-primario" type="button" id="novo-investimento"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 5v14M5 12h14"/></svg>Novo investimento</button>
                     </header>
                     <div class="totais-investimentos" aria-label="Totais da carteira">
                         <div class="secao-investimentos"><span>Capital aplicado</span><h2 id="total-capital-investimentos" aria-describedby="ajuda-capital-aplicado">Indisponível</h2><p id="ajuda-capital-aplicado" class="periodo-historico ajuda-indicador">Capital inicial e movimentações de capital após a referência, até hoje.</p></div>
@@ -439,7 +439,7 @@
                     </div>
                     <div class="form-actions">
                         <button type="button" class="cancel-modal">Cancelar</button>
-                        <button type="submit" class="save-modal">Salvar</button>
+                        <button type="submit" class="btn-primario save-modal">Salvar</button>
                     </div>
                 </form>
             </div>
@@ -534,7 +534,7 @@
                         Cancelar
                     </button>
 
-                    <button type="submit" id="salvar-conta">
+                    <button class="btn-primario" type="submit" id="salvar-conta">
                         Salvar Conta
                     </button>
                 </div>
@@ -631,7 +631,7 @@
                 </div>
                 <div class="form-actions">
                     <button type="button" id="cancelar-investimento">Cancelar</button>
-                    <button type="submit" id="salvar-investimento">Salvar investimento</button>
+                    <button class="btn-primario" type="submit" id="salvar-investimento">Salvar investimento</button>
                 </div>
             </form>
         </div>
@@ -662,7 +662,7 @@
                 </div>
                 <div class="form-actions">
                     <button type="button" id="cancelar-valor-investimento">Cancelar</button>
-                    <button type="submit">Salvar valor</button>
+                    <button class="btn-primario" type="submit">Salvar valor</button>
                 </div>
             </form>
         </div>
@@ -717,7 +717,7 @@
                 </div>
                 <div class="form-actions">
                     <button type="button" id="cancelar-movimentacao">Cancelar</button>
-                    <button type="submit" id="salvar-movimentacao">Salvar aporte</button>
+                    <button class="btn-primario" type="submit" id="salvar-movimentacao">Salvar aporte</button>
                 </div>
             </form>
         </div>

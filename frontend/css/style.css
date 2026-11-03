@@ -1,5 +1,11 @@
 /* Valores atuais: esta base não aplica uma nova paleta nem altera medidas. */
 :root {
+    /* Estados compartilhados dos campos dos modais. */
+    --campo-modal-borda: #998c8b;
+    --campo-modal-borda-hover: #776a89;
+    --campo-modal-borda-foco: #8060b2;
+    --campo-modal-borda-erro: #b46a64;
+
     /* Superfícies e textos */
     --cor-fundo: #f3f6fb;
     --cor-superficie: #ffffff;
@@ -17,7 +23,7 @@
     --cor-borda: #edf0f5;
     --cor-borda-campo: #d7d1db;
     --cor-borda-botao: #f4f5f7;
-    --cor-borda-hover: #d5cbe1;
+    --cor-borda-hover: #e1cccb;
 
     /* Destaque e estados semânticos */
     --cor-destaque: #a163f1;
@@ -395,14 +401,7 @@ tbody tr:hover {
     background: #edeaf0;
 }
 
-.form-actions button[type="submit"] {
-    background: var(--cor-destaque);
-    color: var(--cor-texto-inverso);
-}
 
-.form-actions button[type="submit"]:hover {
-    background: #703bb4cc;
-}
 
 .form-group {
     display: flex;
@@ -795,13 +794,11 @@ td.despesa {
 
 /* Cabeçalho */
 
-.cabecalho-contas,
 .cabecalho-analises,
 .cabecalho-investimentos {
     margin-bottom: 24px;
 }
 
-.cabecalho-contas h1,
 .cabecalho-analises h1,
 .cabecalho-investimentos h1 {
     font-size: 24px;
@@ -809,7 +806,6 @@ td.despesa {
     color: var(--cor-texto-titulo);
 }
 
-.cabecalho-contas p,
 .cabecalho-analises p,
 .cabecalho-investimentos p {
     margin-top: 6px;
@@ -819,14 +815,6 @@ td.despesa {
 }
 
 /* Resumo */
-.card-resumo {
-    background: var(--cor-superficie);
-    box-shadow: 0 2px 8px rgba(73, 30, 90, 0.082);
-    border: 1px solid #f2edf5;
-    border-radius: var(--raio-painel);
-    padding: 10px 20px 10px 20px;
-    margin-bottom: 20px;
-}
 
 .resumo-contas {
     display: grid;
@@ -887,10 +875,9 @@ td.despesa {
 #btn-nova-conta,
 #novo-investimento {
     padding: 4px 10px;
-    background: var(--cor-superficie);
-    border: 1px solid #f7f1fd;
+    border-width: 1px;
+    border-style: solid;
     border-radius: var(--raio-controle);
-    color: #25202a;
     font: inherit;
     font-size: 13px;
     font-weight: 500;
@@ -898,11 +885,6 @@ td.despesa {
     transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
-#btn-nova-conta:hover,
-#novo-investimento:hover {
-    background: var(--cor-superficie-interativa);
-    border-color: #e0c9ff;
-}
 
 /* Estados vazios */
 
@@ -1318,8 +1300,6 @@ td.despesa {
 .experimento-visual .topbar button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 38px; padding: 0 14px; border: 1px solid #ddd8e5; border-radius: 8px; box-shadow: none; font: inherit; font-size: 13px; font-weight: 600; color: #51465f; background: white; }
 .experimento-visual .topbar button svg { width: 16px; height: 16px; }
 .experimento-visual .topbar button:hover { background: #f6f2fc; border-color: #a48abf; }
-.experimento-visual .topbar #add_despesa { background: var(--exp-roxo); border-color: var(--exp-roxo); color: white; }
-.experimento-visual .topbar #add_despesa:hover { background: var(--exp-roxo-hover); border-color: var(--exp-roxo-hover); }
 .experimento-visual .content { width: 100%; max-width: 1480px; box-sizing: border-box; margin: 0 auto; padding: 32px 36px 48px; }
 #pagina-resumo { color: var(--exp-tinta); }
 .resumo-abertura { display: flex; justify-content: space-between; align-items: center; gap: 20px; margin-bottom: 26px; }
@@ -1363,12 +1343,23 @@ td.despesa {
 #pagina-resumo .mensagem-vazia, #pagina-resumo .mensagem-sem-resultados { padding: 24px 8px; color: var(--exp-mutado); font-size: 13px; line-height: 1.6; }
 #pagina-resumo #contas-resumo button { padding: 8px 12px; height: auto; border-width: 1px; border-style: solid; box-shadow: none; font-size: 13px; }
 #pagina-resumo .barra-acoes { box-shadow: none; border-color: var(--exp-linha); background: #faf8fd; }
-#pagina-resumo .botoes-acoes button { height: auto; min-height: 32px; padding: 6px 12px; box-shadow: none; }
 #pagina-resumo ::selection, #modal-overlay ::selection { background: #e6dcf5; color: #35204e; }
 
 /* Cabeçalho e ações permanecem acessíveis enquanto os campos rolam. */
 .experimento-visual #modal-overlay { padding: 24px; box-sizing: border-box; background: rgba(33, 27, 45, 0.42); }
-#modal-overlay .modal { display: flex; flex-direction: column; box-sizing: border-box; width: min(100%, 600px); max-height: calc(100dvh - 48px); padding: 0; border-radius: 16px; overflow: hidden; box-shadow: 0 24px 80px rgba(30, 19, 47, 0.18); }
+#modal-overlay .modal,
+#modal-conta .modal,
+:is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .modal {
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    max-height: calc(100dvh - 48px);
+    padding: 0;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 24px 80px rgba(30, 19, 47, 0.18);
+}
+#modal-overlay .modal { width: min(100%, 600px); }
 #modal-overlay .modal-header { flex: 0 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) 36px; gap: 8px 16px; margin: 0; padding: 26px 28px 20px; border-bottom: 1px solid var(--exp-linha); }
 #modal-overlay .modal-header h2 { margin: 0; align-self: center; font-size: 23px; line-height: 1.2; font-weight: 650; letter-spacing: -0.025em; color: var(--exp-tinta); }
 #modal-overlay .modal-descricao { grid-column: 1; grid-row: 2; margin: 0; font-size: 12px; line-height: 1.5; color: var(--exp-mutado); }
@@ -1380,24 +1371,33 @@ td.despesa {
 #modal-overlay .campo-nome { grid-column: 1 / -1; }
 #modal-overlay .form-group { min-width: 0; gap: 7px; }
 #modal-overlay label { margin: 0; color: #51475f; font-size: 12px; font-weight: 600; }
-#modal-overlay :is(input, select) { min-width: 0; height: 44px; padding: 10px 12px; font: inherit; font-size: 14px; color: #302738; background-color: white; border: 1px solid #918b99; border-radius: 8px; caret-color: var(--exp-roxo); }
+#modal-overlay :is(input, select) { min-width: 0; height: 44px; padding: 10px 12px; font: inherit; font-size: 14px; color: #302738; background-color: white; border: 1px solid var(--campo-modal-borda); border-radius: 8px; caret-color: var(--exp-roxo); }
 #modal-overlay input::placeholder { color: #706879; }
 #modal-overlay .entrada-moeda { position: relative; }
 #modal-overlay .entrada-moeda > span { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 13px; color: #706879; pointer-events: none; }
 #modal-overlay .entrada-moeda input { padding-left: 38px; font-variant-numeric: tabular-nums; }
-#modal-overlay :is(input, select):hover:not(.invalido):not(:focus) { border-color: #776a89; }
-#modal-overlay :is(input, select):focus:not(.invalido) { border-color: #8060b2; outline: 1px solid #8060b2; outline-offset: 0; box-shadow: none; }
-#modal-overlay :is(input, select).invalido { border-color: #b46a64; }
-#modal-overlay :is(input, select).invalido:focus { border-color: #b46a64; outline: 1px solid #b46a64; outline-offset: 0; box-shadow: none; }
+#modal-overlay :is(input, select):hover:not(.invalido):not(:focus) { border-color: var(--campo-modal-borda-hover); }
+#modal-overlay :is(input, select):focus:not(.invalido) { border-color: var(--campo-modal-borda-foco); outline: 1px solid var(--campo-modal-borda-foco); outline-offset: 0; box-shadow: none; }
+#modal-overlay :is(input, select).invalido { border-color: var(--campo-modal-borda-erro); }
+#modal-overlay :is(input, select).invalido:focus { border-color: var(--campo-modal-borda-erro); outline: 1px solid var(--campo-modal-borda-erro); outline-offset: 0; box-shadow: none; }
 #modal-overlay .erro-campo { margin: 0; font-size: 11.5px; line-height: 1.4; color: var(--cor-erro); }
 #modal-overlay .erro-campo:empty { display: none; }
 #modal-overlay .ajuda-transacao { font-size: 11px; line-height: 1.4; color: var(--exp-mutado); }
-#modal-overlay .form-actions { flex: 0 0 auto; justify-content: flex-end; gap: 10px; margin: 0; padding: 18px 28px; border-top: 1px solid var(--exp-linha); background: #fcfbfd; }
+#modal-overlay .form-actions,
+#modal-conta .modal-footer,
+:is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .form-actions {
+    flex: 0 0 auto;
+    justify-content: flex-end;
+    gap: 10px;
+    margin: 0;
+    padding: 18px 28px;
+    border-top: 1px solid var(--exp-linha);
+    background: #fcfbfd;
+}
 #modal-overlay .form-actions button { height: 40px; padding: 0 18px; font: inherit; font-size: 13px; font-weight: 600; border-radius: 8px; box-shadow: none; transition: background-color 0.16s ease, color 0.16s ease; }
 #modal-overlay .form-actions .cancel-modal { background: white; border: 1px solid #d8d1e0; color: #62566f; }
 #modal-overlay .form-actions .cancel-modal:hover { background: #f1edf6; }
-#modal-overlay .form-actions .save-modal { background: var(--exp-roxo); border: 1px solid var(--exp-roxo); color: white; min-width: 110px; }
-#modal-overlay .form-actions .save-modal:hover { background: var(--exp-roxo-hover); border-color: var(--exp-roxo-hover); }
+#modal-overlay .form-actions .save-modal { border-width: 1px; border-style: solid; min-width: 110px; }
 .experimento-visual .sidebar a:focus-visible, .experimento-visual .topbar button:focus-visible,
 #pagina-resumo :is(a, button, .tabela-resumo):focus-visible, #modal-overlay button:focus-visible { outline: 2px solid var(--exp-roxo); outline-offset: 3px; }
 
@@ -1578,8 +1578,7 @@ td.despesa {
 #pagina-contas h1 { margin:0 0 8px; font-size:28px; letter-spacing:-.025em; color:var(--exp-tinta); }
 #pagina-contas .contas-abertura p { margin:0; color:var(--exp-mutado); font-size:13px; line-height:1.5; }
 #pagina-contas button { min-height:44px; border-radius:8px; font:inherit; font-size:13px; box-shadow:none; transition:background-color .16s ease,border-color .16s ease; }
-#pagina-contas #btn-nova-conta { display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:0 16px; white-space:nowrap; background:var(--exp-roxo); border:1px solid var(--exp-roxo); color:white; }
-#pagina-contas #btn-nova-conta:hover { background:var(--exp-roxo-hover); }
+#pagina-contas #btn-nova-conta { display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:0 16px; white-space:nowrap; border-width:1px; border-style:solid; }
 #pagina-contas #btn-nova-conta svg { width:17px; height:17px; }
 #pagina-contas .resumo-contas { display:block; margin:0 0 32px; }
 #pagina-contas .card-conta-resumo { padding:28px; border:1px solid var(--exp-linha); border-radius:16px; background:#fbf9fe; box-shadow:none; }
@@ -1608,7 +1607,7 @@ td.despesa {
 #pagina-contas ::selection, #modal-conta ::selection { background:#e6dcf5; color:#35204e; }
 /* Modal de contas: campos roláveis e ações fora da área de rolagem. */
 .experimento-visual :is(#modal-conta,#modal-exclusao-conta,#modal-exclusao) { padding:24px; box-sizing:border-box; background:rgba(33,27,45,.42); }
-#modal-conta .modal { display:flex; flex-direction:column; box-sizing:border-box; width:min(100%,600px); max-height:calc(100dvh - 48px); padding:0; border-radius:16px; overflow:hidden; box-shadow:0 24px 80px rgba(30,19,47,.18); }
+#modal-conta .modal { width: min(100%,600px); }
 #modal-conta .modal-header { margin:0; padding:24px 28px; border-bottom:1px solid var(--exp-linha); flex:0 0 auto; gap:16px; }
 #modal-conta .modal-header h2 { margin:0; font-size:23px; color:var(--exp-tinta); letter-spacing:-.025em; }
 #modal-conta .close-modal { display:grid; place-items:center; width:36px; height:36px; padding:8px; border:0; border-radius:8px; background:#f6f4f8; color:#71677d; box-shadow:none; }
@@ -1618,12 +1617,12 @@ td.despesa {
 #modal-conta .form-group { min-width:0; margin:0; gap:7px; }
 #modal-conta .form-group:first-child { grid-column:1/-1; }
 #modal-conta label { margin:0; font-size:12px; font-weight:600; color:#51475f; }
-#modal-conta :is(input:not([type=checkbox]),select) { box-sizing:border-box; width:100%; min-width:0; height:44px; padding:10px 12px; font:inherit; font-size:14px; border:1px solid #918b99; border-radius:8px; background:white; color:#302738; caret-color:var(--exp-roxo); transition:border-color .16s ease; }
+#modal-conta :is(input:not([type=checkbox]),select) { box-sizing:border-box; width:100%; min-width:0; height:44px; padding:10px 12px; font:inherit; font-size:14px; border:1px solid var(--campo-modal-borda); border-radius:8px; background:white; color:#302738; caret-color:var(--exp-roxo); transition:border-color .16s ease; }
 #modal-conta input::placeholder { color:#706879; }
-#modal-conta :is(input:not([type=checkbox]),select):hover:not(:focus):not(.invalido) { border-color:#776a89; }
-#modal-conta :is(input:not([type=checkbox]),select):focus { border-color:#8060b2; outline:1px solid #8060b2; outline-offset:0; box-shadow:none; }
-#modal-conta :is(input,select).invalido { border-color:#b46a64; }
-#modal-conta :is(input,select).invalido:focus { outline-color:#b46a64; }
+#modal-conta :is(input:not([type=checkbox]),select):hover:not(:focus):not(.invalido) { border-color:var(--campo-modal-borda-hover); }
+#modal-conta :is(input:not([type=checkbox]),select):focus { border-color:var(--campo-modal-borda-foco); outline:1px solid var(--campo-modal-borda-foco); outline-offset:0; box-shadow:none; }
+#modal-conta :is(input,select).invalido { border-color:var(--campo-modal-borda-erro); }
+#modal-conta :is(input,select).invalido:focus { outline-color:var(--campo-modal-borda-erro); }
 #modal-conta .erro-campo { margin:0; font-size:11.5px; line-height:1.4; }
 #modal-conta .erro-campo:empty { display:none; }
 #modal-conta .ajuda-campo { margin:0; font-size:11.5px; color:var(--exp-mutado); line-height:1.5; }
@@ -1631,10 +1630,8 @@ td.despesa {
 #modal-conta #incluir-saldo-disponivel { width:18px; height:18px; flex:0 0 18px; accent-color:var(--exp-roxo); }
 #modal-conta #incluir-saldo-disponivel:focus-visible { outline:2px solid var(--exp-roxo); outline-offset:3px; }
 #modal-conta #ajuda-inclusao-saldo { grid-column:1/-1; padding-left:28px; }
-#modal-conta .modal-footer { display:flex; flex:0 0 auto; justify-content:flex-end; gap:10px; margin:0; padding:18px 28px; border-top:1px solid var(--exp-linha); background:#fcfbfd; }
+#modal-conta .modal-footer { display: flex; }
 #modal-conta .modal-footer button, #modal-exclusao-conta button, #modal-exclusao button { min-height:44px; padding:0 18px; font:inherit; font-size:13px; font-weight:600; border-radius:8px; box-shadow:none; background:white; color:#62566f; border:1px solid #d8d1e0; }
-#modal-conta #salvar-conta { background:var(--exp-roxo); border-color:var(--exp-roxo); color:white; }
-#modal-conta #salvar-conta:hover { background:var(--exp-roxo-hover); }
 #modal-conta #cancelar-modal-conta:hover { background:#f1edf6; }
 #modal-exclusao-conta .modal-confirmacao, #modal-exclusao .modal-confirmacao { box-sizing:border-box; width:min(100%,440px); padding:28px; border-radius:16px; box-shadow:0 24px 80px rgba(30,19,47,.18); }
 #modal-exclusao-conta h2, #modal-exclusao h2 { margin:0 0 12px; font-size:22px; color:var(--exp-tinta); }
@@ -1795,8 +1792,7 @@ td.despesa {
 #pagina-investimentos .cabecalho-investimentos p { margin:0; max-width:60ch; font-size:13px; line-height:1.6; color:var(--exp-mutado); }
 #pagina-investimentos button { min-height:44px; padding:0 14px; font:inherit; font-size:12px; border-radius:8px; border:1px solid #d8d1e0; color:#62566f; background:white; box-shadow:none; transition:background-color .16s ease,border-color .16s ease; }
 #pagina-investimentos button:hover { background:#f4effb; border-color:#baa8d5; }
-#pagina-investimentos #novo-investimento { display:inline-flex; align-items:center; justify-content:center; gap:8px; flex-shrink:0; background:var(--exp-roxo); border-color:var(--exp-roxo); color:white; font-size:13px; padding:0 16px; }
-#pagina-investimentos #novo-investimento:hover { background:var(--exp-roxo-hover); }
+#pagina-investimentos #novo-investimento { display:inline-flex; align-items:center; justify-content:center; gap:8px; flex-shrink:0; font-size:13px; padding:0 16px; }
 #pagina-investimentos #novo-investimento svg { width:17px; height:17px; }
 #pagina-investimentos .totais-investimentos { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0; border:1px solid var(--exp-linha); border-radius:16px; overflow:hidden; background:white; }
 #pagina-investimentos .totais-investimentos:has(.valor-investimento-extenso) { grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr)); }
@@ -1857,7 +1853,7 @@ td.despesa {
 #pagina-investimentos ::selection { background:#e6dcf5; color:#35204e; }
 /* Mesma anatomia dos demais modais: cabeçalho e ações fixos, campos roláveis. */
 :is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao,#modal-exclusao-investimento) { padding:24px; box-sizing:border-box; background:rgba(33,27,45,.42); }
-:is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .modal { display:flex; flex-direction:column; box-sizing:border-box; width:min(100%,660px); max-height:calc(100dvh - 48px); padding:0; border-radius:16px; overflow:hidden; box-shadow:0 24px 80px rgba(30,19,47,.18); }
+:is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .modal { width: min(100%,660px); }
 :is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .modal-header { flex:0 0 auto; gap:16px; margin:0; padding:24px 28px; border-bottom:1px solid var(--exp-linha); }
 :is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .modal-header h2 { flex:1; min-width:0; overflow-wrap:anywhere; margin:0; font-size:23px; letter-spacing:-.025em; color:var(--exp-tinta); }
 :is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .close-modal { display:grid; place-items:center; flex:0 0 36px; width:36px; height:36px; padding:8px; border:0; border-radius:8px; box-shadow:none; color:#71677d; background:#f6f4f8; }
@@ -1869,22 +1865,20 @@ td.despesa {
 #modal-valor-investimento #avaliacao-anterior-investimento { margin:0; font-size:13px; line-height:1.6; color:var(--exp-tinta); }
 :is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .campos-investimento #campos-resgate:not(.hidden) { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px; }
 :is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .campos-investimento label { margin:0; color:#51475f; font-size:12px; font-weight:600; line-height:1.5; }
-:is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .campos-investimento :is(input:not([type=checkbox]),select,textarea) { box-sizing:border-box; width:100%; min-width:0; min-height:44px; padding:10px 12px; font:inherit; font-size:14px; background:white; border:1px solid #918b99; border-radius:8px; color:#302738; caret-color:var(--exp-roxo); transition:border-color .16s ease; }
+:is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .campos-investimento :is(input:not([type=checkbox]),select,textarea) { box-sizing:border-box; width:100%; min-width:0; min-height:44px; padding:10px 12px; font:inherit; font-size:14px; background:white; border:1px solid var(--campo-modal-borda); border-radius:8px; color:#302738; caret-color:var(--exp-roxo); transition:border-color .16s ease; }
 :is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .campos-investimento textarea { resize:vertical; min-height:82px; }
-:is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .campos-investimento :is(input,select,textarea):hover:not(:focus):not(.invalido) { border-color:#776a89; }
-:is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .campos-investimento :is(input:not([type=checkbox]),select,textarea):focus { border-color:#8060b2; outline:1px solid #8060b2; outline-offset:0; box-shadow:none; }
-:is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .campos-investimento :is(input,select,textarea).invalido { border-color:#b46a64; }
-:is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .campos-investimento :is(input,select,textarea).invalido:focus { outline-color:#b46a64; }
+:is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .campos-investimento :is(input,select,textarea):hover:not(:focus):not(.invalido) { border-color:var(--campo-modal-borda-hover); }
+:is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .campos-investimento :is(input:not([type=checkbox]),select,textarea):focus { border-color:var(--campo-modal-borda-foco); outline:1px solid var(--campo-modal-borda-foco); outline-offset:0; box-shadow:none; }
+:is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .campos-investimento :is(input,select,textarea).invalido { border-color:var(--campo-modal-borda-erro); }
+:is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .campos-investimento :is(input,select,textarea).invalido:focus { outline-color:var(--campo-modal-borda-erro); }
 :is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .campos-investimento small:not(.erro-campo), #modal-valor-investimento #ajuda-valor-manual { margin:0; font-size:11.5px; line-height:1.5; color:var(--exp-mutado); }
 :is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .campos-investimento .erro-campo { margin:0; font-size:11.5px; line-height:1.5; }
 :is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .campos-investimento .erro-campo:empty { display:none; }
 :is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .campos-investimento .confirmacao-retroativa { display:flex; align-items:baseline; gap:8px; font-weight:400; }
 :is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .campos-investimento .confirmacao-retroativa.hidden { display:none; }
 :is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .campos-investimento input[type=checkbox] { width:18px; height:18px; flex:0 0 18px; margin:0; accent-color:var(--exp-roxo); }
-:is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .form-actions { flex:0 0 auto; display:flex; justify-content:flex-end; flex-wrap:wrap; gap:10px; margin:0; padding:18px 28px; border-top:1px solid var(--exp-linha); background:#fcfbfd; }
+:is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .form-actions { display: flex; flex-wrap: wrap; }
 :is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao,#modal-exclusao-investimento) button { min-height:44px; padding:0 18px; font:inherit; font-size:13px; border-radius:8px; box-shadow:none; background:white; color:#62566f; border:1px solid #d8d1e0; }
-:is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) button[type=submit] { color:white; background:var(--exp-roxo); border-color:var(--exp-roxo); }
-:is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) button[type=submit]:hover { background:var(--exp-roxo-hover); }
 :is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao,#modal-exclusao-investimento) :is(button,input[type=checkbox]):focus-visible { outline:2px solid var(--exp-roxo); outline-offset:3px; }
 #modal-exclusao-investimento .modal-confirmacao { box-sizing:border-box; width:min(100%,440px); max-width:100%; padding:28px; border-radius:16px; box-shadow:0 24px 80px rgba(30,19,47,.18); }
 #modal-exclusao-investimento h2 { margin:0 0 12px; color:var(--exp-tinta); font-size:22px; }
@@ -2048,7 +2042,11 @@ td.despesa {
 /* Variantes de cor: a geometria continua sob responsabilidade de cada componente. */
 .btn-primario { --acao-fundo: var(--exp-roxo); --acao-hover: var(--exp-roxo-hover); }
 .btn-excluir { --acao-fundo: var(--cor-despesa); --acao-hover: #a91b1b; }
-:is(#pagina-resumo, #pagina-transacoes, #pagina-contas, #pagina-investimentos, #modal-exclusao, #modal-exclusao-conta, #modal-exclusao-investimento) button:is(.btn-primario, .btn-excluir) { background: var(--acao-fundo); border-color: var(--acao-fundo); color: #fff; }
-:is(#pagina-resumo, #pagina-transacoes, #pagina-contas, #pagina-investimentos, #modal-exclusao, #modal-exclusao-conta, #modal-exclusao-investimento) button:is(.btn-primario, .btn-excluir):hover:not(:disabled) { background: var(--acao-hover); border-color: var(--acao-hover); color: #fff; }
-:is(#pagina-resumo, #pagina-transacoes, #pagina-contas, #pagina-investimentos, #modal-exclusao, #modal-exclusao-conta, #modal-exclusao-investimento) button:is(.btn-primario, .btn-excluir):focus-visible { outline: 2px solid var(--exp-roxo); outline-offset: 3px; }
-:is(#pagina-resumo, #pagina-transacoes, #pagina-contas, #pagina-investimentos, #modal-exclusao, #modal-exclusao-conta, #modal-exclusao-investimento) button:is(.btn-primario, .btn-excluir):disabled { opacity: .4; cursor: not-allowed; }
+:is(.topbar, #pagina-resumo, #pagina-transacoes, #pagina-contas, #pagina-investimentos, #modal-overlay, #modal-conta, #modal-investimento, #modal-valor-investimento, #modal-movimentacao, #modal-exclusao, #modal-exclusao-conta, #modal-exclusao-investimento) button:is(.btn-primario, .btn-excluir) { background: var(--acao-fundo); border-color: var(--acao-fundo); color: #fff; }
+:is(.topbar, #pagina-resumo, #pagina-transacoes, #pagina-contas, #pagina-investimentos, #modal-overlay, #modal-conta, #modal-investimento, #modal-valor-investimento, #modal-movimentacao, #modal-exclusao, #modal-exclusao-conta, #modal-exclusao-investimento) button:is(.btn-primario, .btn-excluir):hover:not(:disabled) { background: var(--acao-hover); border-color: var(--acao-borda-hover, var(--acao-hover)); color: #fff; }
+:is(.topbar, #pagina-resumo, #pagina-transacoes, #pagina-contas, #pagina-investimentos, #modal-overlay, #modal-conta, #modal-investimento, #modal-valor-investimento, #modal-movimentacao, #modal-exclusao, #modal-exclusao-conta, #modal-exclusao-investimento) button:is(.btn-primario, .btn-excluir):focus-visible { outline: 2px solid var(--exp-roxo); outline-offset: 3px; }
+:is(.topbar, #pagina-resumo, #pagina-transacoes, #pagina-contas, #pagina-investimentos, #modal-overlay, #modal-conta, #modal-investimento, #modal-valor-investimento, #modal-movimentacao, #modal-exclusao, #modal-exclusao-conta, #modal-exclusao-investimento) button:is(.btn-primario, .btn-excluir):disabled { opacity: .4; cursor: not-allowed; }
+
+/* Nestes primários, a borda conserva o roxo normal durante o hover. */
+:is(#btn-nova-conta, #novo-investimento, #salvar-conta).btn-primario,
+:is(#modal-investimento, #modal-valor-investimento, #modal-movimentacao) button.btn-primario { --acao-borda-hover: var(--exp-roxo); }
