@@ -1161,7 +1161,7 @@ function fecharModal(modal) {
         : document.getElementById("pagina-contas").classList.contains("ativa") ? botaoNovaConta
         : document.getElementById("pagina-investimentos").classList.contains("ativa") ? document.getElementById("novo-investimento")
         : addReceita;
-    destino.focus();
+    destino.focus({ preventScroll: Boolean(destino.closest("#lista-investimentos")) });
     focoAnteriorModal = null;
 }
 const formatadorMoeda = new Intl.NumberFormat("pt-BR", {
@@ -2350,13 +2350,68 @@ function fecharExclusaoInvestimento() {
     investimentoEmExclusao = null;
 }
 
+function apresentarValorInvestimento(elemento, centavos) {
+    elemento.textContent = formatarCentavos(centavos);
+    elemento.classList.toggle("valor-investimento-extenso", elemento.textContent.length > 18);
+}
+
+function prepararRetornoFocoInvestimento(id, acao) {
+    const item = [...document.getElementById("lista-investimentos").children]
+        .find((elemento) => elemento.dataset.investimentoId === id);
+    focoAnteriorModal = item?.querySelector(`[data-acao="${acao}"]`)
+        ?? document.getElementById("novo-investimento");
+    const administracao = focoAnteriorModal.closest(".gerenciar-investimento");
+    if (administracao) {
+        posicionarAcoesAdministrativasInvestimento(administracao);
+        administracao.open = true;
+    }
+}
+
+function posicionarAcoesAdministrativasInvestimento(menu) {
+    const posicao = menu.getBoundingClientRect();
+    const altura = menu.querySelector(".acoes-administrativas-investimento").getBoundingClientRect().height || 110;
+    const limiteInferior = larguraMobileTransacoes.matches
+        ? navegacaoPrincipal.getBoundingClientRect().top : window.innerHeight;
+    menu.classList.toggle("abre-acima", posicao.bottom + altura + 6 > limiteInferior && posicao.top > altura + 6);
+}
+
+function fecharAcoesAdministrativasInvestimentos(exceto = null, restaurarFoco = false) {
+    document.querySelectorAll("#lista-investimentos .gerenciar-investimento[open]").forEach((menu) => {
+        if (menu === exceto) return;
+        const focoDentro = menu.contains(document.activeElement);
+        menu.open = false;
+        if (restaurarFoco && focoDentro) menu.querySelector("summary").focus({ preventScroll: true });
+    });
+}
+
+document.addEventListener("click", (evento) => {
+    if (modalAtivo || evento.target.closest(".modal-overlay")) return;
+    const menu = evento.target.closest(".gerenciar-investimento");
+    if (menu && evento.target.closest("summary")) posicionarAcoesAdministrativasInvestimento(menu);
+    fecharAcoesAdministrativasInvestimentos(menu, true);
+});
+document.addEventListener("keydown", (evento) => {
+    if (evento.key !== "Escape" || modalAtivo || evento.target.closest(".modal-overlay")) return;
+    if (document.querySelector("#lista-investimentos .gerenciar-investimento[open]")) {
+        fecharAcoesAdministrativasInvestimentos(null, true);
+        evento.preventDefault();
+    }
+});
+
+// O painel acompanha o card; ao mudar a área visível, evita permanecer
+// aberto sobre a navegação inferior ou fora dos limites da janela.
+function fecharAcoesInvestimentosAoMudarViewport() {
+    if (!modalAtivo) fecharAcoesAdministrativasInvestimentos(null, true);
+}
+window.addEventListener("scroll", fecharAcoesInvestimentosAoMudarViewport, { passive: true });
+window.addEventListener("resize", fecharAcoesInvestimentosAoMudarViewport);
+
 function renderizarInvestimentos() {
     const acompanhamento = obterAcompanhamentoInvestimentos();
     const { capitais, valores: estimativas, totalCapitalCentavos } = acompanhamento;
-    document.getElementById("total-capital-investimentos").textContent = totalCapitalCentavos === null
-        ? "Indisponível" : formatarCentavos(totalCapitalCentavos);
-    document.getElementById("total-valor-investimentos").textContent = estimativas.disponivel
-        ? formatarCentavos(estimativas.totalValorCentavos) : "Indisponível";
+    apresentarValorInvestimento(document.getElementById("total-capital-investimentos"), totalCapitalCentavos);
+    apresentarValorInvestimento(document.getElementById("total-valor-investimentos"),
+        estimativas.disponivel ? estimativas.totalValorCentavos : null);
     renderizarHistoricoInvestimentos();
     const lista = document.getElementById("lista-investimentos");
     lista.replaceChildren();
@@ -2369,9 +2424,11 @@ function renderizarInvestimentos() {
         lista.appendChild(mensagem);
         return;
     }
+    const restricaoMovimentacao = obterRestricaoMovimentacaoInvestimentos();
     investimentos.forEach((investimento) => {
         const item = document.createElement("article");
         item.classList.add("item-investimento");
+        item.dataset.investimentoId = investimento.id;
         const nome = document.createElement("h3");
         nome.textContent = investimento.nome;
         const detalhes = document.createElement("p");
@@ -2379,49 +2436,91 @@ function renderizarInvestimentos() {
         const valores = document.createElement("dl");
         const posicao = estimativas.valoresPorInvestimento?.get(investimento.id);
         const capital = capitais.disponivel ? capitais.capitaisPorInvestimentoCentavos.get(investimento.id) : null;
-        [["Capital aplicado", capital], [posicao?.ajustado ? "Valor estimado" : "Valor informado manualmente",
-            posicao?.disponivel ? posicao.valorCentavos : null]].forEach(([rotulo, valor]) => {
+        [["Capital aplicado atual", capital, "Inicial", investimento.capitalInicial, investimento.dataReferenciaCapital],
+            ["Valor estimado atual",
+                posicao?.disponivel ? posicao.valorCentavos : null, "Manual",
+                investimento.valorInformado, investimento.dataReferenciaValor]].forEach(([rotulo, valor, rotuloBase, base, dataBase]) => {
             const grupo = document.createElement("div");
             const termo = document.createElement("dt");
             termo.textContent = rotulo;
             const descricao = document.createElement("dd");
-            descricao.textContent = formatarCentavos(valor);
+            const quantia = document.createElement("span");
+            quantia.className = "valor-investimento";
+            apresentarValorInvestimento(quantia, valor);
+            const referenciaBase = document.createElement("p");
+            referenciaBase.className = "base-investimento";
+            const quantiaBase = document.createElement("span");
+            quantiaBase.className = "valor-base-investimento";
+            quantiaBase.textContent = formatarCentavos(converterParaCentavos(base));
+            referenciaBase.append(`${rotuloBase}: `, quantiaBase,
+                ` · fim de ${formatarDataInvestimento(dataBase)}`);
+            descricao.append(quantia, referenciaBase);
             grupo.append(termo, descricao);
             valores.appendChild(grupo);
         });
         const referencia = document.createElement("p");
         referencia.classList.add("referencia-investimento");
         const dataAtualizacao = obterDataLocal(new Date(investimento.atualizadoEm));
-        referencia.textContent = `Referência do capital: ${formatarDataInvestimento(investimento.dataReferenciaCapital)} · Valor informado manualmente: ${formatadorMoeda.format(investimento.valorInformado)} · Referência do valor: ${formatarDataInvestimento(investimento.dataReferenciaValor)} · Atualização manual: ${formatarDataInvestimento(dataAtualizacao)}.`;
+        referencia.textContent = `Atualização manual: ${formatarDataInvestimento(dataAtualizacao)}`;
         const aviso = document.createElement("p");
         aviso.classList.add("aviso-investimento");
         aviso.textContent = posicao && !posicao.disponivel ? posicao.motivo
             : !capitais.disponivel ? capitais.motivo : "";
         const acoes = document.createElement("div");
         acoes.classList.add("acoes-investimento");
-        [["Aporte", (id) => abrirModalMovimentacao("aporte", id)],
-            ["Resgate", (id) => abrirModalMovimentacao("resgate", id)],
-            ["Atualizar valor", abrirAtualizacaoValor],
-            ["Editar", abrirModalInvestimento], ["Excluir", solicitarExclusaoInvestimento]].forEach(([rotulo, acao]) => {
+        const administracao = document.createElement("details");
+        administracao.className = "gerenciar-investimento";
+        const abrirAdministracao = document.createElement("summary");
+        abrirAdministracao.textContent = "Mais ações";
+        abrirAdministracao.setAttribute("aria-label", `Mais ações do investimento ${investimento.nome}`);
+        const acoesAdministrativas = document.createElement("div");
+        acoesAdministrativas.className = "acoes-administrativas-investimento";
+        acoesAdministrativas.id = `administracao-investimento-${investimento.id}`;
+        abrirAdministracao.setAttribute("aria-controls", acoesAdministrativas.id);
+        administracao.append(abrirAdministracao, acoesAdministrativas);
+        [["Aporte", "aporte", (id) => abrirModalMovimentacao("aporte", id)],
+            ["Resgate", "resgate", (id) => abrirModalMovimentacao("resgate", id)],
+            ["Atualizar valor", "atualizar", abrirAtualizacaoValor],
+            ["Editar", "editar", abrirModalInvestimento], ["Excluir", "excluir", solicitarExclusaoInvestimento]].forEach(([rotulo, chave, acao]) => {
             const botao = document.createElement("button");
             botao.type = "button";
             botao.textContent = rotulo;
+            botao.dataset.acao = chave;
             botao.setAttribute("aria-label", `${rotulo} investimento ${investimento.nome}`);
             if (rotulo === "Excluir") botao.classList.add("btn-excluir");
-            botao.addEventListener("click", () => acao(investimento.id));
-            acoes.appendChild(botao);
+            if (restricaoMovimentacao && (chave === "aporte" || chave === "resgate")) {
+                botao.disabled = true;
+                botao.setAttribute("aria-describedby", `restricao-movimentacao-${investimento.id}`);
+            }
+            const administrativa = chave === "editar" || chave === "excluir";
+            botao.addEventListener("click", () => {
+                if (!administrativa) fecharAcoesAdministrativasInvestimentos();
+                acao(investimento.id);
+            });
+            (administrativa ? acoesAdministrativas : acoes).appendChild(botao);
         });
         const identidade = document.createElement("header");
         identidade.className = "identidade-investimento";
         identidade.append(nome, detalhes);
-        item.append(identidade, valores, referencia);
+        item.append(identidade, valores, administracao);
         if (investimento.observacoes) {
             const nota = document.createElement("p");
             nota.className = "nota-investimento";
             nota.textContent = investimento.observacoes;
             item.appendChild(nota);
         }
-        item.append(aviso, acoes);
+        if (aviso.textContent) item.appendChild(aviso);
+        if (restricaoMovimentacao) {
+            const explicacao = document.createElement("p");
+            explicacao.className = "restricao-movimentacao-investimento";
+            explicacao.id = `restricao-movimentacao-${investimento.id}`;
+            explicacao.textContent = restricaoMovimentacao.mensagem;
+            item.appendChild(explicacao);
+        }
+        const rodape = document.createElement("footer");
+        rodape.className = "rodape-investimento";
+        rodape.append(referencia, acoes);
+        item.appendChild(rodape);
         lista.appendChild(item);
     });
 }
@@ -2475,6 +2574,7 @@ formInvestimento.addEventListener("submit", (evento) => {
     // Resolve os nomes atuais pelos IDs, preservando os registros e o estado da listagem.
     renderizarTransacoes(listaTransacoes, 5);
     atualizarTabelaCompleta();
+    if (editando) prepararRetornoFocoInvestimento(registro.id, "editar");
     fecharModalInvestimento();
     mostrarToast(editando ? "Investimento atualizado." : "Investimento cadastrado.", "sucesso");
 });
@@ -2525,6 +2625,8 @@ function abrirAtualizacaoValor(id) {
     formValorInvestimento.reset();
     limparErros(formValorInvestimento);
     document.getElementById("titulo-valor-investimento").textContent = `Atualizar valor · ${investimento.nome}`;
+    document.getElementById("avaliacao-anterior-investimento").textContent =
+        `Avaliação anterior: ${formatarCentavos(converterParaCentavos(investimento.valorInformado))}, referente ao final de ${formatarDataInvestimento(investimento.dataReferenciaValor)}. Registro atualizado em ${formatarDataInvestimento(obterDataLocal(new Date(investimento.atualizadoEm)))}.`;
     campoValorManual.value = investimento.valorInformado;
     campoDataValorManual.max = obterDataLocal();
     campoDataValorManual.value = investimento.dataReferenciaValor;
@@ -2565,6 +2667,7 @@ formValorInvestimento.addEventListener("submit", (evento) => {
     if (!persistirColecao("investimentos", candidatos)) return;
     investimentos = candidatos;
     renderizarInvestimentos();
+    prepararRetornoFocoInvestimento(atualizado.id, "atualizar");
     fecharAtualizacaoValor();
     mostrarToast("Valor informado atualizado. As estimativas foram recalculadas.", "sucesso");
 });
@@ -2641,13 +2744,20 @@ const camposMovimentacao = Object.fromEntries(
 let tipoMovimentacao = "aporte";
 let movimentacaoEmEdicao = null;
 
-function podeMovimentarInvestimentos() {
+function obterRestricaoMovimentacaoInvestimentos() {
     if (["transacoes", "contas", "investimentos"].some((chave) => colecoesBloqueadas.has(chave))) {
-        mostrarToast("Não é possível movimentar: contas, investimentos ou transações estão indisponíveis. Os dados armazenados foram preservados.", "erro");
-        return false;
+        return { mensagem: "Não é possível movimentar: contas, investimentos ou transações estão indisponíveis. Os dados armazenados foram preservados.", tipo: "erro" };
     }
     if (!contas.length || !investimentos.length) {
-        mostrarToast("Cadastre pelo menos uma conta e um investimento antes de registrar aportes ou resgates.", "informacao");
+        return { mensagem: "Cadastre pelo menos uma conta e um investimento antes de registrar aportes ou resgates.", tipo: "informacao" };
+    }
+    return null;
+}
+
+function podeMovimentarInvestimentos() {
+    const restricao = obterRestricaoMovimentacaoInvestimentos();
+    if (restricao) {
+        mostrarToast(restricao.mensagem, restricao.tipo);
         return false;
     }
     return true;

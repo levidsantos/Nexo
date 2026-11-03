@@ -1809,30 +1809,54 @@ td.despesa {
 #pagina-investimentos #novo-investimento:hover { background:var(--exp-roxo-hover); }
 #pagina-investimentos #novo-investimento svg { width:17px; height:17px; }
 #pagina-investimentos .totais-investimentos { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0; border:1px solid var(--exp-linha); border-radius:16px; overflow:hidden; background:white; }
+#pagina-investimentos .totais-investimentos:has(.valor-investimento-extenso) { grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr)); }
 #pagina-investimentos .secao-investimentos { padding:0; margin:28px 0 0; border:0; background:none; box-shadow:none; }
 #pagina-investimentos .totais-investimentos .secao-investimentos { padding:26px 28px; margin:0; }
 #pagina-investimentos .totais-investimentos .secao-investimentos + .secao-investimentos { border-left:1px solid var(--exp-linha); background:#fbf9fe; }
 #pagina-investimentos .totais-investimentos span { font-size:13px; color:#51475f; }
-#pagina-investimentos .totais-investimentos .secao-investimentos h2 { margin:12px 0 0; color:var(--exp-tinta); font-size:32px; line-height:1.2; letter-spacing:-.025em; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+#pagina-investimentos .totais-investimentos .secao-investimentos h2 { margin:12px 0 0; color:var(--exp-tinta); font-size:32px; line-height:1.2; letter-spacing:-.025em; font-variant-numeric:tabular-nums; white-space:nowrap; }
+#pagina-investimentos .totais-investimentos .secao-investimentos h2.valor-investimento-extenso { font-size:clamp(16px,5vw,32px); }
 #pagina-investimentos #total-valor-investimentos { color:#35204e; }
 #pagina-investimentos .ajuda-indicador { margin:12px 0 0; font-size:11.5px; color:var(--exp-mutado); line-height:1.5; }
 #pagina-investimentos .ajuda-investimentos { margin:12px 0 20px; color:var(--exp-mutado); font-size:12px; line-height:1.6; max-width:90ch; }
 #pagina-investimentos .secao-investimentos-header { margin:0 0 16px; }
 #pagina-investimentos .secao-investimentos h2 { margin:0; font-size:17px; font-weight:600; color:var(--exp-tinta); }
-#pagina-investimentos #lista-investimentos { display:grid; gap:20px; }
-#pagina-investimentos .item-investimento { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.15fr); align-items:start; gap:20px 28px; padding:24px; margin:0; border:1px solid var(--exp-linha); border-radius:14px; background:white; }
-#pagina-investimentos .identidade-investimento { min-width:0; }
+#pagina-investimentos #lista-investimentos { display:grid; gap:16px; }
+#pagina-investimentos .item-investimento { display:grid; grid-template-columns:minmax(160px,.8fr) minmax(0,1.8fr) auto; align-items:start; gap:18px 24px; padding:22px 24px; margin:0; border:1px solid var(--exp-linha); border-radius:14px; background:white; position:relative; container-type:inline-size; }
+#pagina-investimentos .item-investimento:has(.gerenciar-investimento[open]) { z-index:2; }
+#pagina-investimentos .identidade-investimento { min-width:0; grid-column:1; grid-row:1; }
 #pagina-investimentos .item-investimento h3 { margin:0 0 6px; font-size:16px; font-weight:600; line-height:1.4; color:var(--exp-tinta); }
 #pagina-investimentos .item-investimento p { color:var(--exp-mutado); font-size:12px; line-height:1.6; overflow-wrap:anywhere; }
-#pagina-investimentos .item-investimento dl { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px; margin:0; min-width:0; }
-#pagina-investimentos .item-investimento dl > div { min-width:0; }
-#pagina-investimentos .item-investimento dt { font-size:11.5px; line-height:1.5; color:var(--exp-mutado); }
-#pagina-investimentos .item-investimento dd { margin:7px 0 0; font-size:23px; line-height:1.2; font-weight:600; color:var(--exp-tinta); letter-spacing:-.02em; }
+#pagina-investimentos .item-investimento dl { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); grid-template-rows:auto auto; gap:7px 20px; margin:0; min-width:0; grid-column:2; grid-row:1; }
+#pagina-investimentos .item-investimento dl > div { min-width:0; display:grid; grid-template-rows:subgrid; grid-row:span 2; }
+#pagina-investimentos .item-investimento dt { font-size:12px; line-height:1.4; color:var(--exp-mutado); }
+#pagina-investimentos .item-investimento dd { margin:0; font-size:23px; line-height:1.2; font-weight:600; color:var(--exp-tinta); letter-spacing:-.02em; }
+#pagina-investimentos .valor-investimento, #pagina-investimentos .valor-base-investimento { white-space:nowrap; overflow-wrap:normal; }
+#pagina-investimentos .valor-investimento { display:block; }
+#pagina-investimentos .valor-investimento.valor-investimento-extenso { font-size:clamp(16px,4.5vw,23px); }
+#pagina-investimentos .item-investimento .base-investimento { margin:8px 0 0; font-size:13px; line-height:1.5; font-weight:400; letter-spacing:normal; }
 #pagina-investimentos .item-investimento :is(.referencia-investimento,.nota-investimento,.aviso-investimento,.acoes-investimento) { grid-column:1/-1; }
-#pagina-investimentos .item-investimento .referencia-investimento { padding-top:16px; border-top:1px solid var(--exp-linha); font-size:11.5px; }
-#pagina-investimentos .item-investimento .nota-investimento { white-space:pre-wrap; margin-top:-8px; color:#62566f; }
+#pagina-investimentos .item-investimento .referencia-investimento { padding:0; margin:0; border:0; font-size:13px; }
+#pagina-investimentos .item-investimento .restricao-movimentacao-investimento { grid-column:1/-1; margin:0; font-size:13px; }
+#pagina-investimentos .acoes-investimento button:disabled { opacity:.55; cursor:not-allowed; }
+#pagina-investimentos .item-investimento .nota-investimento { white-space:pre-wrap; margin:0; color:#62566f; }
 #pagina-investimentos .item-investimento .aviso-investimento { color:#a43d42; }
 #pagina-investimentos .acoes-investimento { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px; }
+#pagina-investimentos .rodape-investimento { grid-column:1/-1; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px 20px; padding-top:14px; border-top:1px solid var(--exp-linha); }
+#pagina-investimentos .rodape-investimento :is(.referencia-investimento,.acoes-investimento) { flex-basis:auto; }
+#pagina-investimentos .acoes-investimento [data-acao="atualizar"] { color:#54318f; background:#f4effb; border-color:#dfd3ee; }
+#pagina-investimentos .acoes-investimento [data-acao="atualizar"]:hover { background:#ece3f8; border-color:#baa8d5; }
+#pagina-investimentos .gerenciar-investimento { grid-column:3; grid-row:1; position:relative; justify-self:end; }
+#pagina-investimentos .gerenciar-investimento > summary { display:flex; align-items:center; justify-content:center; gap:8px; min-height:44px; padding:0 10px; box-sizing:border-box; list-style:none; border:1px solid #d8d1e0; border-radius:8px; color:#62566f; background:white; white-space:nowrap; }
+#pagina-investimentos .gerenciar-investimento > summary::-webkit-details-marker { display:none; }
+#pagina-investimentos .gerenciar-investimento > summary::after { content:""; width:5px; height:5px; border-right:1.5px solid currentColor; border-bottom:1.5px solid currentColor; transform:translateY(-2px) rotate(45deg); }
+#pagina-investimentos .gerenciar-investimento[open] > summary::after { transform:translateY(1px) rotate(225deg); }
+#pagina-investimentos .gerenciar-investimento > summary:hover { background:#f7f5fa; border-color:#baa8d5; }
+#pagina-investimentos .acoes-administrativas-investimento { position:absolute; z-index:3; right:0; top:calc(100% + 6px); width:168px; padding:6px; box-sizing:border-box; display:grid; gap:4px; background:white; border:1px solid var(--exp-linha); border-radius:10px; box-shadow:0 8px 24px rgba(33,27,45,.1); }
+#pagina-investimentos .gerenciar-investimento.abre-acima .acoes-administrativas-investimento { top:auto; bottom:calc(100% + 6px); }
+#pagina-investimentos .acoes-administrativas-investimento button { text-align:left; border-color:transparent; }
+#pagina-investimentos .acoes-administrativas-investimento .btn-excluir { color:#a43d42; }
+#pagina-investimentos .acoes-administrativas-investimento .btn-excluir:hover { background:#fff5f5; border-color:#ead8da; }
 #pagina-investimentos .acoes-investimento .btn-excluir { color:#a43d42; border-color:#ead8da; }
 #pagina-investimentos .acoes-investimento .btn-excluir:hover { background:#fff5f5; }
 #pagina-investimentos .lista-historico-investimentos { border:1px solid var(--exp-linha); border-radius:14px; overflow:hidden; background:white; }
@@ -1857,7 +1881,8 @@ td.despesa {
 :is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) form { display:flex; flex-direction:column; gap:0; min-height:0; margin:0; overflow:hidden; }
 :is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .campos-investimento { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start; gap:18px 20px; min-height:0; overflow-y:auto; padding:24px 28px; scrollbar-width:thin; scrollbar-color:#b8adc8 transparent; scroll-padding:16px; }
 :is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .campos-investimento .form-group { min-width:0; margin:0; gap:7px; }
-:is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .campos-investimento :is(.form-group:has(#nome-investimento),.form-group:has(textarea),.confirmacao-retroativa,#campos-resgate,#ajuda-valor-manual) { grid-column:1/-1; }
+:is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .campos-investimento :is(.form-group:has(#nome-investimento),.form-group:has(textarea),.confirmacao-retroativa,#campos-resgate,#ajuda-valor-manual,#avaliacao-anterior-investimento) { grid-column:1/-1; }
+#modal-valor-investimento #avaliacao-anterior-investimento { margin:0; font-size:13px; line-height:1.6; color:var(--exp-tinta); }
 :is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .campos-investimento #campos-resgate:not(.hidden) { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px; }
 :is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .campos-investimento label { margin:0; color:#51475f; font-size:12px; font-weight:600; line-height:1.5; }
 :is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .campos-investimento :is(input:not([type=checkbox]),select,textarea) { box-sizing:border-box; width:100%; min-width:0; min-height:44px; padding:10px 12px; font:inherit; font-size:14px; background:white; border:1px solid #918b99; border-radius:8px; color:#302738; caret-color:var(--exp-roxo); transition:border-color .16s ease; }
@@ -1882,9 +1907,23 @@ td.despesa {
 #modal-exclusao-investimento p { font-size:13px; line-height:1.6; color:#62566f; overflow-wrap:anywhere; }
 #modal-exclusao-investimento .acoes-confirmacao { justify-content:flex-end; flex-wrap:wrap; gap:10px; margin-top:24px; }
 #modal-exclusao-investimento #confirmar-exclusao-investimento { color:white; background:#a43d42; border-color:#a43d42; }
+@container (max-width:879px) {
+ #pagina-investimentos .totais-investimentos:has(.valor-investimento-extenso) .secao-investimentos + .secao-investimentos { border-left:0; border-top:1px solid var(--exp-linha); }
+}
+@container (max-width:650px) {
+ #pagina-investimentos .item-investimento dl:has(.valor-investimento-extenso) { grid-template-columns:minmax(0,1fr); grid-template-rows:none; row-gap:16px; }
+ #pagina-investimentos .item-investimento dl:has(.valor-investimento-extenso) > div { display:block; grid-row:auto; }
+ #pagina-investimentos .item-investimento dl:has(.valor-investimento-extenso) dd { margin-top:7px; }
+}
+@container (max-width:260px) {
+ #pagina-investimentos .item-investimento dl { grid-template-columns:minmax(0,1fr); grid-template-rows:none; row-gap:16px; }
+ #pagina-investimentos .item-investimento dl > div { display:block; grid-row:auto; }
+ #pagina-investimentos .item-investimento dd { margin-top:7px; }
+}
 @media(max-width:1100px) {
- #pagina-investimentos .item-investimento { grid-template-columns:minmax(0,1fr); }
- #pagina-investimentos .item-investimento dl { max-width:600px; }
+ #pagina-investimentos .item-investimento { grid-template-columns:minmax(0,1fr) auto; }
+ #pagina-investimentos .gerenciar-investimento { grid-column:2; }
+ #pagina-investimentos .item-investimento dl { grid-column:1/-1; grid-row:2; }
 }
 @media(max-width:700px) {
  #pagina-investimentos h1 { font-size:26px; }
@@ -1893,16 +1932,17 @@ td.despesa {
  #pagina-investimentos .totais-investimentos .secao-investimentos { padding:24px; }
  #pagina-investimentos .totais-investimentos .secao-investimentos + .secao-investimentos { border-left:0; border-top:1px solid var(--exp-linha); }
  #pagina-investimentos .totais-investimentos .secao-investimentos h2 { font-size:30px; }
- #pagina-investimentos .item-investimento { padding:22px; gap:18px; }
+ #pagina-investimentos .item-investimento { padding:20px; gap:16px; }
  #pagina-investimentos .lista-historico-investimentos li { grid-template-columns:minmax(0,1fr); padding:20px; }
  #pagina-investimentos .lista-historico-investimentos .valor-movimento-investimento { grid-column:1; grid-row:auto; text-align:left; }
 }
 @media(max-width:520px) {
  #pagina-investimentos #novo-investimento { width:100%; }
- #pagina-investimentos .item-investimento dl { gap:16px; }
+ #pagina-investimentos .item-investimento dl { column-gap:16px; }
  #pagina-investimentos .item-investimento dd { font-size:21px; }
- #pagina-investimentos .acoes-investimento { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
- #pagina-investimentos .acoes-investimento button:nth-child(3) { grid-column:1/-1; }
+ #pagina-investimentos .rodape-investimento { display:grid; gap:12px; }
+ #pagina-investimentos .acoes-investimento { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
+ #pagina-investimentos .acoes-investimento button { padding:8px; line-height:1.3; }
  :is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao,#modal-exclusao-investimento) { padding:12px; }
  :is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .modal { max-height:calc(100dvh - 24px); }
  :is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .modal-header { padding:20px; }
