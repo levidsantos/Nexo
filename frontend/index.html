@@ -279,12 +279,22 @@
                     </header>
 
                     <section class="card card-historico" aria-labelledby="titulo-historico-financeiro">
-                        <div class="analise-titulo"><h2 id="titulo-historico-financeiro">Histórico financeiro</h2><p>Receitas e despesas por mês, até hoje.</p></div>
-                        <div class="controles-historico" role="group" aria-label="Período do histórico financeiro">
-                            <button type="button" id="historico-anterior" disabled>Período anterior</button>
-                            <p id="periodo-historico-analises" class="periodo-historico" aria-live="polite" aria-atomic="true"></p>
-                            <button type="button" id="historico-proximo" disabled>Período seguinte</button>
-                        </div>
+                        <header class="historico-abertura">
+                            <div class="analise-titulo"><h2 id="titulo-historico-financeiro">Histórico financeiro</h2><p>Evolução mensal de receitas e despesas</p></div>
+                            <div class="controles-historico" role="group" aria-label="Período do histórico financeiro">
+                                <div class="duracoes-historico" role="group" aria-label="Duração do histórico">
+                                    <button type="button" data-duracao-historico="3" aria-pressed="false" disabled>3 meses</button>
+                                    <button type="button" data-duracao-historico="6" aria-pressed="true" disabled>6 meses</button>
+                                    <button type="button" data-duracao-historico="12" aria-pressed="false" disabled>12 meses</button>
+                                </div>
+                                <label class="seletor-mes-historico" for="mes-final-historico">
+                                    <span class="texto-acessivel">Mês final</span>
+                                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>
+                                    <select id="mes-final-historico" aria-describedby="periodo-historico-analises" disabled><option>Sem histórico</option></select>
+                                </label>
+                            </div>
+                        </header>
+                        <p id="periodo-historico-analises" class="periodo-historico" aria-live="polite" aria-atomic="true"></p>
                         <p id="estado-historico-analises" class="mensagem-vazia" role="status"></p>
                         <div id="area-historico-analises" class="area-grafico" hidden>
                             <canvas id="grafico-historico-analises" role="img" aria-label="Histórico mensal de receitas e despesas" aria-describedby="dados-historico-analises"></canvas>
@@ -292,9 +302,9 @@
                         <p id="dados-historico-analises" class="texto-acessivel"></p>
                     </section>
                     <section class="card card-distribuicao" aria-labelledby="titulo-distribuicao">
-                        <header class="distribuicao-abertura"><div class="analise-titulo"><h2 id="titulo-distribuicao">Distribuição de despesas</h2><p id="intervalo-distribuicao" class="periodo-historico"></p></div><div id="total-distribuicao" hidden><span>Total de despesas</span><strong id="valor-total-distribuicao"></strong></div></header>
-                        <div class="filtros-distribuicao">
-                            <div class="form-group">
+                        <header class="distribuicao-abertura">
+                            <div class="analise-titulo"><h2 id="titulo-distribuicao">Distribuição de despesas</h2><p id="intervalo-distribuicao" class="periodo-historico"></p></div>
+                            <div class="controle-periodo-distribuicao">
                                 <label for="periodo-distribuicao">Período</label>
                                 <select id="periodo-distribuicao">
                                     <option value="atual">Mês atual</option>
@@ -302,6 +312,9 @@
                                     <option value="personalizado">Personalizado</option>
                                 </select>
                             </div>
+                            <div id="total-distribuicao" hidden><span>Total de despesas</span><strong id="valor-total-distribuicao"></strong></div>
+                        </header>
+                        <div class="filtros-distribuicao">
                             <div id="meses-distribuicao" hidden>
                                 <div class="form-group">
                                     <label for="mes-inicial-distribuicao">Mês inicial</label>

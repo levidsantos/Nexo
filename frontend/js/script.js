@@ -23,7 +23,8 @@ const filaNotificacoes = [];
 let mensagensParaAnunciar = [];
 let anuncioPendente = null;
 const colecoesBloqueadas = new Set();
-let blocoHistoricoAnalises = 0;
+let duracaoHistoricoAnalises = 6;
+let mesFinalHistoricoAnalises = null;
 const graficosHistorico = { resumo: null, analises: null };
 let graficoDistribuicao = null;
 let transacoes = carregarColecao("transacoes", validarTransacao);
@@ -612,16 +613,16 @@ function obterSaldosContas(hoje = obterDataLocal()) {
 
 function historicoMensalIndisponivel(motivo) {
     return { disponivel: false, motivo, vazio: null, meses: null,
-        primeiroMes: null, ultimoMes: null, bloco: null, totalBlocos: null,
-        temAnterior: false, temProximo: false };
+        primeiroMes: null, ultimoMes: null, mesFinal: null, duracao: null };
 }
 
-// Bloco 0: até seis meses terminando no mês atual. Blocos maiores recuam no tempo.
+// A duração e o mês final selecionam a janela; a agregação financeira é compartilhada.
 // Datas são comparadas como YYYY-MM-DD; não há conversão UTC nem referência de conta.
-function prepararHistoricoMensal(registros, hoje = obterDataLocal(), bloco = 0) {
+function prepararHistoricoMensal(registros, hoje = obterDataLocal(), mesFinal = null, duracao = 6) {
     if (!dataValida(hoje) || !validarColecao(registros, validarTransacao)
-        || !Number.isSafeInteger(bloco) || bloco < 0) {
-        return historicoMensalIndisponivel("Transações, data ou bloco inválidos para preparar o histórico.");
+        || ![3, 6, 12].includes(duracao)
+        || (mesFinal !== null && !dataValida(`${mesFinal}-01`))) {
+        return historicoMensalIndisponivel("Transações, data ou período inválidos para preparar o histórico.");
     }
 
     const totaisPorMes = new Map();
@@ -646,17 +647,16 @@ function prepararHistoricoMensal(registros, hoje = obterDataLocal(), bloco = 0) 
 
     if (primeiroIndice === null) {
         return { disponivel: true, motivo: "Nenhuma movimentação até a data atual.", vazio: true,
-            meses: [], primeiroMes: null, ultimoMes: null, bloco: 0, totalBlocos: 0,
-            temAnterior: false, temProximo: false };
+            meses: [], primeiroMes: null, ultimoMes: null, mesFinal: null, duracao };
     }
 
     const indiceAtual = Number(hoje.slice(0, 4)) * 12 + Number(hoje.slice(5, 7)) - 1;
-    const totalBlocos = Math.ceil((indiceAtual - primeiroIndice + 1) / 6);
-    if (bloco >= totalBlocos) {
-        return historicoMensalIndisponivel("O bloco solicitado está fora do histórico disponível.");
+    const fim = mesFinal === null ? indiceAtual
+        : Number(mesFinal.slice(0, 4)) * 12 + Number(mesFinal.slice(5, 7)) - 1;
+    if (fim < primeiroIndice || fim > indiceAtual) {
+        return historicoMensalIndisponivel("O mês final está fora do histórico disponível.");
     }
-    const fim = indiceAtual - bloco * 6;
-    const inicio = Math.max(primeiroIndice, fim - 5);
+    const inicio = fim - duracao + 1;
     const chaveMes = (indice) => `${String(Math.floor(indice / 12)).padStart(4, "0")}-${String(indice % 12 + 1).padStart(2, "0")}`;
     const meses = [];
     for (let indice = inicio; indice <= fim; indice++) {
@@ -665,11 +665,11 @@ function prepararHistoricoMensal(registros, hoje = obterDataLocal(), bloco = 0) 
     }
     return { disponivel: true, motivo: "", vazio: false, meses,
         primeiroMes: chaveMes(primeiroIndice), ultimoMes: chaveMes(indiceAtual),
-        bloco, totalBlocos, temAnterior: bloco + 1 < totalBlocos, temProximo: bloco > 0 };
+        mesFinal: chaveMes(fim), duracao };
 }
 
 // Entrada da aplicação: utiliza a coleção completa e respeita os bloqueios existentes.
-function obterHistoricoMensal(bloco = 0, hoje = obterDataLocal()) {
+function obterHistoricoMensal(mesFinal = null, duracao = 6, hoje = obterDataLocal()) {
     if (colecoesBloqueadas.has("transacoes") || colecoesBloqueadas.has("contas")) {
         return historicoMensalIndisponivel("Dados de transações ou seus vínculos indisponíveis nesta sessão.");
     }
@@ -677,7 +677,7 @@ function obterHistoricoMensal(bloco = 0, hoje = obterDataLocal()) {
         || !validarVinculosTransacoes(transacoes, contas, investimentos)) {
         return historicoMensalIndisponivel("Não foi possível validar as transações e seus vínculos.");
     }
-    return prepararHistoricoMensal(transacoes, hoje, bloco);
+    return prepararHistoricoMensal(transacoes, hoje, mesFinal, duracao);
 }
 
 // Chaves idênticas aos valores persistidos pelo formulário; cores independem da ordem dos dados.
@@ -912,22 +912,66 @@ function atualizarDistribuicaoDespesas() {
     estado.hidden = !mensagem;
 }
 
-function formatarMesHistorico(mes) {
-    const nomes = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
-    return `${nomes[Number(mes.slice(5, 7)) - 1]}/${mes.slice(0, 4)}`;
+function formatarMesHistorico(mes, incluirAno = true) {
+    const nomes = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+    return nomes[Number(mes.slice(5, 7)) - 1] + (incluirAno ? ` ${mes.slice(0, 4)}` : "");
 }
+
+function formatarPeriodoHistorico(inicio, fim, hoje = obterDataLocal()) {
+    const periodo = inicio === fim ? formatarMesHistorico(fim)
+        : `${formatarMesHistorico(inicio, inicio.slice(0, 4) !== fim.slice(0, 4))} — ${formatarMesHistorico(fim)}`;
+    return periodo + (fim === hoje.slice(0, 7) ? " · Dados até hoje" : "");
+}
+
+// Plugin local: não altera a rosca nem registra comportamento global no Chart.js.
+const indicadorMesHistorico = {
+    id: "indicadorMesHistorico",
+    beforeUpdate(grafico) {
+        grafico.setActiveElements([]);
+        grafico.tooltip?.setActiveElements([], { x: 0, y: 0 });
+    },
+    afterEvent(grafico, argumentos) {
+        const tipo = argumentos.event.native?.type || argumentos.event.type;
+        if (argumentos.inChartArea && tipo !== "touchcancel") return;
+        grafico.setActiveElements([]);
+        grafico.tooltip?.setActiveElements([], { x: 0, y: 0 });
+        argumentos.changed = true;
+    },
+    beforeDatasetsDraw(grafico) {
+        const ativo = grafico.getActiveElements()[0];
+        if (!ativo) return;
+        const { ctx, chartArea } = grafico;
+        const x = ativo.element.x;
+        ctx.save();
+        try {
+            ctx.beginPath();
+            ctx.rect(chartArea.left, chartArea.top, chartArea.right - chartArea.left, chartArea.bottom - chartArea.top);
+            ctx.clip();
+            ctx.beginPath();
+            ctx.moveTo(x, chartArea.top);
+            ctx.lineTo(x, chartArea.bottom);
+            ctx.setLineDash([2, 3]);
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = "#d8d2df";
+            ctx.stroke();
+        } finally {
+            ctx.restore();
+        }
+    }
+};
 
 // As duas visualizações diferem apenas na densidade de eixos e legenda.
 function configurarGraficoHistorico(historico, compacto = false) {
     const configuracao = {
         type: "line",
+        plugins: [indicadorMesHistorico],
         data: {
-            labels: historico.meses.map((mes) => formatarMesHistorico(mes.mes)),
+            labels: historico.meses.map((mes) => formatarPeriodoDistribuicao(mes.mes, mes.mes)),
             datasets: [
                 { label: "Receitas", data: historico.meses.map((mes) => mes.receitasCentavos / 100),
-                    borderColor: "#16805d", backgroundColor: "#16805d", pointStyle: "circle" },
+                    borderColor: "#14966D", backgroundColor: "#14966D", pointStyle: "circle" },
                 { label: "Despesas", data: historico.meses.map((mes) => mes.despesasCentavos / 100),
-                    borderColor: "#8b5cc7", backgroundColor: "#8b5cc7", borderDash: [5, 3], pointStyle: "rectRot" }
+                    borderColor: "#E76F65", backgroundColor: "#E76F65", pointStyle: "circle" }
             ]
         },
         options: {
@@ -935,14 +979,40 @@ function configurarGraficoHistorico(historico, compacto = false) {
             maintainAspectRatio: false,
             animation: false,
             locale: "pt-BR",
+            events: ["mousemove", "mouseout", "click", "touchstart", "touchmove", "touchcancel"],
             interaction: { mode: "index", intersect: false },
-            elements: { line: { borderWidth: 2, tension: 0 }, point: { radius: compacto ? 2 : 3, hoverRadius: 5 } },
+            elements: { line: { borderWidth: 2, cubicInterpolationMode: "monotone" }, point: { radius: 0, hoverRadius: 4, hitRadius: 14 } },
             plugins: {
                 legend: { position: "bottom", labels: { usePointStyle: true, boxWidth: 8, font: { size: compacto ? 11 : 12 } } },
-                tooltip: { callbacks: { label: (contexto) => `${contexto.dataset.label}: ${formatarCentavos(historico.meses[contexto.dataIndex][contexto.datasetIndex === 0 ? "receitasCentavos" : "despesasCentavos"])}` } }
+                tooltip: { callbacks: {
+                    title: (itens) => itens.length ? formatarPeriodoDistribuicao(historico.meses[itens[0].dataIndex].mes, historico.meses[itens[0].dataIndex].mes) : "",
+                    label: (contexto) => `${contexto.dataset.label}: ${formatarCentavos(historico.meses[contexto.dataIndex][contexto.datasetIndex === 0 ? "receitasCentavos" : "despesasCentavos"])}` } }
             },
             scales: {
-                x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: compacto ? 3 : 6 } },
+                x: {
+                    grid: { display: false },
+                    afterBuildTicks: (escala) => {
+                        const limite = compacto || escala.chart.width < 480 ? 3 : 6;
+                        const quantidade = historico.meses.length;
+                        const selecionados = new Set([quantidade - 1]);
+                        // Preserva a virada do ano mesmo quando reduzimos os rótulos.
+                        historico.meses.forEach((item, indice) => {
+                            if (indice > 0 && item.mes.slice(5, 7) === "01") selecionados.add(indice);
+                        });
+                        const distancia = Math.max(1, Math.floor(quantidade / limite));
+                        for (let indice = 0; indice < quantidade && selecionados.size < limite; indice++) {
+                            if ([...selecionados].every((outro) => Math.abs(outro - indice) >= distancia)) selecionados.add(indice);
+                        }
+                        escala.ticks = escala.ticks.filter((tick) => selecionados.has(Number(tick.value)));
+                    },
+                    ticks: { maxRotation: 0, autoSkip: false, callback: (valor) => {
+                        const indice = Number(valor);
+                        const mes = historico.meses[indice].mes;
+                        const nomes = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+                        const virada = indice > 0 && mes.slice(0, 4) !== historico.meses[indice - 1].mes.slice(0, 4);
+                        return nomes[Number(mes.slice(5, 7)) - 1] + (virada ? " '" + mes.slice(2, 4) : "");
+                    } }
+                },
                 y: { beginAtZero: true, border: { display: false },
                     grid: { display: !compacto, color: "#edf0f5" },
                     ticks: { maxTicksLimit: compacto ? 3 : 6, callback: (valor) => formatadorMoeda.format(valor) } }
@@ -950,7 +1020,6 @@ function configurarGraficoHistorico(historico, compacto = false) {
         }
     };
     if (!compacto) {
-        configuracao.options.elements.point.hitRadius = 14;
         configuracao.options.plugins.legend.labels.color = "#62566f";
         configuracao.options.plugins.legend.labels.padding = 20;
         Object.assign(configuracao.options.plugins.tooltip, {
@@ -958,7 +1027,8 @@ function configurarGraficoHistorico(historico, compacto = false) {
             titleFont: { size: 12 }, bodyFont: { size: 12 }
         });
         configuracao.options.scales.x.ticks.color = "#6d6278";
-        configuracao.options.scales.x.ticks.font = { size: 11 };
+        configuracao.options.scales.x.ticks.font = { size: 12 };
+        configuracao.options.scales.x.ticks.padding = 8;
         configuracao.options.scales.y.ticks.color = "#6d6278";
         configuracao.options.scales.y.ticks.font = { size: 11 };
         configuracao.options.scales.y.grid.color = "#eeeaf3";
@@ -977,8 +1047,9 @@ function renderizarGraficoHistorico(destino, historico) {
         : typeof window.Chart !== "function" ? "Gráfico indisponível: não foi possível carregar a biblioteca. Verifique sua conexão e recarregue a página." : "";
 
     periodo.textContent = historico.disponivel && !historico.vazio
-        ? `${formatarMesHistorico(historico.meses[0].mes)} — ${formatarMesHistorico(historico.meses.at(-1).mes)}` : "";
-    descricao.textContent = "";
+        ? formatarPeriodoHistorico(historico.meses[0].mes, historico.meses.at(-1).mes) : "";
+    descricao.textContent = historico.disponivel && !historico.vazio
+        ? `${periodo.textContent}. ` + historico.meses.map((mes) => `${formatarPeriodoDistribuicao(mes.mes, mes.mes)}: receitas ${formatarCentavos(mes.receitasCentavos)}, despesas ${formatarCentavos(mes.despesasCentavos)}.`).join(" ") : "";
     if (!mensagem) {
         area.hidden = false;
         try {
@@ -993,7 +1064,6 @@ function renderizarGraficoHistorico(destino, historico) {
                 if (!destruirInstanciaGrafico(canvas)) throw new Error("Não foi possível liberar o gráfico anterior.");
                 graficosHistorico[destino] = new window.Chart(canvas, configuracao);
             }
-            descricao.textContent = historico.meses.map((mes) => `${formatarMesHistorico(mes.mes)}: receitas ${formatarCentavos(mes.receitasCentavos)}, despesas ${formatarCentavos(mes.despesasCentavos)}.`).join(" ");
         } catch (erro) {
             mensagem = "Gráfico indisponível: não foi possível renderizar o histórico financeiro.";
         }
@@ -1009,18 +1079,51 @@ function renderizarGraficoHistorico(destino, historico) {
     estado.hidden = !mensagem;
 }
 
-function atualizarGraficosHistorico() {
-    const recente = obterHistoricoMensal();
-    // Reutiliza o mesmo resultado para o bloco recente; sem alterar a agregação.
-    if (recente.disponivel) {
-        blocoHistoricoAnalises = recente.vazio ? 0 : Math.min(blocoHistoricoAnalises, recente.totalBlocos - 1);
+function atualizarControlesHistorico(historico) {
+    const seletor = document.getElementById("mes-final-historico");
+    const disponivel = historico.disponivel && !historico.vazio;
+    document.querySelectorAll("[data-duracao-historico]").forEach((botao) => {
+        botao.disabled = !disponivel;
+        botao.setAttribute("aria-pressed", String(Number(botao.dataset.duracaoHistorico) === duracaoHistoricoAnalises));
+    });
+    seletor.disabled = !disponivel;
+    const limites = disponivel ? historico.primeiroMes + ":" + historico.ultimoMes
+        : historico.disponivel ? "vazio" : "indisponivel";
+    if (seletor.dataset.limites !== limites || !seletor.options.length) {
+        seletor.replaceChildren();
+        if (disponivel) {
+            const primeiro = Number(historico.primeiroMes.slice(0, 4)) * 12 + Number(historico.primeiroMes.slice(5, 7)) - 1;
+            const ultimo = Number(historico.ultimoMes.slice(0, 4)) * 12 + Number(historico.ultimoMes.slice(5, 7)) - 1;
+            for (let indice = ultimo; indice >= primeiro; indice--) {
+                const mes = String(Math.floor(indice / 12)).padStart(4, "0") + "-" + String(indice % 12 + 1).padStart(2, "0");
+                const opcao = document.createElement("option");
+                opcao.value = mes;
+                opcao.textContent = formatarPeriodoDistribuicao(mes, mes);
+                seletor.appendChild(opcao);
+            }
+        } else {
+            const opcao = document.createElement("option");
+            opcao.textContent = historico.disponivel ? "Sem histórico" : "Dados indisponíveis";
+            seletor.appendChild(opcao);
+        }
+        seletor.dataset.limites = limites;
     }
-    const analises = blocoHistoricoAnalises === 0 ? recente : obterHistoricoMensal(blocoHistoricoAnalises);
+    if (disponivel) seletor.value = mesFinalHistoricoAnalises;
+}
+
+function atualizarGraficosHistorico() {
+    const recente = obterHistoricoMensal(); // Resumo: sempre seis meses recentes.
+    if (recente.disponivel) {
+        mesFinalHistoricoAnalises = recente.vazio ? null
+            : mesFinalHistoricoAnalises === null ? recente.ultimoMes
+            : mesFinalHistoricoAnalises < recente.primeiroMes ? recente.primeiroMes
+            : mesFinalHistoricoAnalises > recente.ultimoMes ? recente.ultimoMes : mesFinalHistoricoAnalises;
+    }
+    const analises = !recente.disponivel || recente.vazio ? recente
+        : obterHistoricoMensal(mesFinalHistoricoAnalises, duracaoHistoricoAnalises);
+    atualizarControlesHistorico(recente);
     renderizarGraficoHistorico("resumo", recente);
     renderizarGraficoHistorico("analises", analises);
-    const podeNavegar = analises.disponivel && !analises.vazio && typeof window.Chart === "function";
-    document.getElementById("historico-anterior").disabled = !podeNavegar || !analises.temAnterior;
-    document.getElementById("historico-proximo").disabled = !podeNavegar || !analises.temProximo;
 }
 
 function carregarColecao(chave, validarRegistro) {
@@ -2878,15 +2981,30 @@ Object.values(camposMovimentacao).forEach((campo) => {
     campo.addEventListener("change", () => limparErroCampo(campo));
 });
 
-document.getElementById("historico-anterior").addEventListener("click", () => {
-    const historico = obterHistoricoMensal(blocoHistoricoAnalises);
-    if (!historico.disponivel || !historico.temAnterior) return;
-    blocoHistoricoAnalises++;
-    atualizarGraficosHistorico();
+// Um único listener atende as instâncias atuais, sem listeners retidos após destroy().
+document.addEventListener("pointerdown", (evento) => {
+    for (const grafico of Object.values(graficosHistorico)) {
+        if (!grafico || grafico.canvas.contains(evento.target) || !grafico.getActiveElements().length) continue;
+        try {
+            grafico.setActiveElements([]);
+            grafico.tooltip?.setActiveElements([], { x: 0, y: 0 });
+            grafico.draw();
+        } catch (erro) {
+            // Reutiliza o tratamento de falhas visuais, sem gravar dados.
+            atualizarGraficosHistorico();
+            break;
+        }
+    }
+}, { passive: true });
+
+document.querySelectorAll("[data-duracao-historico]").forEach((botao) => {
+    botao.addEventListener("click", () => {
+        duracaoHistoricoAnalises = Number(botao.dataset.duracaoHistorico);
+        atualizarGraficosHistorico();
+    });
 });
-document.getElementById("historico-proximo").addEventListener("click", () => {
-    if (blocoHistoricoAnalises === 0) return;
-    blocoHistoricoAnalises--;
+document.getElementById("mes-final-historico").addEventListener("change", (evento) => {
+    mesFinalHistoricoAnalises = evento.target.value;
     atualizarGraficosHistorico();
 });
 
