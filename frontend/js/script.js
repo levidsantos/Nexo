@@ -789,9 +789,179 @@ function obterDistribuicaoDespesas(tipo = "atual", mesInicial = null, mesFinal =
     return prepararDistribuicaoDespesas(transacoes, periodo.mesInicial, periodo.mesFinal, hoje);
 }
 
+// Estado visual da sessão: a criação de uma instância oculta não consome a entrada.
+const formacoesAnalises = {
+    resumo: { exibido: false, ultimoInicio: null, iniciou: false, quadro: null, grafico: null, inicio: null, progresso: 1, assinatura: null },
+    historico: { exibido: false, ultimoInicio: null, iniciou: false, quadro: null, grafico: null, inicio: null, progresso: 1 },
+    distribuicao: { exibido: false, ultimoInicio: null, iniciou: false, quadro: null, grafico: null, inicio: null, progresso: 1 }
+};
+const movimentoReduzidoGraficos = window.matchMedia("(prefers-reduced-motion: reduce)");
+const recortesFormacaoAnalises = new WeakSet();
+
+function restaurarRecorteFormacao(grafico) {
+    if (recortesFormacaoAnalises.delete(grafico)) grafico.ctx.restore();
+}
+
+function graficoDaFormacao(chave) {
+    if (chave === "distribuicao") return graficoDistribuicao;
+    return chave === "resumo" ? graficosHistorico.resumo : graficosHistorico.analises;
+}
+
+// Apenas a entrada na seção pode liberar uma repetição, nunca uma atualização de dados.
+function prepararFormacoesPagina(pagina) {
+    const agora = performance.now();
+    for (const [chave, estado] of Object.entries(formacoesAnalises)) {
+        if ((chave === "resumo" ? "resumo" : "analises") !== pagina) continue;
+        estado.exibido = estado.ultimoInicio !== null && agora - estado.ultimoInicio < 5000;
+    }
+}
+
+function formacaoEstaVisivel(grafico) {
+    if (!grafico || document.visibilityState !== "visible"
+        || !grafico.canvas.closest(".pagina").classList.contains("ativa")) return false;
+    const area = grafico.canvas.parentElement;
+    if (area.hidden || !grafico.width || !grafico.height) return false;
+    const retangulo = area.getBoundingClientRect();
+    return retangulo.bottom > 0 && retangulo.top < window.innerHeight
+        && retangulo.right > 0 && retangulo.left < window.innerWidth;
+}
+
+function finalizarFormacaoAnalises(chave, redesenhar = false) {
+    const estado = formacoesAnalises[chave];
+    if (estado.quadro !== null) cancelAnimationFrame(estado.quadro);
+    const grafico = estado.grafico;
+    if (grafico) {
+        // Renderizações sucessivas na inicialização não consomem uma entrada ainda não desenhada.
+        if (estado.inicio !== null) estado.exibido = true;
+        restaurarRecorteFormacao(grafico);
+    }
+    estado.quadro = null;
+    estado.grafico = null;
+    estado.inicio = null;
+    estado.iniciou = false;
+    estado.progresso = 1;
+    if (redesenhar && grafico) {
+        try { grafico.draw(); } catch (erro) { /* Falhas visuais não interrompem a aplicação. */ }
+    }
+}
+
+function concluirFormacoesAnalises() {
+    Object.keys(formacoesAnalises).forEach((chave) => finalizarFormacaoAnalises(chave, true));
+}
+
+function agendarFormacaoAnalises(chave) {
+    if (!("IntersectionObserver" in window)) return;
+    const estado = formacoesAnalises[chave];
+    const grafico = graficoDaFormacao(chave);
+    if (estado.exibido || estado.quadro !== null || !formacaoEstaVisivel(grafico)) return;
+    estado.grafico = grafico;
+    const duracao = chave === "historico" ? 500 : 450;
+    const desenhar = (tempo) => {
+        estado.quadro = null;
+        if (grafico !== graficoDaFormacao(chave) || !formacaoEstaVisivel(grafico)
+            || movimentoReduzidoGraficos.matches) {
+            if (formacaoEstaVisivel(grafico)) estado.exibido = true;
+            finalizarFormacaoAnalises(chave, true);
+            return;
+        }
+        if (estado.inicio === null) {
+            estado.exibido = true;
+            estado.progresso = 0;
+            const entrada = grafico.canvas.closest(".card").getAnimations?.()
+                .find((animacao) => animacao.animationName === "entrada-pagina");
+            const timing = entrada?.effect.getTiming();
+            const espera = entrada ? Math.max(0, timing.delay + Number(timing.duration) / 2 - Number(entrada.currentTime)) : 0;
+            estado.inicio = tempo + espera;
+        }
+        const fracao = Math.max(0, Math.min(1, (tempo - estado.inicio) / duracao));
+        if (tempo >= estado.inicio && !estado.iniciou) {
+            estado.ultimoInicio = tempo; // Mesmo relógio monotônico de performance.now().
+            estado.iniciou = true;
+        }
+        estado.progresso = 1 - (1 - fracao) ** 3;
+        try {
+            grafico.draw();
+        } catch (erro) {
+            finalizarFormacaoAnalises(chave, true);
+            return;
+        }
+        // Um resize/update disparado pelo próprio draw pode ter concluído a formação.
+        if (estado.grafico !== grafico) return;
+        if (fracao < 1) estado.quadro = requestAnimationFrame(desenhar);
+        else finalizarFormacaoAnalises(chave);
+    };
+    estado.quadro = requestAnimationFrame(desenhar);
+}
+
+// Recorta somente as séries; eixos, legendas, tooltips e coordenadas ficam completos.
+const formacaoGraficosAnalises = {
+    id: "formacao-analises",
+    beforeDatasetsDraw(grafico) {
+        const estado = Object.values(formacoesAnalises).find((item) => item.grafico === grafico);
+        if (!estado || estado.progresso >= 1) return;
+        const { ctx, chartArea } = grafico;
+        ctx.save();
+        recortesFormacaoAnalises.add(grafico);
+        try {
+            ctx.beginPath();
+            if (grafico.config.type === "line") {
+                ctx.rect(chartArea.left, chartArea.top,
+                    (chartArea.right - chartArea.left) * estado.progresso, chartArea.bottom - chartArea.top);
+            } else {
+                const arcos = grafico.getDatasetMeta(0).data;
+                const primeiro = arcos[0];
+                const ultimo = arcos.at(-1);
+                ctx.moveTo(primeiro.x, primeiro.y);
+                ctx.arc(primeiro.x, primeiro.y, Math.max(grafico.width, grafico.height) * 2,
+                    primeiro.startAngle, primeiro.startAngle + (ultimo.endAngle - primeiro.startAngle) * estado.progresso);
+                ctx.closePath();
+            }
+            ctx.clip();
+        } catch (erro) {
+            restaurarRecorteFormacao(grafico);
+            throw erro;
+        }
+    },
+    afterDatasetsDraw(grafico) {
+        restaurarRecorteFormacao(grafico);
+    },
+    beforeUpdate(grafico) {
+        for (const [chave, estado] of Object.entries(formacoesAnalises)) {
+            // O compacto pode estabilizar seu tamanho enquanto ainda aguarda a entrada do card.
+            if (estado.grafico === grafico && estado.exibido && (chave !== "resumo" || estado.iniciou)) {
+                finalizarFormacaoAnalises(chave);
+            }
+        }
+    },
+    resize(grafico) { formacaoGraficosAnalises.beforeUpdate(grafico); },
+    beforeDestroy(grafico) {
+        for (const [chave, estado] of Object.entries(formacoesAnalises)) {
+            if (estado.grafico === grafico) finalizarFormacaoAnalises(chave);
+        }
+    }
+};
+
+function observarFormacoesAnalises() {
+    if (!("IntersectionObserver" in window)) return; // Sem observador, mantém os gráficos completos.
+    const observador = new IntersectionObserver((entradas) => {
+        for (const entrada of entradas) {
+            const chave = entrada.target.id === "area-historico-resumo" ? "resumo"
+                : entrada.target.id === "area-historico-analises" ? "historico" : "distribuicao";
+            if (entrada.isIntersecting) agendarFormacaoAnalises(chave);
+            else finalizarFormacaoAnalises(chave, true);
+        }
+    });
+    ["area-historico-resumo", "area-historico-analises", "area-distribuicao"]
+        .forEach((id) => observador.observe(document.getElementById(id)));
+    movimentoReduzidoGraficos.addEventListener("change", () => {
+        if (movimentoReduzidoGraficos.matches) concluirFormacoesAnalises();
+    });
+}
+
 function configurarGraficoDistribuicao(classificacoes) {
     return {
         type: "doughnut",
+        plugins: [formacaoGraficosAnalises],
         data: { labels: classificacoes.map((item) => item.nome), datasets: [{
             data: classificacoes.map((item) => item.totalCentavos / 100),
             backgroundColor: classificacoes.map((item) => item.cor), borderWidth: 2, borderColor: "#ffffff"
@@ -837,6 +1007,7 @@ function limparGraficoDistribuicao() {
 }
 
 function atualizarDistribuicaoDespesas() {
+    finalizarFormacaoAnalises("distribuicao");
     const tipo = document.getElementById("periodo-distribuicao").value;
     const inicial = document.getElementById("mes-inicial-distribuicao");
     const final = document.getElementById("mes-final-distribuicao");
@@ -909,6 +1080,11 @@ function atualizarDistribuicaoDespesas() {
     }
     if (mensagem) limparGraficoDistribuicao();
     estado.textContent = mensagem;
+    // Se a visita começou sem gráfico válido, novos lançamentos continuam instantâneos.
+    if (mensagem && document.getElementById("grafico-distribuicao").closest(".pagina").classList.contains("ativa")) {
+        formacoesAnalises.distribuicao.exibido = true;
+    }
+    agendarFormacaoAnalises("distribuicao");
     estado.hidden = !mensagem;
 }
 
@@ -964,7 +1140,7 @@ const indicadorMesHistorico = {
 function configurarGraficoHistorico(historico, compacto = false) {
     const configuracao = {
         type: "line",
-        plugins: [indicadorMesHistorico],
+        plugins: [indicadorMesHistorico, formacaoGraficosAnalises],
         data: {
             labels: historico.meses.map((mes) => formatarPeriodoDistribuicao(mes.mes, mes.mes)),
             datasets: [
@@ -1037,6 +1213,20 @@ function configurarGraficoHistorico(historico, compacto = false) {
 }
 
 function renderizarGraficoHistorico(destino, historico) {
+    const chaveFormacao = destino === "resumo" ? "resumo" : "historico";
+    const formacao = formacoesAnalises[chaveFormacao];
+    const assinatura = destino === "resumo" && historico.disponivel && !historico.vazio
+        ? JSON.stringify(historico.meses) : null;
+    const preservarEsperaResumo = destino === "resumo" && assinatura !== null
+        && assinatura === formacao.assinatura && formacao.grafico === graficosHistorico.resumo
+        && formacao.quadro !== null && !formacao.iniciou && formacaoEstaVisivel(formacao.grafico);
+    if (!preservarEsperaResumo) {
+        if (destino === "resumo" && formacao.grafico && assinatura !== formacao.assinatura) {
+            formacao.exibido = true;
+        }
+        finalizarFormacaoAnalises(chaveFormacao);
+    }
+    if (destino === "resumo") formacao.assinatura = assinatura;
     const area = document.getElementById(`area-historico-${destino}`);
     const estado = document.getElementById(`estado-historico-${destino}`);
     const periodo = document.getElementById(`periodo-historico-${destino}`);
@@ -1077,6 +1267,10 @@ function renderizarGraficoHistorico(destino, historico) {
     }
     estado.textContent = mensagem;
     estado.hidden = !mensagem;
+    if (mensagem && canvas.closest(".pagina").classList.contains("ativa")) {
+        formacoesAnalises[chaveFormacao].exibido = true;
+    }
+    agendarFormacaoAnalises(chaveFormacao);
 }
 
 function atualizarControlesHistorico(historico) {
@@ -1658,12 +1852,14 @@ function navegarPara(paginaDestino) {
 
     const mudouPagina = !paginaSelecionada.classList.contains("ativa");
     if (mudouPagina) {
+        concluirFormacoesAnalises();
+        prepararFormacoesPagina(paginaDestino);
         limparSelecao();
     }
 
     if (mudouPagina) {
         paginas.forEach((pagina) => {
-            pagina.classList.remove("ativa");
+            pagina.classList.remove("ativa", "entrada-pagina");
         });
         paginaSelecionada.classList.add("ativa");
     }
@@ -1687,6 +1883,37 @@ function navegarPara(paginaDestino) {
             titulo.focus({ preventScroll: true });
         }
         window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+        if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+            if (paginaDestino === "contas") {
+                let indiceConta = 0;
+                paginaSelecionada.querySelectorAll("#lista-contas > .item-conta, #lista-contas > .mensagem-vazia")
+                    .forEach((elemento) => {
+                        const atraso = elemento.classList.contains("item-conta")
+                            ? Math.min(indiceConta++ * 70, 350) : 0;
+                        elemento.style.setProperty("--atraso-entrada-conta", `${atraso}ms`);
+                        elemento.classList.add("entrada-conta");
+                    });
+            }
+            if (paginaDestino === "investimentos") {
+                let indiceInvestimento = 0;
+                paginaSelecionada.querySelectorAll("#lista-investimentos > .item-investimento, #lista-investimentos > .mensagem-vazia")
+                    .forEach((elemento) => {
+                        const atraso = elemento.classList.contains("item-investimento")
+                            ? Math.min(indiceInvestimento++ * 70, 350) : 0;
+                        elemento.style.setProperty("--atraso-entrada-investimento", `${atraso}ms`);
+                        elemento.classList.add("entrada-investimento");
+                    });
+            }
+            // Reinicia a entrada mesmo ao retornar antes do fim da animação anterior.
+            void paginaSelecionada.offsetWidth;
+            paginaSelecionada.classList.add("entrada-pagina");
+        }
+        // Reavalia depois da rolagem e da entrada CSS, inclusive em navegações muito rápidas.
+        if (paginaDestino === "resumo") agendarFormacaoAnalises("resumo");
+        if (paginaDestino === "analises") {
+            agendarFormacaoAnalises("historico");
+            agendarFormacaoAnalises("distribuicao");
+        }
     }
 }
 
@@ -3031,6 +3258,7 @@ if ("ResizeObserver" in window) {
     observadorDimensoesAcoes.observe(navegacaoPrincipal);
 }
 
+observarFormacoesAnalises();
 navegarPara("resumo");
 atualizarOpcoesContas();
 renderizarTransacoes(listaTransacoes, 5);
@@ -3038,6 +3266,11 @@ atualizarCategorias();
 atualizarTabelaCompleta();
 atualizarResumo();
 atualizarBarraAcoes();
+
+// A carga inicial já começa no Resumo; não precisa trocar de página ou mover o foco.
+if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    document.getElementById("pagina-resumo").classList.add("entrada-pagina");
+}
 
 // Usa o dia local atualizado ao retornar à aplicação ou restaurar a página.
 window.addEventListener("pageshow", () => {
@@ -3047,6 +3280,7 @@ window.addEventListener("pageshow", () => {
     atualizarDistribuicaoDespesas();
 });
 document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible") concluirFormacoesAnalises();
     if (document.visibilityState === "visible") {
         renderizarInvestimentos();
         atualizarVisualizacoesSaldos();

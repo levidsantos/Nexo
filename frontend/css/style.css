@@ -3,7 +3,8 @@
     /* Estados compartilhados dos campos dos modais. */
     --campo-modal-borda: #998c8b;
     --campo-modal-borda-hover: #776a89;
-    --campo-modal-borda-foco: #8060b2;
+    --campo-modal-borda-foco: #655d70;
+    --campo-sombra-foco: inset 0 0 0 1px var(--campo-modal-borda-foco), 0 0 0 3px rgba(104, 64, 181, 0.08);
     --campo-modal-borda-erro: #b46a64;
 
     /* Superfícies e textos */
@@ -788,6 +789,118 @@ td.despesa {
     display: block;
 }
 
+/* Resumo: quatro etapas, sem animar o overview junto dos seus cards. */
+#pagina-resumo.ativa.entrada-pagina > :is(.resumo, .transacoes),
+#pagina-resumo.ativa.entrada-pagina > .overview > .card {
+    --entrada-deslocamento: 12px;
+    animation: entrada-pagina 400ms ease-in-out backwards;
+}
+#pagina-resumo.ativa.entrada-pagina > .overview > .card-historico { animation-delay: 110ms; }
+#pagina-resumo.ativa.entrada-pagina > .overview > .card:has(#contas-resumo) { animation-delay: 220ms; }
+#pagina-resumo.ativa.entrada-pagina > .transacoes { animation-delay: 330ms; }
+
+/* Contas: os cards escalonam sem transformar o contêiner da seção. */
+#pagina-contas.ativa.entrada-pagina > :is(.contas-abertura, .resumo-contas),
+#pagina-contas.ativa.entrada-pagina > .secao-contas > .secao-contas-header {
+    --entrada-deslocamento: 12px;
+    animation: entrada-pagina 400ms ease-in-out backwards;
+}
+#pagina-contas.ativa.entrada-pagina > .resumo-contas { animation-delay: 100ms; }
+#pagina-contas.ativa.entrada-pagina > .secao-contas > .secao-contas-header { animation-delay: 200ms; }
+#pagina-contas.ativa.entrada-pagina #lista-contas > .entrada-conta {
+    --entrada-deslocamento: 12px;
+    animation: entrada-pagina 400ms ease-in-out backwards;
+    animation-delay: calc(200ms + var(--atraso-entrada-conta, 0ms));
+}
+
+/* Análises: os cards entram completos, sem animar os canvas internamente. */
+#pagina-analises.ativa.entrada-pagina > :is(.cabecalho-analises, .card-historico, .card-distribuicao) {
+    --entrada-deslocamento: 12px;
+    animation: entrada-pagina 400ms ease-in-out backwards;
+}
+#pagina-analises.ativa.entrada-pagina > .card-historico { animation-delay: 110ms; }
+#pagina-analises.ativa.entrada-pagina > .card-distribuicao { animation-delay: 220ms; }
+
+/* Investimentos: cards escalonados e movimentações como um único bloco. */
+#pagina-investimentos.ativa.entrada-pagina > :is(.cabecalho-investimentos, .totais-investimentos),
+#pagina-investimentos.ativa.entrada-pagina > #ajuda-estimativa-investimentos,
+#pagina-investimentos.ativa.entrada-pagina > .secao-investimentos:has(> #lista-investimentos) > .secao-investimentos-header,
+#pagina-investimentos.ativa.entrada-pagina > .secao-investimentos:has(> #historico-investimentos),
+#pagina-investimentos.ativa.entrada-pagina #lista-investimentos > .entrada-investimento {
+    --entrada-deslocamento: 12px;
+    animation: entrada-pagina 400ms ease-in-out backwards;
+}
+#pagina-investimentos.ativa.entrada-pagina > .totais-investimentos,
+#pagina-investimentos.ativa.entrada-pagina > #ajuda-estimativa-investimentos { animation-delay: 100ms; }
+#pagina-investimentos.ativa.entrada-pagina > .secao-investimentos:has(> #lista-investimentos) > .secao-investimentos-header { animation-delay: 200ms; }
+#pagina-investimentos.ativa.entrada-pagina #lista-investimentos > .entrada-investimento { animation-delay: calc(200ms + var(--atraso-entrada-investimento, 0ms)); }
+#pagina-investimentos.ativa.entrada-pagina > .secao-investimentos:has(> #historico-investimentos) { animation-delay: 300ms; }
+
+/* A superfície anima separadamente: o painel não transforma a barra fixa mobile. */
+#pagina-transacoes.ativa.entrada-pagina > .transacoes-abertura {
+    --entrada-deslocamento: 12px;
+    animation: entrada-pagina 400ms ease-in-out backwards;
+}
+#pagina-transacoes.ativa.entrada-pagina > .transacoes-painel {
+    position: relative;
+    background: transparent;
+    border-color: transparent;
+}
+#pagina-transacoes.ativa.entrada-pagina > .transacoes-painel::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    z-index: 0;
+    border: 1px solid var(--exp-linha);
+    border-radius: inherit;
+    background: var(--cor-superficie);
+    pointer-events: none;
+    --entrada-deslocamento: 12px;
+    animation: entrada-pagina 400ms ease-in-out 100ms backwards;
+}
+/* Camadas locais, sem transformar o ancestral nem reposicionar a barra fixa. */
+#pagina-transacoes.ativa.entrada-pagina > .transacoes-painel > :not(#barra-contextual-transacoes) {
+    position: relative;
+    z-index: 1;
+}
+#pagina-transacoes.ativa.entrada-pagina > .transacoes-painel > #erro-filtro-datas,
+#pagina-transacoes.ativa.entrada-pagina > .transacoes-painel > :is(.area-pesquisa, .transacoes-lista-header, .tabela-transacoes, .paginacao) {
+    animation: entrada-conteudo-transacoes 400ms ease-in-out backwards;
+}
+#pagina-transacoes.ativa.entrada-pagina > .transacoes-painel > .area-pesquisa,
+#pagina-transacoes.ativa.entrada-pagina > .transacoes-painel > #erro-filtro-datas { animation-delay: 100ms; }
+#pagina-transacoes.ativa.entrada-pagina > .transacoes-painel > :is(.transacoes-lista-header, .tabela-transacoes, .paginacao) { animation-delay: 200ms; }
+
+@keyframes entrada-pagina {
+    from { opacity: 0; transform: translateY(var(--entrada-deslocamento, 8px)); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes entrada-conteudo-transacoes {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #pagina-investimentos.ativa.entrada-pagina > :is(.cabecalho-investimentos, .totais-investimentos),
+    #pagina-investimentos.ativa.entrada-pagina > #ajuda-estimativa-investimentos,
+    #pagina-investimentos.ativa.entrada-pagina > .secao-investimentos:has(> #lista-investimentos) > .secao-investimentos-header,
+    #pagina-investimentos.ativa.entrada-pagina > .secao-investimentos:has(> #historico-investimentos),
+    #pagina-investimentos.ativa.entrada-pagina #lista-investimentos > .entrada-investimento,
+    #pagina-analises.ativa.entrada-pagina > :is(.cabecalho-analises, .card-historico, .card-distribuicao),
+    #pagina-contas.ativa.entrada-pagina > :is(.contas-abertura, .resumo-contas),
+    #pagina-contas.ativa.entrada-pagina > .secao-contas > .secao-contas-header,
+    #pagina-contas.ativa.entrada-pagina #lista-contas > .entrada-conta,
+    #pagina-resumo.ativa.entrada-pagina > :is(.resumo, .transacoes),
+    #pagina-resumo.ativa.entrada-pagina > .overview > .card,
+    #pagina-transacoes.ativa.entrada-pagina > .transacoes-abertura,
+    #pagina-transacoes.ativa.entrada-pagina > .transacoes-painel::before,
+    #pagina-transacoes.ativa.entrada-pagina > .transacoes-painel > #erro-filtro-datas,
+    #pagina-transacoes.ativa.entrada-pagina > .transacoes-painel > :is(.area-pesquisa, .transacoes-lista-header, .tabela-transacoes, .paginacao) {
+        animation: none;
+    }
+}
+
 /* =========================
    PÁGINA CONTAS
 ========================= */
@@ -1311,7 +1424,8 @@ td.despesa {
 #pagina-resumo .resumo { display: grid; grid-template-columns: 1.35fr 1fr 1fr; gap: 0; background: var(--exp-papel); border: 1px solid var(--exp-linha); border-radius: 16px; margin-bottom: 24px; overflow: hidden; }
 #pagina-resumo .resumo .card { min-width: 0; margin: 0; padding: 26px 28px; border: 0; border-radius: 0; box-shadow: none; background: none; }
 #pagina-resumo .resumo .card + .card { border-left: 1px solid var(--exp-linha); }
-#pagina-resumo .resumo .card-saldo { background: #fbf9fe; }
+#pagina-resumo .resumo .card-saldo { background: linear-gradient(120deg, #e9ddfb 0%, #f4ecff 55%, #ffffff 100%); box-shadow: inset 0 0 0 1px #eee6f7; }
+#pagina-resumo .resumo .card-saldo .ajuda-indicador { color: #625b6f; }
 #pagina-resumo .resumo .card > span { margin: 0 0 14px; color: #625b6f; font-size: 13px; font-weight: 550; }
 #pagina-resumo .resumo h3 { font-size: 28px; font-weight: 600; line-height: 1.15; letter-spacing: -0.035em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 #pagina-resumo .resumo #valor-saldo { font-size: 36px; color: #3e2c60; }
@@ -1371,13 +1485,13 @@ td.despesa {
 #modal-overlay .campo-nome { grid-column: 1 / -1; }
 #modal-overlay .form-group { min-width: 0; gap: 7px; }
 #modal-overlay label { margin: 0; color: #51475f; font-size: 12px; font-weight: 600; }
-#modal-overlay :is(input, select) { min-width: 0; height: 44px; padding: 10px 12px; font: inherit; font-size: 14px; color: #302738; background-color: white; border: 1px solid var(--campo-modal-borda); border-radius: 8px; caret-color: var(--exp-roxo); }
+#modal-overlay :is(input, select) { transition:border-color .2s ease, box-shadow .2s ease; min-width: 0; height: 44px; padding: 10px 12px; font: inherit; font-size: 14px; color: #302738; background-color: white; border: 1px solid var(--campo-modal-borda); border-radius: 8px; caret-color: var(--exp-roxo); }
 #modal-overlay input::placeholder { color: #706879; }
 #modal-overlay .entrada-moeda { position: relative; }
 #modal-overlay .entrada-moeda > span { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 13px; color: #706879; pointer-events: none; }
 #modal-overlay .entrada-moeda input { padding-left: 38px; font-variant-numeric: tabular-nums; }
 #modal-overlay :is(input, select):hover:not(.invalido):not(:focus) { border-color: var(--campo-modal-borda-hover); }
-#modal-overlay :is(input, select):focus:not(.invalido) { border-color: var(--campo-modal-borda-foco); outline: 1px solid var(--campo-modal-borda-foco); outline-offset: 0; box-shadow: none; }
+#modal-overlay :is(input, select):focus:not(.invalido) { border-color: var(--campo-modal-borda-foco); outline: none; box-shadow: var(--campo-sombra-foco); }
 #modal-overlay :is(input, select).invalido { border-color: var(--campo-modal-borda-erro); }
 #modal-overlay :is(input, select).invalido:focus { border-color: var(--campo-modal-borda-erro); outline: 1px solid var(--campo-modal-borda-erro); outline-offset: 0; box-shadow: none; }
 #modal-overlay .erro-campo { margin: 0; font-size: 11.5px; line-height: 1.4; color: var(--cor-erro); }
@@ -1477,6 +1591,7 @@ td.despesa {
 #pagina-transacoes .area-pesquisa > div { min-width: 0; }
 #pagina-transacoes .area-pesquisa label { display: block; font-size: 11px; font-weight: 600; color: #62596d; margin-bottom: 7px; }
 #pagina-transacoes .area-pesquisa :is(input, select) { display: block; width: 100%; min-width: 0; height: 42px; padding: 9px 11px; font: inherit; font-size: 13px; color: var(--exp-tinta); background: #fff; border: 1px solid #b0a9bb; border-radius: 8px; box-shadow: none; caret-color: var(--exp-roxo); }
+#pagina-transacoes .area-pesquisa :is(input,select):focus:not(.invalido) { border-color:var(--campo-modal-borda-foco); outline:none; box-shadow:var(--campo-sombra-foco); }
 #pagina-transacoes .area-pesquisa input::placeholder { color: var(--exp-mutado); }
 #pagina-transacoes .entrada-busca { position: relative; }
 #pagina-transacoes .entrada-busca svg { position: absolute; top: 13px; left: 12px; width: 16px; height: 16px; color: var(--exp-mutado); pointer-events: none; }
@@ -1522,7 +1637,7 @@ td.despesa {
 #pagina-transacoes .mensagem-sem-resultados { padding: 56px 20px; font-size: 13px; color: var(--exp-mutado); text-align: center; }
 #pagina-transacoes .paginacao { margin: 0; padding: 18px 24px; border-top: 1px solid var(--exp-linha); }
 #pagina-transacoes #info-paginacao { font-size: 12px; color: var(--exp-mutado); }
-#pagina-transacoes :is(input, select, button):focus-visible { outline: 2px solid var(--exp-roxo); outline-offset: 3px; }
+#pagina-transacoes :is(input[type=checkbox], button):focus-visible { outline: 2px solid var(--exp-roxo); outline-offset: 3px; }
 #pagina-transacoes ::selection { background: #e6dcf5; color: #35204e; }
 @media (min-width: 1350px) {
     #pagina-transacoes .area-pesquisa { grid-template-columns: minmax(190px, 1.5fr) minmax(125px, .8fr) minmax(150px, 1fr) 145px 145px auto; gap: 12px; }
@@ -1581,10 +1696,10 @@ td.despesa {
 #pagina-contas #btn-nova-conta { display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:0 16px; white-space:nowrap; border-width:1px; border-style:solid; }
 #pagina-contas #btn-nova-conta svg { width:17px; height:17px; }
 #pagina-contas .resumo-contas { display:block; margin:0 0 32px; }
-#pagina-contas .card-conta-resumo { padding:28px; border:1px solid var(--exp-linha); border-radius:16px; background:#fbf9fe; box-shadow:none; }
+#pagina-contas .card-conta-resumo { padding:28px; border:1px solid #eee6f7; border-radius:16px; background:linear-gradient(120deg, #e9ddfb 0%, #f4ecff 55%, #ffffff 100%); box-shadow:none; }
 #pagina-contas .card-conta-resumo > span { color:#51475f; font-size:13px; }
 #pagina-contas #saldo-total-contas { margin:12px 0; color:#35204e; font-size:36px; line-height:1.2; letter-spacing:-.025em; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
-#pagina-contas #ajuda-saldo-total { margin:0; font-size:12px; color:var(--exp-mutado); line-height:1.5; }
+#pagina-contas #ajuda-saldo-total { margin:0; font-size:12px; color:#625b6f; line-height:1.5; }
 #pagina-contas .secao-contas { padding:0; margin:0; background:none; border:0; box-shadow:none; }
 #pagina-contas .secao-contas-header { margin-bottom:18px; }
 #pagina-contas .secao-contas-header h2 { margin:0 0 6px; font-size:17px; font-weight:600; color:var(--exp-tinta); }
@@ -1617,12 +1732,12 @@ td.despesa {
 #modal-conta .form-group { min-width:0; margin:0; gap:7px; }
 #modal-conta .form-group:first-child { grid-column:1/-1; }
 #modal-conta label { margin:0; font-size:12px; font-weight:600; color:#51475f; }
-#modal-conta :is(input:not([type=checkbox]),select) { box-sizing:border-box; width:100%; min-width:0; height:44px; padding:10px 12px; font:inherit; font-size:14px; border:1px solid var(--campo-modal-borda); border-radius:8px; background:white; color:#302738; caret-color:var(--exp-roxo); transition:border-color .16s ease; }
+#modal-conta :is(input:not([type=checkbox]),select) { box-sizing:border-box; width:100%; min-width:0; height:44px; padding:10px 12px; font:inherit; font-size:14px; border:1px solid var(--campo-modal-borda); border-radius:8px; background:white; color:#302738; caret-color:var(--exp-roxo); transition:border-color .16s ease, box-shadow .16s ease; }
 #modal-conta input::placeholder { color:#706879; }
 #modal-conta :is(input:not([type=checkbox]),select):hover:not(:focus):not(.invalido) { border-color:var(--campo-modal-borda-hover); }
-#modal-conta :is(input:not([type=checkbox]),select):focus { border-color:var(--campo-modal-borda-foco); outline:1px solid var(--campo-modal-borda-foco); outline-offset:0; box-shadow:none; }
+#modal-conta :is(input:not([type=checkbox]),select):focus { border-color:var(--campo-modal-borda-foco); outline:none; box-shadow:var(--campo-sombra-foco); }
 #modal-conta :is(input,select).invalido { border-color:var(--campo-modal-borda-erro); }
-#modal-conta :is(input,select).invalido:focus { outline-color:var(--campo-modal-borda-erro); }
+#modal-conta :is(input,select).invalido:focus { outline:1px solid var(--campo-modal-borda-erro); outline-offset:0; box-shadow:none; }
 #modal-conta .erro-campo { margin:0; font-size:11.5px; line-height:1.4; }
 #modal-conta .erro-campo:empty { display:none; }
 #modal-conta .ajuda-campo { margin:0; font-size:11.5px; color:var(--exp-mutado); line-height:1.5; }
@@ -1721,7 +1836,7 @@ td.despesa {
 #pagina-analises .seletor-mes-historico { position:relative; display:block; width:220px; max-width:100%; min-width:0; color:#62566f; }
 #pagina-analises .seletor-mes-historico svg { position:absolute; left:12px; top:14px; width:17px; height:17px; pointer-events:none; }
 #pagina-analises .seletor-mes-historico::after { content:""; position:absolute; right:14px; top:19px; width:5px; height:5px; border-right:1.5px solid currentColor; border-bottom:1.5px solid currentColor; transform:rotate(45deg); pointer-events:none; }
-#pagina-analises #mes-final-historico { box-sizing:border-box; width:100%; min-width:0; min-height:44px; padding:10px 32px 10px 38px; appearance:none; font:inherit; font-size:13px; background:white; border:1px solid #b0a9bb; border-radius:10px; color:var(--exp-tinta); }
+#pagina-analises #mes-final-historico { box-sizing:border-box; width:100%; min-width:0; min-height:44px; padding:10px 32px 10px 38px; appearance:none; font:inherit; font-size:13px; background:white; border:1px solid #b0a9bb; border-radius:10px; color:var(--exp-tinta); transition:border-color .16s ease, box-shadow .16s ease; }
 #pagina-analises #mes-final-historico:disabled { opacity:.5; cursor:not-allowed; }
 #pagina-analises #periodo-historico-analises { margin:16px 0; font-size:12px; line-height:1.5; color:var(--exp-mutado); font-variant-numeric:tabular-nums; }
 #pagina-analises button { min-height:44px; height:auto; padding:10px 14px; font:inherit; font-size:12px; background:white; border:1px solid #d8d1e0; color:#62566f; border-radius:8px; box-shadow:none; transition:background-color .16s ease,border-color .16s ease; }
@@ -1741,11 +1856,11 @@ td.despesa {
 #pagina-analises #meses-distribuicao:not([hidden]) { width:auto; display:flex; flex-direction:row; flex-wrap:wrap; gap:16px; }
 #pagina-analises #meses-distribuicao .form-group { width:180px; }
 #pagina-analises .filtros-distribuicao label, #pagina-analises .controle-periodo-distribuicao label { display:block; margin:0 0 7px; color:#51475f; font-size:12px; font-weight:600; }
-#pagina-analises .filtros-distribuicao :is(input,select), #pagina-analises .controle-periodo-distribuicao select { min-width:0; min-height:44px; border:1px solid #918b99; border-radius:8px; padding:10px 12px; font-size:13px; caret-color:var(--exp-roxo); transition:border-color .16s ease; }
+#pagina-analises .filtros-distribuicao :is(input,select), #pagina-analises .controle-periodo-distribuicao select { min-width:0; min-height:44px; border:1px solid #918b99; border-radius:8px; padding:10px 12px; font-size:13px; caret-color:var(--exp-roxo); transition:border-color .16s ease, box-shadow .16s ease; }
 #pagina-analises .filtros-distribuicao :is(input,select):hover, #pagina-analises .controle-periodo-distribuicao select:hover { border-color:#776a89; }
-#pagina-analises .filtros-distribuicao :is(input,select):focus, #pagina-analises .controle-periodo-distribuicao select:focus { border-color:#8060b2; outline:1px solid #8060b2; outline-offset:0; box-shadow:none; }
+#pagina-analises .filtros-distribuicao :is(input,select):focus, #pagina-analises .controle-periodo-distribuicao select:focus, #pagina-analises #mes-final-historico:focus { border-color:var(--campo-modal-borda-foco); outline:none; box-shadow:var(--campo-sombra-foco); }
 #pagina-analises .filtros-distribuicao input.invalido { border-color:#b46a64; }
-#pagina-analises .filtros-distribuicao input.invalido:focus { outline-color:#b46a64; }
+#pagina-analises .filtros-distribuicao input.invalido:focus { outline:1px solid #b46a64; outline-offset:0; box-shadow:none; }
 #pagina-analises .erro-campo { font-size:11.5px; line-height:1.5; }
 #pagina-analises .erro-campo:empty { display:none; }
 #pagina-analises .conteudo-distribuicao { display:grid; grid-template-columns:240px minmax(0,460px); align-items:center; gap:32px; max-width:732px; margin:0 auto; }
@@ -1826,7 +1941,7 @@ td.despesa {
  #pagina-analises #mes-final-historico { font-size:16px; }
  #pagina-analises .controle-periodo-distribuicao select { font-size:16px; }
 }
-@media(prefers-reduced-motion:reduce) { #pagina-analises :is(button,input,select) { transition:none; } }
+@media(prefers-reduced-motion:reduce) { #pagina-analises :is(button,input,select), #pagina-analises #mes-final-historico { transition:none; } }
 /* O filtro adicional mantém os mesmos controles e a grade responsiva. */
 @media (min-width:1350px) {
  #pagina-transacoes .area-pesquisa { grid-template-columns:minmax(160px,1.3fr) minmax(100px,.8fr) minmax(125px,1fr) minmax(165px,1.1fr) 135px 135px auto; }
@@ -1913,12 +2028,12 @@ td.despesa {
 #modal-valor-investimento #avaliacao-anterior-investimento { margin:0; font-size:13px; line-height:1.6; color:var(--exp-tinta); }
 :is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .campos-investimento #campos-resgate:not(.hidden) { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px; }
 :is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .campos-investimento label { margin:0; color:#51475f; font-size:12px; font-weight:600; line-height:1.5; }
-:is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .campos-investimento :is(input:not([type=checkbox]),select,textarea) { box-sizing:border-box; width:100%; min-width:0; min-height:44px; padding:10px 12px; font:inherit; font-size:14px; background:white; border:1px solid var(--campo-modal-borda); border-radius:8px; color:#302738; caret-color:var(--exp-roxo); transition:border-color .16s ease; }
+:is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .campos-investimento :is(input:not([type=checkbox]),select,textarea) { box-sizing:border-box; width:100%; min-width:0; min-height:44px; padding:10px 12px; font:inherit; font-size:14px; background:white; border:1px solid var(--campo-modal-borda); border-radius:8px; color:#302738; caret-color:var(--exp-roxo); transition:border-color .16s ease, box-shadow .16s ease; }
 :is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .campos-investimento textarea { resize:vertical; min-height:82px; }
 :is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .campos-investimento :is(input,select,textarea):hover:not(:focus):not(.invalido) { border-color:var(--campo-modal-borda-hover); }
-:is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .campos-investimento :is(input:not([type=checkbox]),select,textarea):focus { border-color:var(--campo-modal-borda-foco); outline:1px solid var(--campo-modal-borda-foco); outline-offset:0; box-shadow:none; }
+:is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .campos-investimento :is(input:not([type=checkbox]),select,textarea):focus { border-color:var(--campo-modal-borda-foco); outline:none; box-shadow:var(--campo-sombra-foco); }
 :is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .campos-investimento :is(input,select,textarea).invalido { border-color:var(--campo-modal-borda-erro); }
-:is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .campos-investimento :is(input,select,textarea).invalido:focus { outline-color:var(--campo-modal-borda-erro); }
+:is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .campos-investimento :is(input,select,textarea).invalido:focus { outline:1px solid var(--campo-modal-borda-erro); outline-offset:0; box-shadow:none; }
 :is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .campos-investimento small:not(.erro-campo), #modal-valor-investimento #ajuda-valor-manual { margin:0; font-size:11.5px; line-height:1.5; color:var(--exp-mutado); }
 :is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .campos-investimento .erro-campo { margin:0; font-size:11.5px; line-height:1.5; }
 :is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .campos-investimento .erro-campo:empty { display:none; }
