@@ -389,7 +389,7 @@ tbody tr:hover {
     font-size: 0.75rem;
     font-weight: 600;
     cursor: pointer;
-    transition: 0.2s;
+    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
 
 .form-actions button[type="button"] {
@@ -1660,7 +1660,7 @@ td.despesa {
  #modal-exclusao-conta .modal-confirmacao, #modal-exclusao .modal-confirmacao { padding:24px; }
  #modal-exclusao-conta .acoes-confirmacao, #modal-exclusao .acoes-confirmacao { flex-wrap:wrap; }
 }
-@media (prefers-reduced-motion:reduce) { #pagina-contas button, #modal-conta :is(input,select,button) { transition:none; } }
+@media (prefers-reduced-motion:reduce) { #pagina-contas button, #modal-conta :is(input,select,button), :is(#modal-exclusao,#modal-exclusao-conta,#modal-exclusao-investimento) button { transition:none; } }
 /* Navegação única: sidebar no desktop, destinos fixos ao alcance do polegar no mobile. */
 .rotulo-investimentos-curto { display:none; }
 @media (max-width:850px) {
@@ -1978,7 +1978,7 @@ td.despesa {
  :is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .form-actions { padding:16px 20px; }
  :is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .form-actions button { flex:1; }
 }
-@media(prefers-reduced-motion:reduce) { #pagina-investimentos button, :is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .campos-investimento :is(input,select,textarea) { transition:none; } }
+@media(prefers-reduced-motion:reduce) { #pagina-investimentos button, :is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) button, :is(#modal-investimento,#modal-valor-investimento,#modal-movimentacao) .campos-investimento :is(input,select,textarea) { transition:none; } }
 
 /* Resumo: os mesmos registros recentes, com prioridade para nome e valor no mobile. */
 #pagina-resumo .contexto-recente { display: none; }
