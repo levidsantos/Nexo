@@ -22,8 +22,16 @@ const notificacoesAtivas = [];
 const filaNotificacoes = [];
 let mensagensParaAnunciar = [];
 let anuncioPendente = null;
+const transicoesToasts = new Map();
+const movimentoReduzidoToasts = window.matchMedia("(prefers-reduced-motion: reduce)");
+movimentoReduzidoToasts.addEventListener("change", () => {
+    if (movimentoReduzidoToasts.matches) {
+        for (const transicao of [...transicoesToasts.values()]) transicao.concluir();
+    }
+});
 const colecoesBloqueadas = new Set();
-let blocoHistoricoAnalises = 0;
+let duracaoHistoricoAnalises = 6;
+let mesFinalHistoricoAnalises = null;
 const graficosHistorico = { resumo: null, analises: null };
 let graficoDistribuicao = null;
 let transacoes = carregarColecao("transacoes", validarTransacao);
@@ -55,12 +63,36 @@ const paginas = document.querySelectorAll(".pagina")
 const campoPesquisa = document.getElementById("pesquisa-transacoes");
 const filtroTipo = document.getElementById("filtro-tipo");
 const filtroCategoria = document.getElementById("filtro-categoria");
+const filtroClassificacao = document.getElementById("filtro-classificacao");
 const filtroDataInicial = document.getElementById("data-inicial");
 const filtroDataFinal = document.getElementById("data-final");
 const erroFiltroDatas = document.getElementById("erro-filtro-datas");
 const botaoLimparFiltros = document.getElementById("limpar-filtros");
 let paginaAtual = 1;
-const transacoesPorPagina = 8;
+let totalPaginasTransacoes = 1;
+let transicaoPaginacao = null;
+const movimentoReduzidoPaginacao = window.matchMedia("(prefers-reduced-motion: reduce)");
+movimentoReduzidoPaginacao.addEventListener("change", () => {
+    if (movimentoReduzidoPaginacao.matches && transicaoPaginacao) atualizarTabelaCompleta();
+});
+window.addEventListener("resize", () => {
+    if (transicaoPaginacao) atualizarTabelaCompleta();
+}, { passive: true });
+const larguraMobileTransacoes = window.matchMedia("(max-width: 850px)");
+let transacoesPorPagina = larguraMobileTransacoes.matches ? 6 : 8;
+const paginaTransacoes = document.getElementById("pagina-transacoes");
+const barraAcoesCompleta = document.getElementById("barra-acoes-completa");
+const barraContextual = document.getElementById("barra-contextual-transacoes");
+const quantidadeContextual = document.getElementById("quantidade-contextual-transacoes");
+const acoesContextuais = new Map([
+    [document.getElementById("editar-selecao-contextual"), botaoEditarCompleta],
+    [document.getElementById("excluir-selecao-contextual"), botaoExcluirCompleta],
+    [document.getElementById("cancelar-selecao-contextual"), document.getElementById("limpar-selecao-completa")]
+]);
+const navegacaoPrincipal = document.querySelector(".sidebar nav");
+let barraSuperiorVisivel = true;
+let observadorBarraSuperior = null;
+let alturaNavegacaoAcoes = 0;
 const infoPaginacao = document.getElementById("info-paginacao");
 const botaoPaginaAnterior = document.getElementById("pagina-anterior");
 const botaoProximaPagina = document.getElementById("proxima-pagina");
@@ -89,6 +121,9 @@ const saldoTotalContas = document.getElementById("saldo-total-contas");
 let modalAtivo = null;
 let focoAnteriorModal = null;
 let elementosInertes = [];
+let transicaoModal = null;
+let limpezaModal = null;
+const movimentoReduzidoModais = window.matchMedia("(prefers-reduced-motion: reduce)");
 
 // botoes para abrir e fechar o modal
 addReceita.addEventListener("click", () => {
@@ -137,6 +172,7 @@ function mostrarToast(mensagem, tipo = "informacao") {
     if (notificacoesAtivas.length === 3) {
         const temporaria = notificacoesAtivas.find((notificacao) => {
             return notificacao.tipo !== "erro"
+                && !notificacao.saindo
                 && !notificacao.elemento.contains(document.activeElement);
         });
         if (temporaria) {
@@ -148,6 +184,10 @@ function mostrarToast(mensagem, tipo = "informacao") {
 }
 
 function exibirProximosToasts() {
+    // O overlay está desaparecendo; seu fade não deve esconder o novo toast.
+    if (areaNotificacoes.parentElement?.classList.contains("modal-saindo")) {
+        document.body.appendChild(areaNotificacoes);
+    }
     const titulos = { sucesso: "Sucesso", erro: "Erro", informacao: "Informação" };
     while (notificacoesAtivas.length < 3 && filaNotificacoes.length > 0) {
         const notificacao = filaNotificacoes.shift();
@@ -176,6 +216,7 @@ function exibirProximosToasts() {
         notificacao.restante = 4000;
         notificacao.temporizador = null;
         notificacoesAtivas.push(notificacao);
+        animarToast(notificacao);
 
         elemento.addEventListener("mouseenter", () => pausarToast(notificacao));
         elemento.addEventListener("mouseleave", () => retomarToast(notificacao));
@@ -208,7 +249,7 @@ function pausarToast(notificacao) {
 }
 
 function retomarToast(notificacao) {
-    if (!notificacao.elemento.isConnected || notificacao.tipo === "erro" || notificacao.temporizador !== null
+    if (notificacao.saindo || !notificacao.elemento.isConnected || notificacao.tipo === "erro" || notificacao.temporizador !== null
         || notificacao.elemento.matches(":hover")
         || notificacao.elemento.contains(document.activeElement)) return;
     notificacao.inicio = Date.now();
@@ -217,14 +258,14 @@ function retomarToast(notificacao) {
 
 function fecharToast(notificacao) {
     const indice = notificacoesAtivas.indexOf(notificacao);
-    if (indice === -1) return;
+    if (indice === -1 || notificacao.saindo) return;
+    notificacao.saindo = true;
     const tinhaFoco = notificacao.elemento.contains(document.activeElement);
     clearTimeout(notificacao.temporizador);
-    notificacoesAtivas.splice(indice, 1);
-    notificacao.elemento.remove();
-    exibirProximosToasts();
+    notificacao.temporizador = null;
     if (tinhaFoco) {
-        const proxima = notificacoesAtivas[Math.min(indice, notificacoesAtivas.length - 1)];
+        const restantes = notificacoesAtivas.filter((item) => !item.saindo);
+        const proxima = restantes[Math.min(indice, restantes.length - 1)];
         if (proxima) {
             proxima.elemento.querySelector("button").focus();
         } else if (podeReceberFoco(notificacao.focoAnterior)) {
@@ -235,6 +276,57 @@ function fecharToast(notificacao) {
             addReceita.focus();
         }
     }
+    notificacao.elemento.inert = true;
+    animarToast(notificacao, true, () => {
+        // Resolve o índice atual: outras notificações podem ter saído antes desta.
+        const atual = notificacoesAtivas.indexOf(notificacao);
+        if (atual !== -1) notificacoesAtivas.splice(atual, 1);
+        notificacao.elemento.remove();
+        exibirProximosToasts();
+    });
+}
+
+function animarToast(notificacao, saindo = false, aoTerminar = () => {}) {
+    const elemento = notificacao.elemento;
+    let quadroEntrada = null;
+    transicoesToasts.get(notificacao)?.cancelar();
+    transicoesToasts.delete(notificacao);
+    const concluir = () => {
+        transicoesToasts.get(notificacao)?.cancelar();
+        transicoesToasts.delete(notificacao);
+        elemento.classList.remove("notificacao-animando", "notificacao-entrando", "notificacao-saindo");
+        aoTerminar();
+    };
+    if (movimentoReduzidoToasts.matches) {
+        concluir();
+        return;
+    }
+    elemento.classList.add("notificacao-animando");
+    if (saindo) {
+        elemento.classList.remove("notificacao-entrando");
+        elemento.classList.add("notificacao-saindo");
+    }
+    else {
+        elemento.classList.add("notificacao-entrando");
+        void elemento.offsetWidth;
+        quadroEntrada = requestAnimationFrame(() => {
+            quadroEntrada = null;
+            elemento.classList.remove("notificacao-entrando");
+        });
+    }
+    const aoFinalizarTransicao = (evento) => {
+        if (evento.target === elemento && evento.propertyName === "opacity") concluir();
+    };
+    const temporizador = setTimeout(concluir, (saindo ? 150 : 220) + 50);
+    elemento.addEventListener("transitionend", aoFinalizarTransicao);
+    transicoesToasts.set(notificacao, {
+        concluir,
+        cancelar: () => {
+            if (quadroEntrada !== null) cancelAnimationFrame(quadroEntrada);
+            clearTimeout(temporizador);
+            elemento.removeEventListener("transitionend", aoFinalizarTransicao);
+        }
+    });
 }
 
 function textoPreenchido(valor) {
@@ -597,16 +689,16 @@ function obterSaldosContas(hoje = obterDataLocal()) {
 
 function historicoMensalIndisponivel(motivo) {
     return { disponivel: false, motivo, vazio: null, meses: null,
-        primeiroMes: null, ultimoMes: null, bloco: null, totalBlocos: null,
-        temAnterior: false, temProximo: false };
+        primeiroMes: null, ultimoMes: null, mesFinal: null, duracao: null };
 }
 
-// Bloco 0: até seis meses terminando no mês atual. Blocos maiores recuam no tempo.
+// A duração e o mês final selecionam a janela; a agregação financeira é compartilhada.
 // Datas são comparadas como YYYY-MM-DD; não há conversão UTC nem referência de conta.
-function prepararHistoricoMensal(registros, hoje = obterDataLocal(), bloco = 0) {
+function prepararHistoricoMensal(registros, hoje = obterDataLocal(), mesFinal = null, duracao = 6) {
     if (!dataValida(hoje) || !validarColecao(registros, validarTransacao)
-        || !Number.isSafeInteger(bloco) || bloco < 0) {
-        return historicoMensalIndisponivel("Transações, data ou bloco inválidos para preparar o histórico.");
+        || ![3, 6, 12].includes(duracao)
+        || (mesFinal !== null && !dataValida(`${mesFinal}-01`))) {
+        return historicoMensalIndisponivel("Transações, data ou período inválidos para preparar o histórico.");
     }
 
     const totaisPorMes = new Map();
@@ -631,17 +723,16 @@ function prepararHistoricoMensal(registros, hoje = obterDataLocal(), bloco = 0) 
 
     if (primeiroIndice === null) {
         return { disponivel: true, motivo: "Nenhuma movimentação até a data atual.", vazio: true,
-            meses: [], primeiroMes: null, ultimoMes: null, bloco: 0, totalBlocos: 0,
-            temAnterior: false, temProximo: false };
+            meses: [], primeiroMes: null, ultimoMes: null, mesFinal: null, duracao };
     }
 
     const indiceAtual = Number(hoje.slice(0, 4)) * 12 + Number(hoje.slice(5, 7)) - 1;
-    const totalBlocos = Math.ceil((indiceAtual - primeiroIndice + 1) / 6);
-    if (bloco >= totalBlocos) {
-        return historicoMensalIndisponivel("O bloco solicitado está fora do histórico disponível.");
+    const fim = mesFinal === null ? indiceAtual
+        : Number(mesFinal.slice(0, 4)) * 12 + Number(mesFinal.slice(5, 7)) - 1;
+    if (fim < primeiroIndice || fim > indiceAtual) {
+        return historicoMensalIndisponivel("O mês final está fora do histórico disponível.");
     }
-    const fim = indiceAtual - bloco * 6;
-    const inicio = Math.max(primeiroIndice, fim - 5);
+    const inicio = fim - duracao + 1;
     const chaveMes = (indice) => `${String(Math.floor(indice / 12)).padStart(4, "0")}-${String(indice % 12 + 1).padStart(2, "0")}`;
     const meses = [];
     for (let indice = inicio; indice <= fim; indice++) {
@@ -650,11 +741,11 @@ function prepararHistoricoMensal(registros, hoje = obterDataLocal(), bloco = 0) 
     }
     return { disponivel: true, motivo: "", vazio: false, meses,
         primeiroMes: chaveMes(primeiroIndice), ultimoMes: chaveMes(indiceAtual),
-        bloco, totalBlocos, temAnterior: bloco + 1 < totalBlocos, temProximo: bloco > 0 };
+        mesFinal: chaveMes(fim), duracao };
 }
 
 // Entrada da aplicação: utiliza a coleção completa e respeita os bloqueios existentes.
-function obterHistoricoMensal(bloco = 0, hoje = obterDataLocal()) {
+function obterHistoricoMensal(mesFinal = null, duracao = 6, hoje = obterDataLocal()) {
     if (colecoesBloqueadas.has("transacoes") || colecoesBloqueadas.has("contas")) {
         return historicoMensalIndisponivel("Dados de transações ou seus vínculos indisponíveis nesta sessão.");
     }
@@ -662,7 +753,7 @@ function obterHistoricoMensal(bloco = 0, hoje = obterDataLocal()) {
         || !validarVinculosTransacoes(transacoes, contas, investimentos)) {
         return historicoMensalIndisponivel("Não foi possível validar as transações e seus vínculos.");
     }
-    return prepararHistoricoMensal(transacoes, hoje, bloco);
+    return prepararHistoricoMensal(transacoes, hoje, mesFinal, duracao);
 }
 
 // Chaves idênticas aos valores persistidos pelo formulário; cores independem da ordem dos dados.
@@ -672,6 +763,13 @@ const CLASSIFICACOES_DESPESAS = Object.freeze({
     Imprevisto: Object.freeze({ nome: "Imprevistos", cor: "#E4B044" }),
     Investimento: Object.freeze({ nome: "Investimentos", cor: "#E58A45" }),
     Desejo: Object.freeze({ nome: "Desejos", cor: "#9164CB" })
+});
+
+Object.entries(CLASSIFICACOES_DESPESAS).forEach(([id, definicao]) => {
+    const opcao = document.createElement("option");
+    opcao.value = id;
+    opcao.textContent = definicao.nome;
+    filtroClassificacao.appendChild(opcao);
 });
 
 function classificacaoDespesaValida(classificacao) {
@@ -767,9 +865,179 @@ function obterDistribuicaoDespesas(tipo = "atual", mesInicial = null, mesFinal =
     return prepararDistribuicaoDespesas(transacoes, periodo.mesInicial, periodo.mesFinal, hoje);
 }
 
+// Estado visual da sessão: a criação de uma instância oculta não consome a entrada.
+const formacoesAnalises = {
+    resumo: { exibido: false, ultimoInicio: null, iniciou: false, quadro: null, grafico: null, inicio: null, progresso: 1, assinatura: null },
+    historico: { exibido: false, ultimoInicio: null, iniciou: false, quadro: null, grafico: null, inicio: null, progresso: 1 },
+    distribuicao: { exibido: false, ultimoInicio: null, iniciou: false, quadro: null, grafico: null, inicio: null, progresso: 1 }
+};
+const movimentoReduzidoGraficos = window.matchMedia("(prefers-reduced-motion: reduce)");
+const recortesFormacaoAnalises = new WeakSet();
+
+function restaurarRecorteFormacao(grafico) {
+    if (recortesFormacaoAnalises.delete(grafico)) grafico.ctx.restore();
+}
+
+function graficoDaFormacao(chave) {
+    if (chave === "distribuicao") return graficoDistribuicao;
+    return chave === "resumo" ? graficosHistorico.resumo : graficosHistorico.analises;
+}
+
+// Apenas a entrada na seção pode liberar uma repetição, nunca uma atualização de dados.
+function prepararFormacoesPagina(pagina) {
+    const agora = performance.now();
+    for (const [chave, estado] of Object.entries(formacoesAnalises)) {
+        if ((chave === "resumo" ? "resumo" : "analises") !== pagina) continue;
+        estado.exibido = estado.ultimoInicio !== null && agora - estado.ultimoInicio < 5000;
+    }
+}
+
+function formacaoEstaVisivel(grafico) {
+    if (!grafico || document.visibilityState !== "visible"
+        || !grafico.canvas.closest(".pagina").classList.contains("ativa")) return false;
+    const area = grafico.canvas.parentElement;
+    if (area.hidden || !grafico.width || !grafico.height) return false;
+    const retangulo = area.getBoundingClientRect();
+    return retangulo.bottom > 0 && retangulo.top < window.innerHeight
+        && retangulo.right > 0 && retangulo.left < window.innerWidth;
+}
+
+function finalizarFormacaoAnalises(chave, redesenhar = false) {
+    const estado = formacoesAnalises[chave];
+    if (estado.quadro !== null) cancelAnimationFrame(estado.quadro);
+    const grafico = estado.grafico;
+    if (grafico) {
+        // Renderizações sucessivas na inicialização não consomem uma entrada ainda não desenhada.
+        if (estado.inicio !== null) estado.exibido = true;
+        restaurarRecorteFormacao(grafico);
+    }
+    estado.quadro = null;
+    estado.grafico = null;
+    estado.inicio = null;
+    estado.iniciou = false;
+    estado.progresso = 1;
+    if (redesenhar && grafico) {
+        try { grafico.draw(); } catch (erro) { /* Falhas visuais não interrompem a aplicação. */ }
+    }
+}
+
+function concluirFormacoesAnalises() {
+    Object.keys(formacoesAnalises).forEach((chave) => finalizarFormacaoAnalises(chave, true));
+}
+
+function agendarFormacaoAnalises(chave) {
+    if (!("IntersectionObserver" in window)) return;
+    const estado = formacoesAnalises[chave];
+    const grafico = graficoDaFormacao(chave);
+    if (estado.exibido || estado.quadro !== null || !formacaoEstaVisivel(grafico)) return;
+    estado.grafico = grafico;
+    const duracao = chave === "historico" ? 500 : 450;
+    const desenhar = (tempo) => {
+        estado.quadro = null;
+        if (grafico !== graficoDaFormacao(chave) || !formacaoEstaVisivel(grafico)
+            || movimentoReduzidoGraficos.matches) {
+            if (formacaoEstaVisivel(grafico)) estado.exibido = true;
+            finalizarFormacaoAnalises(chave, true);
+            return;
+        }
+        if (estado.inicio === null) {
+            estado.exibido = true;
+            estado.progresso = 0;
+            const entrada = grafico.canvas.closest(".card").getAnimations?.()
+                .find((animacao) => animacao.animationName === "entrada-pagina");
+            const timing = entrada?.effect.getTiming();
+            const espera = entrada ? Math.max(0, timing.delay + Number(timing.duration) / 2 - Number(entrada.currentTime)) : 0;
+            estado.inicio = tempo + espera;
+        }
+        const fracao = Math.max(0, Math.min(1, (tempo - estado.inicio) / duracao));
+        if (tempo >= estado.inicio && !estado.iniciou) {
+            estado.ultimoInicio = tempo; // Mesmo relógio monotônico de performance.now().
+            estado.iniciou = true;
+        }
+        estado.progresso = 1 - (1 - fracao) ** 3;
+        try {
+            grafico.draw();
+        } catch (erro) {
+            finalizarFormacaoAnalises(chave, true);
+            return;
+        }
+        // Um resize/update disparado pelo próprio draw pode ter concluído a formação.
+        if (estado.grafico !== grafico) return;
+        if (fracao < 1) estado.quadro = requestAnimationFrame(desenhar);
+        else finalizarFormacaoAnalises(chave);
+    };
+    estado.quadro = requestAnimationFrame(desenhar);
+}
+
+// Recorta somente as séries; eixos, legendas, tooltips e coordenadas ficam completos.
+const formacaoGraficosAnalises = {
+    id: "formacao-analises",
+    beforeDatasetsDraw(grafico) {
+        const estado = Object.values(formacoesAnalises).find((item) => item.grafico === grafico);
+        if (!estado || estado.progresso >= 1) return;
+        const { ctx, chartArea } = grafico;
+        ctx.save();
+        recortesFormacaoAnalises.add(grafico);
+        try {
+            ctx.beginPath();
+            if (grafico.config.type === "line") {
+                ctx.rect(chartArea.left, chartArea.top,
+                    (chartArea.right - chartArea.left) * estado.progresso, chartArea.bottom - chartArea.top);
+            } else {
+                const arcos = grafico.getDatasetMeta(0).data;
+                const primeiro = arcos[0];
+                const ultimo = arcos.at(-1);
+                ctx.moveTo(primeiro.x, primeiro.y);
+                ctx.arc(primeiro.x, primeiro.y, Math.max(grafico.width, grafico.height) * 2,
+                    primeiro.startAngle, primeiro.startAngle + (ultimo.endAngle - primeiro.startAngle) * estado.progresso);
+                ctx.closePath();
+            }
+            ctx.clip();
+        } catch (erro) {
+            restaurarRecorteFormacao(grafico);
+            throw erro;
+        }
+    },
+    afterDatasetsDraw(grafico) {
+        restaurarRecorteFormacao(grafico);
+    },
+    beforeUpdate(grafico) {
+        for (const [chave, estado] of Object.entries(formacoesAnalises)) {
+            // O compacto pode estabilizar seu tamanho enquanto ainda aguarda a entrada do card.
+            if (estado.grafico === grafico && estado.exibido && (chave !== "resumo" || estado.iniciou)) {
+                finalizarFormacaoAnalises(chave);
+            }
+        }
+    },
+    resize(grafico) { formacaoGraficosAnalises.beforeUpdate(grafico); },
+    beforeDestroy(grafico) {
+        for (const [chave, estado] of Object.entries(formacoesAnalises)) {
+            if (estado.grafico === grafico) finalizarFormacaoAnalises(chave);
+        }
+    }
+};
+
+function observarFormacoesAnalises() {
+    if (!("IntersectionObserver" in window)) return; // Sem observador, mantém os gráficos completos.
+    const observador = new IntersectionObserver((entradas) => {
+        for (const entrada of entradas) {
+            const chave = entrada.target.id === "area-historico-resumo" ? "resumo"
+                : entrada.target.id === "area-historico-analises" ? "historico" : "distribuicao";
+            if (entrada.isIntersecting) agendarFormacaoAnalises(chave);
+            else finalizarFormacaoAnalises(chave, true);
+        }
+    });
+    ["area-historico-resumo", "area-historico-analises", "area-distribuicao"]
+        .forEach((id) => observador.observe(document.getElementById(id)));
+    movimentoReduzidoGraficos.addEventListener("change", () => {
+        if (movimentoReduzidoGraficos.matches) concluirFormacoesAnalises();
+    });
+}
+
 function configurarGraficoDistribuicao(classificacoes) {
     return {
         type: "doughnut",
+        plugins: [formacaoGraficosAnalises],
         data: { labels: classificacoes.map((item) => item.nome), datasets: [{
             data: classificacoes.map((item) => item.totalCentavos / 100),
             backgroundColor: classificacoes.map((item) => item.cor), borderWidth: 2, borderColor: "#ffffff"
@@ -815,6 +1083,7 @@ function limparGraficoDistribuicao() {
 }
 
 function atualizarDistribuicaoDespesas() {
+    finalizarFormacaoAnalises("distribuicao");
     const tipo = document.getElementById("periodo-distribuicao").value;
     const inicial = document.getElementById("mes-inicial-distribuicao");
     const final = document.getElementById("mes-final-distribuicao");
@@ -887,25 +1156,74 @@ function atualizarDistribuicaoDespesas() {
     }
     if (mensagem) limparGraficoDistribuicao();
     estado.textContent = mensagem;
+    // Se a visita começou sem gráfico válido, novos lançamentos continuam instantâneos.
+    if (mensagem && document.getElementById("grafico-distribuicao").closest(".pagina").classList.contains("ativa")) {
+        formacoesAnalises.distribuicao.exibido = true;
+    }
+    agendarFormacaoAnalises("distribuicao");
     estado.hidden = !mensagem;
 }
 
-function formatarMesHistorico(mes) {
-    const nomes = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
-    return `${nomes[Number(mes.slice(5, 7)) - 1]}/${mes.slice(0, 4)}`;
+function formatarMesHistorico(mes, incluirAno = true) {
+    const nomes = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+    return nomes[Number(mes.slice(5, 7)) - 1] + (incluirAno ? ` ${mes.slice(0, 4)}` : "");
 }
+
+function formatarPeriodoHistorico(inicio, fim, hoje = obterDataLocal()) {
+    const periodo = inicio === fim ? formatarMesHistorico(fim)
+        : `${formatarMesHistorico(inicio, inicio.slice(0, 4) !== fim.slice(0, 4))} — ${formatarMesHistorico(fim)}`;
+    return periodo + (fim === hoje.slice(0, 7) ? " · Dados até hoje" : "");
+}
+
+// Plugin local: não altera a rosca nem registra comportamento global no Chart.js.
+const indicadorMesHistorico = {
+    id: "indicadorMesHistorico",
+    beforeUpdate(grafico) {
+        grafico.setActiveElements([]);
+        grafico.tooltip?.setActiveElements([], { x: 0, y: 0 });
+    },
+    afterEvent(grafico, argumentos) {
+        const tipo = argumentos.event.native?.type || argumentos.event.type;
+        if (argumentos.inChartArea && tipo !== "touchcancel") return;
+        grafico.setActiveElements([]);
+        grafico.tooltip?.setActiveElements([], { x: 0, y: 0 });
+        argumentos.changed = true;
+    },
+    beforeDatasetsDraw(grafico) {
+        const ativo = grafico.getActiveElements()[0];
+        if (!ativo) return;
+        const { ctx, chartArea } = grafico;
+        const x = ativo.element.x;
+        ctx.save();
+        try {
+            ctx.beginPath();
+            ctx.rect(chartArea.left, chartArea.top, chartArea.right - chartArea.left, chartArea.bottom - chartArea.top);
+            ctx.clip();
+            ctx.beginPath();
+            ctx.moveTo(x, chartArea.top);
+            ctx.lineTo(x, chartArea.bottom);
+            ctx.setLineDash([2, 3]);
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = "#d8d2df";
+            ctx.stroke();
+        } finally {
+            ctx.restore();
+        }
+    }
+};
 
 // As duas visualizações diferem apenas na densidade de eixos e legenda.
 function configurarGraficoHistorico(historico, compacto = false) {
-    return {
+    const configuracao = {
         type: "line",
+        plugins: [indicadorMesHistorico, formacaoGraficosAnalises],
         data: {
-            labels: historico.meses.map((mes) => formatarMesHistorico(mes.mes)),
+            labels: historico.meses.map((mes) => formatarPeriodoDistribuicao(mes.mes, mes.mes)),
             datasets: [
                 { label: "Receitas", data: historico.meses.map((mes) => mes.receitasCentavos / 100),
-                    borderColor: "#16805d", backgroundColor: "#16805d", pointStyle: "circle" },
+                    borderColor: "#14966D", backgroundColor: "#14966D", pointStyle: "circle" },
                 { label: "Despesas", data: historico.meses.map((mes) => mes.despesasCentavos / 100),
-                    borderColor: "#8b5cc7", backgroundColor: "#8b5cc7", borderDash: [5, 3], pointStyle: "rectRot" }
+                    borderColor: "#E76F65", backgroundColor: "#E76F65", pointStyle: "circle" }
             ]
         },
         options: {
@@ -913,23 +1231,78 @@ function configurarGraficoHistorico(historico, compacto = false) {
             maintainAspectRatio: false,
             animation: false,
             locale: "pt-BR",
+            events: ["mousemove", "mouseout", "click", "touchstart", "touchmove", "touchcancel"],
             interaction: { mode: "index", intersect: false },
-            elements: { line: { borderWidth: 2, tension: 0 }, point: { radius: compacto ? 2 : 3, hoverRadius: 5 } },
+            elements: { line: { borderWidth: 2, cubicInterpolationMode: "monotone" }, point: { radius: 0, hoverRadius: 4, hitRadius: 14 } },
             plugins: {
                 legend: { position: "bottom", labels: { usePointStyle: true, boxWidth: 8, font: { size: compacto ? 11 : 12 } } },
-                tooltip: { callbacks: { label: (contexto) => `${contexto.dataset.label}: ${formatarCentavos(historico.meses[contexto.dataIndex][contexto.datasetIndex === 0 ? "receitasCentavos" : "despesasCentavos"])}` } }
+                tooltip: { callbacks: {
+                    title: (itens) => itens.length ? formatarPeriodoDistribuicao(historico.meses[itens[0].dataIndex].mes, historico.meses[itens[0].dataIndex].mes) : "",
+                    label: (contexto) => `${contexto.dataset.label}: ${formatarCentavos(historico.meses[contexto.dataIndex][contexto.datasetIndex === 0 ? "receitasCentavos" : "despesasCentavos"])}` } }
             },
             scales: {
-                x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: compacto ? 3 : 6 } },
+                x: {
+                    grid: { display: false },
+                    afterBuildTicks: (escala) => {
+                        const limite = compacto || escala.chart.width < 480 ? 3 : 6;
+                        const quantidade = historico.meses.length;
+                        const selecionados = new Set([quantidade - 1]);
+                        // Preserva a virada do ano mesmo quando reduzimos os rótulos.
+                        historico.meses.forEach((item, indice) => {
+                            if (indice > 0 && item.mes.slice(5, 7) === "01") selecionados.add(indice);
+                        });
+                        const distancia = Math.max(1, Math.floor(quantidade / limite));
+                        for (let indice = 0; indice < quantidade && selecionados.size < limite; indice++) {
+                            if ([...selecionados].every((outro) => Math.abs(outro - indice) >= distancia)) selecionados.add(indice);
+                        }
+                        escala.ticks = escala.ticks.filter((tick) => selecionados.has(Number(tick.value)));
+                    },
+                    ticks: { maxRotation: 0, autoSkip: false, callback: (valor) => {
+                        const indice = Number(valor);
+                        const mes = historico.meses[indice].mes;
+                        const nomes = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+                        const virada = indice > 0 && mes.slice(0, 4) !== historico.meses[indice - 1].mes.slice(0, 4);
+                        return nomes[Number(mes.slice(5, 7)) - 1] + (virada ? " '" + mes.slice(2, 4) : "");
+                    } }
+                },
                 y: { beginAtZero: true, border: { display: false },
                     grid: { display: !compacto, color: "#edf0f5" },
                     ticks: { maxTicksLimit: compacto ? 3 : 6, callback: (valor) => formatadorMoeda.format(valor) } }
             }
         }
     };
+    if (!compacto) {
+        configuracao.options.plugins.legend.labels.color = "#62566f";
+        configuracao.options.plugins.legend.labels.padding = 20;
+        Object.assign(configuracao.options.plugins.tooltip, {
+            backgroundColor: "#302738", padding: 12, cornerRadius: 8,
+            titleFont: { size: 12 }, bodyFont: { size: 12 }
+        });
+        configuracao.options.scales.x.ticks.color = "#6d6278";
+        configuracao.options.scales.x.ticks.font = { size: 12 };
+        configuracao.options.scales.x.ticks.padding = 8;
+        configuracao.options.scales.y.ticks.color = "#6d6278";
+        configuracao.options.scales.y.ticks.font = { size: 11 };
+        configuracao.options.scales.y.grid.color = "#eeeaf3";
+    }
+    return configuracao;
 }
 
 function renderizarGraficoHistorico(destino, historico) {
+    const chaveFormacao = destino === "resumo" ? "resumo" : "historico";
+    const formacao = formacoesAnalises[chaveFormacao];
+    const assinatura = destino === "resumo" && historico.disponivel && !historico.vazio
+        ? JSON.stringify(historico.meses) : null;
+    const preservarEsperaResumo = destino === "resumo" && assinatura !== null
+        && assinatura === formacao.assinatura && formacao.grafico === graficosHistorico.resumo
+        && formacao.quadro !== null && !formacao.iniciou && formacaoEstaVisivel(formacao.grafico);
+    if (!preservarEsperaResumo) {
+        if (destino === "resumo" && formacao.grafico && assinatura !== formacao.assinatura) {
+            formacao.exibido = true;
+        }
+        finalizarFormacaoAnalises(chaveFormacao);
+    }
+    if (destino === "resumo") formacao.assinatura = assinatura;
     const area = document.getElementById(`area-historico-${destino}`);
     const estado = document.getElementById(`estado-historico-${destino}`);
     const periodo = document.getElementById(`periodo-historico-${destino}`);
@@ -940,8 +1313,9 @@ function renderizarGraficoHistorico(destino, historico) {
         : typeof window.Chart !== "function" ? "Gráfico indisponível: não foi possível carregar a biblioteca. Verifique sua conexão e recarregue a página." : "";
 
     periodo.textContent = historico.disponivel && !historico.vazio
-        ? `${formatarMesHistorico(historico.meses[0].mes)} — ${formatarMesHistorico(historico.meses.at(-1).mes)}` : "";
-    descricao.textContent = "";
+        ? formatarPeriodoHistorico(historico.meses[0].mes, historico.meses.at(-1).mes) : "";
+    descricao.textContent = historico.disponivel && !historico.vazio
+        ? `${periodo.textContent}. ` + historico.meses.map((mes) => `${formatarPeriodoDistribuicao(mes.mes, mes.mes)}: receitas ${formatarCentavos(mes.receitasCentavos)}, despesas ${formatarCentavos(mes.despesasCentavos)}.`).join(" ") : "";
     if (!mensagem) {
         area.hidden = false;
         try {
@@ -956,7 +1330,6 @@ function renderizarGraficoHistorico(destino, historico) {
                 if (!destruirInstanciaGrafico(canvas)) throw new Error("Não foi possível liberar o gráfico anterior.");
                 graficosHistorico[destino] = new window.Chart(canvas, configuracao);
             }
-            descricao.textContent = historico.meses.map((mes) => `${formatarMesHistorico(mes.mes)}: receitas ${formatarCentavos(mes.receitasCentavos)}, despesas ${formatarCentavos(mes.despesasCentavos)}.`).join(" ");
         } catch (erro) {
             mensagem = "Gráfico indisponível: não foi possível renderizar o histórico financeiro.";
         }
@@ -970,20 +1343,57 @@ function renderizarGraficoHistorico(destino, historico) {
     }
     estado.textContent = mensagem;
     estado.hidden = !mensagem;
+    if (mensagem && canvas.closest(".pagina").classList.contains("ativa")) {
+        formacoesAnalises[chaveFormacao].exibido = true;
+    }
+    agendarFormacaoAnalises(chaveFormacao);
+}
+
+function atualizarControlesHistorico(historico) {
+    const seletor = document.getElementById("mes-final-historico");
+    const disponivel = historico.disponivel && !historico.vazio;
+    document.querySelectorAll("[data-duracao-historico]").forEach((botao) => {
+        botao.disabled = !disponivel;
+        botao.setAttribute("aria-pressed", String(Number(botao.dataset.duracaoHistorico) === duracaoHistoricoAnalises));
+    });
+    seletor.disabled = !disponivel;
+    const limites = disponivel ? historico.primeiroMes + ":" + historico.ultimoMes
+        : historico.disponivel ? "vazio" : "indisponivel";
+    if (seletor.dataset.limites !== limites || !seletor.options.length) {
+        seletor.replaceChildren();
+        if (disponivel) {
+            const primeiro = Number(historico.primeiroMes.slice(0, 4)) * 12 + Number(historico.primeiroMes.slice(5, 7)) - 1;
+            const ultimo = Number(historico.ultimoMes.slice(0, 4)) * 12 + Number(historico.ultimoMes.slice(5, 7)) - 1;
+            for (let indice = ultimo; indice >= primeiro; indice--) {
+                const mes = String(Math.floor(indice / 12)).padStart(4, "0") + "-" + String(indice % 12 + 1).padStart(2, "0");
+                const opcao = document.createElement("option");
+                opcao.value = mes;
+                opcao.textContent = formatarPeriodoDistribuicao(mes, mes);
+                seletor.appendChild(opcao);
+            }
+        } else {
+            const opcao = document.createElement("option");
+            opcao.textContent = historico.disponivel ? "Sem histórico" : "Dados indisponíveis";
+            seletor.appendChild(opcao);
+        }
+        seletor.dataset.limites = limites;
+    }
+    if (disponivel) seletor.value = mesFinalHistoricoAnalises;
 }
 
 function atualizarGraficosHistorico() {
-    const recente = obterHistoricoMensal();
-    // Reutiliza o mesmo resultado para o bloco recente; sem alterar a agregação.
+    const recente = obterHistoricoMensal(); // Resumo: sempre seis meses recentes.
     if (recente.disponivel) {
-        blocoHistoricoAnalises = recente.vazio ? 0 : Math.min(blocoHistoricoAnalises, recente.totalBlocos - 1);
+        mesFinalHistoricoAnalises = recente.vazio ? null
+            : mesFinalHistoricoAnalises === null ? recente.ultimoMes
+            : mesFinalHistoricoAnalises < recente.primeiroMes ? recente.primeiroMes
+            : mesFinalHistoricoAnalises > recente.ultimoMes ? recente.ultimoMes : mesFinalHistoricoAnalises;
     }
-    const analises = blocoHistoricoAnalises === 0 ? recente : obterHistoricoMensal(blocoHistoricoAnalises);
+    const analises = !recente.disponivel || recente.vazio ? recente
+        : obterHistoricoMensal(mesFinalHistoricoAnalises, duracaoHistoricoAnalises);
+    atualizarControlesHistorico(recente);
     renderizarGraficoHistorico("resumo", recente);
     renderizarGraficoHistorico("analises", analises);
-    const podeNavegar = analises.disponivel && !analises.vazio && typeof window.Chart === "function";
-    document.getElementById("historico-anterior").disabled = !podeNavegar || !analises.temAnterior;
-    document.getElementById("historico-proximo").disabled = !podeNavegar || !analises.temProximo;
 }
 
 function carregarColecao(chave, validarRegistro) {
@@ -1090,43 +1500,138 @@ function podeReceberFoco(elemento) {
         && getComputedStyle(elemento).visibility !== "hidden";
 }
 
-function abrirModal(modal, focoInicial) {
-    focoAnteriorModal = document.activeElement;
-    modalAtivo = modal;
-    modal.classList.remove("hidden");
-    modal.querySelector('[role="dialog"]').appendChild(areaNotificacoes);
+function posicionarNotificacoesModal(modal, noPainel) {
+    const painel = modal.querySelector('[role="dialog"]');
+    const foco = areaNotificacoes.contains(document.activeElement) ? document.activeElement : null;
+    // O anúncio permanece no diálogo mesmo enquanto os toasts escapam do transform.
+    (noPainel ? areaNotificacoes : painel).appendChild(anuncioNotificacoes);
+    (noPainel ? painel : modal).appendChild(areaNotificacoes);
+    if (foco) foco.focus({ preventScroll: true });
+}
 
-    // Inativa apenas irmãos no caminho até o body, nunca um ancestral do modal.
-    let elemento = modal;
-    while (elemento !== document.body) {
-        for (const irmao of elemento.parentElement.children) {
-            if (irmao !== elemento) {
-                elementosInertes.push({ elemento: irmao, inert: irmao.inert });
-                irmao.inert = true;
+function abrirModal(modal, focoInicial) {
+    const focoRetorno = focoAnteriorModal;
+    if (modalAtivo && modalAtivo !== modal) concluirFechamentoModal(modalAtivo, false);
+    const reabrindo = modalAtivo === modal;
+    cancelarTransicaoModal();
+    limpezaModal = null;
+    if (!reabrindo) {
+        focoAnteriorModal = document.activeElement;
+        if (focoRetorno) focoAnteriorModal = focoRetorno;
+        modalAtivo = modal;
+        modal.classList.remove("hidden");
+        modal.querySelector('[role="dialog"]').appendChild(areaNotificacoes);
+
+        // Inativa apenas irmãos no caminho até o body, nunca um ancestral do modal.
+        let elemento = modal;
+        while (elemento !== document.body) {
+            for (const irmao of elemento.parentElement.children) {
+                if (irmao !== elemento) {
+                    elementosInertes.push({ elemento: irmao, inert: irmao.inert });
+                    irmao.inert = true;
+                }
             }
+            elemento = elemento.parentElement;
         }
-        elemento = elemento.parentElement;
+    }
+    modal.classList.remove("modal-saindo", "modal-entrando");
+    modal.classList.add("modal-abrindo");
+    if (!movimentoReduzidoModais.matches) {
+        // Fora do painel transformado, os toasts continuam fixos na viewport.
+        posicionarNotificacoesModal(modal, false);
+        if (!reabrindo) {
+            modal.classList.add("modal-entrando");
+            void modal.offsetWidth;
+            modal.classList.remove("modal-entrando");
+        }
+        aguardarTransicaoModal(modal, 200, () => {
+            modal.classList.remove("modal-abrindo");
+            posicionarNotificacoesModal(modal, true);
+        });
+    } else {
+        modal.classList.remove("modal-abrindo");
+        posicionarNotificacoesModal(modal, true);
     }
     focoInicial.focus();
 }
 
-function fecharModal(modal) {
+function cancelarTransicaoModal() {
+    if (transicaoModal) transicaoModal();
+    transicaoModal = null;
+}
+
+function aguardarTransicaoModal(modal, duracao, concluir) {
+    const finalizar = () => {
+        cancelarTransicaoModal();
+        concluir();
+    };
+    const aoTerminar = (evento) => {
+        if (evento.target === modal && evento.propertyName === "opacity") finalizar();
+    };
+    // Fallback para abas suspensas ou ausência de transitionend.
+    const temporizador = setTimeout(finalizar, duracao + 50);
+    modal.addEventListener("transitionend", aoTerminar);
+    transicaoModal = () => {
+        clearTimeout(temporizador);
+        modal.removeEventListener("transitionend", aoTerminar);
+    };
+}
+
+function fecharModal(modal, aoFechar = null) {
+    if (modal !== modalAtivo || modal.classList.contains("modal-saindo")) return;
+    cancelarTransicaoModal();
+    limpezaModal = aoFechar;
+    if (movimentoReduzidoModais.matches) {
+        concluirFechamentoModal(modal);
+        return;
+    }
+    posicionarNotificacoesModal(modal, false);
+    modal.classList.add("modal-saindo");
+    aguardarTransicaoModal(modal, 150, () => concluirFechamentoModal(modal));
+}
+
+function concluirFechamentoModal(modal, restaurarFoco = true) {
+    cancelarTransicaoModal();
     modal.classList.add("hidden");
+    modal.classList.remove("modal-abrindo", "modal-entrando", "modal-saindo");
+    const limpar = limpezaModal;
+    limpezaModal = null;
+    if (limpar) limpar();
     for (const estado of elementosInertes) {
         estado.elemento.inert = estado.inert;
     }
     elementosInertes = [];
     modalAtivo = null;
-    document.body.appendChild(areaNotificacoes);
+    areaNotificacoes.appendChild(anuncioNotificacoes);
+    if (areaNotificacoes.parentElement !== document.body) document.body.appendChild(areaNotificacoes);
 
     const destino = podeReceberFoco(focoAnteriorModal) ? focoAnteriorModal
         : document.getElementById("pagina-transacoes").classList.contains("ativa") ? campoPesquisa
         : document.getElementById("pagina-contas").classList.contains("ativa") ? botaoNovaConta
         : document.getElementById("pagina-investimentos").classList.contains("ativa") ? document.getElementById("novo-investimento")
         : addReceita;
-    destino.focus();
+    if (restaurarFoco) destino.focus({ preventScroll: Boolean(destino.closest("#lista-investimentos")) });
     focoAnteriorModal = null;
 }
+
+// Mantém o foco contido, mas impede novas ações durante a saída.
+for (const tipo of ["click", "submit", "keydown"]) {
+    document.addEventListener(tipo, (evento) => {
+        if (!modalAtivo?.classList.contains("modal-saindo")
+            || (tipo === "keydown" && evento.key === "Tab")) return;
+        evento.preventDefault();
+        evento.stopImmediatePropagation();
+    }, true);
+}
+movimentoReduzidoModais.addEventListener("change", () => {
+    if (!movimentoReduzidoModais.matches || !modalAtivo) return;
+    if (modalAtivo.classList.contains("modal-saindo")) concluirFechamentoModal(modalAtivo);
+    else {
+        cancelarTransicaoModal();
+        modalAtivo.classList.remove("modal-abrindo", "modal-entrando");
+        posicionarNotificacoesModal(modalAtivo, true);
+    }
+});
 const formatadorMoeda = new Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL"
@@ -1142,7 +1647,7 @@ function formatarCentavos(centavos) {
     return inteiro < 0n && inteiro > -100n ? `-${texto}` : texto;
 }
 
-function renderizarTransacoes(tabelaDestino, limite=null, pesquisa="", tipo="todos", categoria="todas", dataInicial="", dataFinal="") {
+function renderizarTransacoes(tabelaDestino, limite=null, pesquisa="", tipo="todos", categoria="todas", dataInicial="", dataFinal="", classificacao="todas") {
     tabelaDestino.innerHTML = "";
     
     const transacoesOrdenadas = transacoes.toSorted((a, b) => {
@@ -1159,10 +1664,12 @@ function renderizarTransacoes(tabelaDestino, limite=null, pesquisa="", tipo="tod
         const correspondeTipo = tipo === "todos" || transacao.tipo === tipo;
         const categoriaTransacao = ehMovimentacaoInvestimento(transacao) ? "" : transacao.categoria;
         const correspondeCategoria = categoria === "todas" || categoriaTransacao.trim() === categoria.trim();
+        const correspondeClassificacao = classificacao === "todas"
+            || (transacao.tipo === "despesa" && transacao.classificacao === classificacao);
         const correspondeDataInicial = !dataInicial || transacao.data >= dataInicial;
         const correspondeDataFinal = !dataFinal || transacao.data <= dataFinal;
 
-        return correspondePesquisa && correspondeTipo && correspondeCategoria && correspondeDataInicial && correspondeDataFinal;;
+        return correspondePesquisa && correspondeTipo && correspondeCategoria && correspondeClassificacao && correspondeDataInicial && correspondeDataFinal;
     });
 
     let transacoesExibidas;
@@ -1172,6 +1679,7 @@ function renderizarTransacoes(tabelaDestino, limite=null, pesquisa="", tipo="tod
             1,
             Math.ceil(transacoesFiltradas.length / transacoesPorPagina)
         );
+        totalPaginasTransacoes = totalPaginas;
 
         // Impede que a página atual ultrapasse a última disponível
         paginaAtual = Math.min(paginaAtual, totalPaginas);
@@ -1183,6 +1691,9 @@ function renderizarTransacoes(tabelaDestino, limite=null, pesquisa="", tipo="tod
 
         // Atualiza os controles
         infoPaginacao.textContent = `Página ${paginaAtual} de ${totalPaginas}`;
+        document.getElementById("total-resultados").textContent = colecoesBloqueadas.has("transacoes")
+            ? "Dados indisponíveis"
+            : `${transacoesFiltradas.length} ${transacoesFiltradas.length === 1 ? "transação" : "transações"}`;
 
         botaoPaginaAnterior.disabled = paginaAtual === 1;
         botaoProximaPagina.disabled = paginaAtual === totalPaginas;
@@ -1205,7 +1716,7 @@ function renderizarTransacoes(tabelaDestino, limite=null, pesquisa="", tipo="tod
 
         linha.appendChild(celula);
         tabelaDestino.appendChild(linha);
-
+        if (tabelaDestino === listaTransacoesCompleta) sincronizarSelecaoPagina();
         return;
     }
 
@@ -1222,7 +1733,14 @@ function renderizarTransacoes(tabelaDestino, limite=null, pesquisa="", tipo="tod
         checkbox.setAttribute("aria-label", `Selecionar ${transacao.nome}`);
         checkbox.checked = transacoesSelecionadas.includes(transacao.id);
 
-        celulaSelecao.appendChild(checkbox);
+        if (tabelaDestino === listaTransacoesCompleta) {
+            const rotuloSelecao = document.createElement("label");
+            rotuloSelecao.className = "alvo-selecao";
+            rotuloSelecao.appendChild(checkbox);
+            celulaSelecao.appendChild(rotuloSelecao);
+        } else {
+            celulaSelecao.appendChild(checkbox);
+        }
         linha.appendChild(celulaSelecao);
 
         checkbox.addEventListener("change", () => {
@@ -1279,11 +1797,85 @@ function renderizarTransacoes(tabelaDestino, limite=null, pesquisa="", tipo="tod
         celulaValor.textContent = `${sinal}${formatadorMoeda.format(transacao.valor)}`;
         celulaValor.classList.add(transacao.tipo);
         linha.appendChild(celulaValor);
+        if (tabelaDestino === listaTransacoes) {
+            linha.setAttribute("role", "row");
+            ["selecao", "nome", "categoria", "data", "pagamento", "classificacao", "conta", "valor"].forEach((campo, indice) => {
+                linha.children[indice].classList.add(`recente-${campo}`);
+                linha.children[indice].setAttribute("role", "cell");
+            });
+            const rotuloSelecao = document.createElement("label");
+            rotuloSelecao.className = "selecao-recente";
+            rotuloSelecao.appendChild(checkbox);
+            celulaSelecao.appendChild(rotuloSelecao);
 
-
-
+            const categoriaDesktop = document.createElement("span");
+            categoriaDesktop.className = "categoria-recente-desktop";
+            categoriaDesktop.textContent = celulaCategoria.textContent;
+            const contexto = document.createElement("span");
+            contexto.className = "contexto-recente";
+            const tipo = { receita: "Receita", despesa: "Despesa", aporte: "Aporte", resgate: "Resgate" }[transacao.tipo];
+            const complemento = ehMovimentacaoInvestimento(transacao) ? celulaConta.textContent : transacao.categoria;
+            contexto.textContent = `${tipo} · ${complemento}`;
+            celulaCategoria.replaceChildren(categoriaDesktop, contexto);
+        }
+        if (tabelaDestino === listaTransacoesCompleta) {
+            linha.setAttribute("role", "row");
+            const nome = document.createElement("span");
+            nome.className = "nome-transacao";
+            nome.textContent = celulaNome.textContent;
+            const tipo = document.createElement("span");
+            tipo.className = `tipo-transacao tipo-${transacao.tipo}`;
+            tipo.textContent = { receita: "Receita", despesa: "Despesa", aporte: "Aporte", resgate: "Resgate" }[transacao.tipo];
+            celulaNome.replaceChildren(nome, tipo);
+            ["selecionar", "nome", "categoria", "data", "pagamento", "classificacao", "conta", "valor"].forEach((campo, indice) => {
+                linha.children[indice].classList.add(`transacao-${campo}`);
+                linha.children[indice].setAttribute("role", "cell");
+            });
+            [[celulaCategoria, "Categoria"], [celulaPagamento, "Pagamento"], [celulaClassificacao, "Classificação"], [celulaConta, "Conta"]].forEach(([celula, rotulo]) => {
+                const texto = document.createElement("span");
+                texto.textContent = celula.textContent;
+                const label = document.createElement("span");
+                label.className = "rotulo-mobile";
+                label.textContent = rotulo;
+                label.setAttribute("aria-hidden", "true");
+                celula.replaceChildren(label, texto);
+            });
+            // A tabela desktop permanece completa; no mobile, agrupa apenas os dados aplicáveis.
+            const complementos = document.createElement("div");
+            complementos.className = "complementos-mobile";
+            const movimentacao = ehMovimentacaoInvestimento(transacao);
+            const dados = movimentacao
+                ? [[transacao.tipo === "aporte" ? "Origem" : "Destino", celulaConta.lastChild.textContent],
+                    ["Investimento", investimento?.nome ?? "Investimento indisponível"]]
+                : [["Categoria", transacao.categoria], ["Conta", celulaConta.lastChild.textContent]];
+            if (transacao.tipo === "despesa") {
+                dados.push(["Classificação", transacao.classificacao], ["Pagamento", transacao.pagamento]);
+            }
+            dados.forEach(([rotulo, valor]) => {
+                if (typeof valor !== "string" || !valor.trim() || valor.trim() === "-") return;
+                const detalhe = document.createElement("span");
+                const label = document.createElement("span");
+                label.className = "rotulo-complemento";
+                label.textContent = `${rotulo}: `;
+                detalhe.append(label, document.createTextNode(valor));
+                complementos.appendChild(detalhe);
+            });
+            celulaCategoria.appendChild(complementos);
+            const tipoData = document.createElement("span");
+            tipoData.className = "tipo-data-mobile";
+            tipoData.textContent = `${tipo.textContent} · `;
+            celulaData.prepend(tipoData);
+            if (transacao.tipo === "resgate") {
+                const recebido = document.createElement("span");
+                recebido.className = "recebido-mobile";
+                recebido.textContent = "Recebido na conta";
+                celulaValor.appendChild(recebido);
+            }
+            linha.classList.toggle("selecionada", checkbox.checked);
+        }
         tabelaDestino.appendChild(linha);
     })
+    if (tabelaDestino === listaTransacoesCompleta) sincronizarSelecaoPagina();
 }
 
 function calcularTotaisResumo(registros) {
@@ -1318,7 +1910,19 @@ function atualizarResumo() {
 function sincronizarCheckboxes() {
     document.querySelectorAll(".checkbox-transacao").forEach((checkbox) => {
         checkbox.checked = transacoesSelecionadas.includes(checkbox.value);
+        checkbox.closest("tr").classList.toggle("selecionada", checkbox.checked);
     });
+    sincronizarSelecaoPagina();
+}
+
+// O controle em lote opera apenas sobre os registros já renderizados nesta página.
+function sincronizarSelecaoPagina() {
+    const controle = document.getElementById("selecionar-pagina");
+    const caixas = [...listaTransacoesCompleta.querySelectorAll(".checkbox-transacao")];
+    const selecionadas = caixas.filter((caixa) => caixa.checked).length;
+    controle.disabled = caixas.length === 0;
+    controle.checked = caixas.length > 0 && selecionadas === caixas.length;
+    controle.indeterminate = selecionadas > 0 && selecionadas < caixas.length;
 }
 
 function limparSelecao() {
@@ -1343,6 +1947,54 @@ function atualizarBarraAcoes() {
     quantidadeSelecionadasCompleta.textContent = texto;
     areaAcoesCompleta.classList.toggle("ativa", quantidade > 0);
     botaoEditarCompleta.disabled = quantidade !== 1;
+    atualizarBarraContextual();
+}
+
+function atualizarBarraContextual() {
+    const temSelecaoMobile = larguraMobileTransacoes.matches && observadorBarraSuperior !== null && transacoesSelecionadas.length > 0
+        && paginaTransacoes.classList.contains("ativa");
+    const flutuante = temSelecaoMobile && !barraSuperiorVisivel;
+    const focoAtual = document.activeElement;
+    let proximoFoco = null;
+    acoesContextuais.forEach((original, contextual) => {
+        contextual.disabled = original.disabled || transacoesSelecionadas.length === 0;
+        if (flutuante && focoAtual === original) proximoFoco = contextual;
+        if (!flutuante && temSelecaoMobile && focoAtual === contextual) proximoFoco = original;
+    });
+    quantidadeContextual.textContent = quantidadeSelecionadasCompleta.textContent;
+    barraAcoesCompleta.classList.toggle("acoes-superiores-ocultas", flutuante);
+    barraAcoesCompleta.inert = flutuante || transacoesSelecionadas.length === 0;
+    if (barraAcoesCompleta.inert) barraAcoesCompleta.setAttribute("aria-hidden", "true");
+    else barraAcoesCompleta.removeAttribute("aria-hidden");
+    barraContextual.classList.toggle("visivel", flutuante);
+    barraContextual.inert = !flutuante;
+    barraContextual.setAttribute("aria-hidden", String(!flutuante));
+    paginaTransacoes.classList.toggle("tem-selecao-mobile", temSelecaoMobile);
+    if (proximoFoco && !modalAtivo && !proximoFoco.disabled) {
+        // Ao trocar a representação focada, não deixa o foco em controles ocultos.
+        [barraAcoesCompleta, barraContextual].forEach((barra) => barra.classList.add("troca-foco-contextual"));
+        proximoFoco.focus({ preventScroll: true });
+        requestAnimationFrame(() => {
+            [barraAcoesCompleta, barraContextual].forEach((barra) => barra.classList.remove("troca-foco-contextual"));
+        });
+    }
+}
+
+function observarBarraSuperior() {
+    if (!("IntersectionObserver" in window)) return; // Mantém a barra superior como alternativa.
+    observadorBarraSuperior?.disconnect();
+    observadorBarraSuperior = null;
+    if (!larguraMobileTransacoes.matches) barraSuperiorVisivel = true;
+    if (larguraMobileTransacoes.matches) {
+        alturaNavegacaoAcoes = Math.ceil(navegacaoPrincipal.getBoundingClientRect().height);
+        paginaTransacoes.style.setProperty("--altura-nav-acoes", `${alturaNavegacaoAcoes}px`);
+        observadorBarraSuperior = new IntersectionObserver(([entrada]) => {
+            barraSuperiorVisivel = entrada.isIntersecting && entrada.intersectionRatio >= .99;
+            atualizarBarraContextual();
+        }, { threshold: [0, .99, 1], rootMargin: `0px 0px -${alturaNavegacaoAcoes + 8}px 0px` });
+        observadorBarraSuperior.observe(areaAcoesCompleta);
+    }
+    atualizarBarraContextual();
 }
 
 function preencherFormulario(transacao) {
@@ -1357,10 +2009,11 @@ function preencherFormulario(transacao) {
 }
 
 function fecharModalTransacao() {
-    fecharModal(modalOverlay);
-    formTransacao.reset();
-    limparErros(formTransacao);
-    transacaoEmEdicao = null;
+    fecharModal(modalOverlay, () => {
+        formTransacao.reset();
+        limparErros(formTransacao);
+        transacaoEmEdicao = null;
+    });
 }
 
 function navegarPara(paginaDestino) {
@@ -1370,27 +2023,156 @@ function navegarPara(paginaDestino) {
 
     if (!paginaSelecionada) return;
 
-    if (!paginaSelecionada.classList.contains("ativa")) {
+    const mudouPagina = !paginaSelecionada.classList.contains("ativa");
+    if (mudouPagina && transicaoPaginacao) atualizarTabelaCompleta();
+    if (mudouPagina) {
+        concluirFormacoesAnalises();
+        prepararFormacoesPagina(paginaDestino);
         limparSelecao();
     }
 
-    paginas.forEach((pagina) => {
-        pagina.classList.remove("ativa");
-    });
-
-    paginaSelecionada.classList.add("ativa");
+    if (mudouPagina) {
+        paginas.forEach((pagina) => {
+            pagina.classList.remove("ativa", "entrada-pagina");
+        });
+        paginaSelecionada.classList.add("ativa");
+    }
 
     linksNavegacao.forEach((link) => {
         const linkAtivo = link.dataset.pagina === paginaDestino;
 
         link.classList.toggle("ativo", linkAtivo);
+        if (link.closest("nav")) {
+            if (linkAtivo) link.setAttribute("aria-current", "page");
+            else link.removeAttribute("aria-current");
+        }
     });
     if (paginaDestino === "analises" || paginaDestino === "resumo") atualizarGraficosHistorico();
     if (paginaDestino === "analises") atualizarDistribuicaoDespesas();
     if (paginaDestino === "investimentos") renderizarInvestimentos();
+    if (mudouPagina) {
+        const titulo = paginaSelecionada.querySelector("h1");
+        if (titulo) {
+            titulo.setAttribute("tabindex", "-1");
+            titulo.focus({ preventScroll: true });
+        }
+        window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+        if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+            if (paginaDestino === "contas") {
+                let indiceConta = 0;
+                paginaSelecionada.querySelectorAll("#lista-contas > .item-conta, #lista-contas > .mensagem-vazia")
+                    .forEach((elemento) => {
+                        const atraso = elemento.classList.contains("item-conta")
+                            ? Math.min(indiceConta++ * 70, 350) : 0;
+                        elemento.style.setProperty("--atraso-entrada-conta", `${atraso}ms`);
+                        elemento.classList.add("entrada-conta");
+                    });
+            }
+            if (paginaDestino === "investimentos") {
+                let indiceInvestimento = 0;
+                paginaSelecionada.querySelectorAll("#lista-investimentos > .item-investimento, #lista-investimentos > .mensagem-vazia")
+                    .forEach((elemento) => {
+                        const atraso = elemento.classList.contains("item-investimento")
+                            ? Math.min(indiceInvestimento++ * 70, 350) : 0;
+                        elemento.style.setProperty("--atraso-entrada-investimento", `${atraso}ms`);
+                        elemento.classList.add("entrada-investimento");
+                    });
+            }
+            // Reinicia a entrada mesmo ao retornar antes do fim da animação anterior.
+            void paginaSelecionada.offsetWidth;
+            paginaSelecionada.classList.add("entrada-pagina");
+        }
+        // Reavalia depois da rolagem e da entrada CSS, inclusive em navegações muito rápidas.
+        if (paginaDestino === "resumo") agendarFormacaoAnalises("resumo");
+        if (paginaDestino === "analises") {
+            agendarFormacaoAnalises("historico");
+            agendarFormacaoAnalises("distribuicao");
+        }
+    }
 }
 
-function atualizarTabelaCompleta() {
+function cancelarTransicaoPaginacao() {
+    if (!transicaoPaginacao) return;
+    const anterior = transicaoPaginacao;
+    transicaoPaginacao = null;
+    anterior.animacoes.forEach((animacao) => animacao.cancel());
+    anterior.animacaoAltura?.cancel();
+    listaTransacoesCompleta.inert = anterior.inert;
+    anterior.area.style.minHeight = anterior.alturaAnterior;
+    anterior.area.style.height = anterior.alturaExplicitaAnterior;
+    anterior.area.classList.remove("paginando-registros");
+}
+
+async function mudarPaginaTransacoes(direcao) {
+    const destino = Math.max(1, Math.min(totalPaginasTransacoes, paginaAtual + direcao));
+    if (destino === paginaAtual) return;
+    cancelarTransicaoPaginacao();
+    paginaAtual = destino;
+    limparSelecao();
+    const elementos = () => [...listaTransacoesCompleta.querySelectorAll(
+        larguraMobileTransacoes.matches ? ":scope > tr" : "td"
+    )];
+    if (movimentoReduzidoPaginacao.matches || !paginaTransacoes.classList.contains("ativa")
+        || !elementos().length || typeof elementos()[0].animate !== "function") {
+        atualizarTabelaCompleta();
+        return;
+    }
+    const area = listaTransacoesCompleta.closest(".tabela-transacoes");
+    const estado = { area, alturaAnterior: area.style.minHeight,
+        alturaExplicitaAnterior: area.style.height, alturaInicial: area.getBoundingClientRect().height,
+        inert: listaTransacoesCompleta.inert, animacoes: [] };
+    transicaoPaginacao = estado;
+    area.style.minHeight = `${estado.alturaInicial}px`;
+    area.classList.add("paginando-registros");
+    if (listaTransacoesCompleta.contains(document.activeElement)) {
+        (direcao > 0 ? botaoProximaPagina : botaoPaginaAnterior).focus({ preventScroll: true });
+    }
+    listaTransacoesCompleta.inert = true;
+    const animar = (quadros, duracao) => {
+        estado.animacoes = [];
+        for (const elemento of elementos()) {
+            const animacao = elemento.animate(quadros,
+                { duration: duracao, easing: "ease-out", fill: "both" });
+            estado.animacoes.push(animacao);
+            // Também cobre cancelamento se a criação de uma animação seguinte falhar.
+            animacao.finished.catch(() => {});
+        }
+        return Promise.all(estado.animacoes.map((animacao) => animacao.finished));
+    };
+    try {
+        await animar([{ opacity: 1, transform: "translateX(0)" },
+            { opacity: 0, transform: `translateX(${-direcao * 8}px)` }], 100);
+        if (transicaoPaginacao !== estado) return;
+        atualizarTabelaCompleta(true);
+        estado.animacoes.forEach((animacao) => animacao.cancel());
+        // Mede o layout natural já com os novos registros, antes do próximo paint.
+        area.style.minHeight = estado.alturaAnterior;
+        area.style.height = estado.alturaExplicitaAnterior;
+        // Inclui a barra de rolagem horizontal, quando o layout desktop precisar dela.
+        area.classList.remove("paginando-registros");
+        const alturaFinal = area.getBoundingClientRect().height;
+        area.classList.add("paginando-registros");
+        area.style.height = `${estado.alturaInicial}px`;
+        let fimAltura = Promise.resolve();
+        if (Math.abs(alturaFinal - estado.alturaInicial) > 0.5) {
+            estado.animacaoAltura = area.animate([
+                { height: `${estado.alturaInicial}px` }, { height: `${alturaFinal}px` }
+            ], { duration: 250, easing: "cubic-bezier(0.23, 1, 0.32, 1)", fill: "both" });
+            fimAltura = estado.animacaoAltura.finished;
+            fimAltura.catch(() => {});
+        }
+        await Promise.all([fimAltura,
+            animar([{ opacity: 0, transform: `translateX(${direcao * 8}px)` },
+                { opacity: 1, transform: "translateX(0)" }], 180)]);
+        if (transicaoPaginacao === estado) cancelarTransicaoPaginacao();
+    } catch {
+        // Cancelamentos antigos não podem sobrescrever uma navegação mais recente.
+        if (transicaoPaginacao === estado) atualizarTabelaCompleta();
+    }
+}
+
+function atualizarTabelaCompleta(preservarTransicao = false) {
+    if (!preservarTransicao) cancelarTransicaoPaginacao();
     const pesquisa = campoPesquisa.value.trim().toLowerCase();
     const tipo = filtroTipo.value;
     const categoria = filtroCategoria.value;
@@ -1408,7 +2190,7 @@ function atualizarTabelaCompleta() {
         }
     });
 
-    renderizarTransacoes(listaTransacoesCompleta, null, pesquisa, tipo, categoria, dataInicial, dataFinal);
+    renderizarTransacoes(listaTransacoesCompleta, null, pesquisa, tipo, categoria, dataInicial, dataFinal, filtroClassificacao.value);
 }
 
 function atualizarCategorias() {
@@ -1493,11 +2275,12 @@ function prepararContasTransacao() {
 }
 
 function fecharModalConta() {
-    fecharModal(modalConta);
-    formConta.reset();
-    limparErros(formConta);
-    contaEmEdicao = null;
-    inclusaoSaldoAlterada = false;
+    fecharModal(modalConta, () => {
+        formConta.reset();
+        limparErros(formConta);
+        contaEmEdicao = null;
+        inclusaoSaldoAlterada = false;
+    });
 }
 
 function podeExcluirConta(contaId) {
@@ -1599,7 +2382,17 @@ function renderizarContas(saldos) {
         excluir.setAttribute("aria-label", `Excluir conta ${conta.nome}`);
         excluir.addEventListener("click", () => solicitarExclusaoConta(conta.id));
         acoes.append(editar, excluir);
-        item.append(nome, detalhes, saldo, acoes);
+        const rotuloSaldo = document.createElement("span");
+        rotuloSaldo.className = "rotulo-saldo-conta";
+        rotuloSaldo.textContent = "Saldo atual";
+        saldo.className = "saldo-atual-conta";
+        if (saldos.disponivel && saldos.saldosPorContaCentavos.get(conta.id) < 0) saldo.classList.add("saldo-negativo");
+        const inclusao = document.createElement("p");
+        inclusao.className = "inclusao-conta";
+        inclusao.textContent = conta.incluirNoSaldoDisponivel
+            ? "Incluída no saldo disponível" : "Fora do saldo disponível";
+        if (conta.incluirNoSaldoDisponivel) inclusao.classList.add("incluida");
+        item.append(nome, detalhes, rotuloSaldo, saldo, inclusao, acoes);
         listaContas.appendChild(item);
     });
 }
@@ -1627,6 +2420,7 @@ function renderizarContasResumo(saldos) {
         if (saldos.disponivel) {
             const cadastrar = document.createElement("button");
             cadastrar.type = "button";
+            cadastrar.classList.add("btn-primario");
             cadastrar.textContent = "Cadastrar primeira conta";
             cadastrar.addEventListener("click", () => abrirModalConta());
             lista.appendChild(cadastrar);
@@ -1697,7 +2491,7 @@ formConta.addEventListener("submit", (evento) => {
     }
     if (valorInformado === "" || !valorMonetarioValido(valorInformado)
         || !campoSaldoInicial.validity.valid) {
-        mostrarErro(campoSaldoInicial, "Informe um saldo não negativo, em centavos e dentro do limite seguro.");
+        mostrarErro(campoSaldoInicial, "Informe um saldo zero ou positivo, com até duas casas decimais, dentro do limite permitido.");
         formularioValido = false;
     }
     if (!dataValida(dataReferencia) || dataReferencia > obterDataLocal() || !campoDataReferencia.validity.valid) {
@@ -1758,8 +2552,28 @@ botaoConfirmarExclusaoConta.addEventListener("click", () => {
 
 // evento campo de pesquisa
 campoPesquisa.addEventListener("input", aplicarFiltros); 
+document.getElementById("selecionar-pagina").addEventListener("change", (evento) => {
+    const selecionar = evento.target.checked;
+    listaTransacoesCompleta.querySelectorAll(".checkbox-transacao").forEach((caixa) => {
+        caixa.checked = selecionar;
+        caixa.dispatchEvent(new Event("change"));
+    });
+});
+document.getElementById("limpar-selecao-completa").addEventListener("click", () => {
+    const veioDaContextual = barraContextual.contains(document.activeElement);
+    const destino = veioDaContextual ? [...listaTransacoesCompleta.querySelectorAll("input"),
+        botaoPaginaAnterior, botaoProximaPagina, campoPesquisa].find((elemento) => {
+        const posicao = elemento.getBoundingClientRect();
+        return !elemento.disabled && posicao.height > 0 && posicao.top >= 0
+            && posicao.bottom <= window.innerHeight - alturaNavegacaoAcoes - 110;
+    }) : null;
+    limparSelecao();
+    if (destino) destino.focus({ preventScroll: true });
+    else document.getElementById("selecionar-pagina").focus();
+});
 filtroTipo.addEventListener("change", aplicarFiltros);
 filtroCategoria.addEventListener("change", aplicarFiltros);
+filtroClassificacao.addEventListener("change", aplicarFiltros);
 filtroDataInicial.addEventListener("change", aplicarFiltros);
 filtroDataFinal.addEventListener("change", aplicarFiltros);
 
@@ -1767,6 +2581,7 @@ botaoLimparFiltros.addEventListener("click", () => {
     campoPesquisa.value = "";
     filtroTipo.value = "todos";
     filtroCategoria.value = "todas";
+    filtroClassificacao.value = "todas";
 
     filtroDataInicial.value = "";
     filtroDataFinal.value = "";
@@ -1774,19 +2589,21 @@ botaoLimparFiltros.addEventListener("click", () => {
 });
 
 botaoPaginaAnterior.addEventListener("click", () => {
-    if (paginaAtual <= 1) return;
-
-    paginaAtual--;
-    limparSelecao();
-    atualizarTabelaCompleta();
+    mudarPaginaTransacoes(-1);
 });
 
 botaoProximaPagina.addEventListener("click", () => {
-    if (botaoProximaPagina.disabled) return;
+    mudarPaginaTransacoes(1);
+});
 
-    paginaAtual++;
-    limparSelecao();
+larguraMobileTransacoes.addEventListener("change", ({ matches }) => {
+    const primeiroIndice = (paginaAtual - 1) * transacoesPorPagina;
+    transacoesPorPagina = matches ? 6 : 8;
+    paginaAtual = Math.floor(primeiroIndice / transacoesPorPagina) + 1;
+    // A lista visível muda de bloco; o Resumo mantém seus cinco registros e a seleção.
+    if (document.getElementById("pagina-transacoes").classList.contains("ativa")) limparSelecao();
     atualizarTabelaCompleta();
+    observarBarraSuperior();
 });
 
 // limpar os erros quando o usuario digitar algo nos campos do formulario
@@ -1806,6 +2623,9 @@ camposFormulario.forEach((campo) => {
     campo.addEventListener("input", () => {
         limparErroCampo(campo);
     });
+});
+selectClassificacao.addEventListener("change", () => {
+    if (classificacaoDespesaValida(selectClassificacao.value)) limparErroCampo(selectClassificacao);
 });
 [botaoExcluir, botaoExcluirCompleta].forEach((botao) => { 
     botao.addEventListener("click", () => {
@@ -1946,7 +2766,7 @@ formTransacao.addEventListener("submit", (enviar) => {
         formularioValido = false;
     }
     if (!valorMonetarioValido(campoValor.value) || valor <= 0 || !campoValor.validity.valid) {
-        mostrarErro(campoValor, "Informe um valor positivo, em centavos e dentro do limite seguro.");
+        mostrarErro(campoValor, "Informe um valor maior que zero, com até duas casas decimais, dentro do limite permitido.");
         formularioValido = false;
     }
     if (categoria.trim() === "") {
@@ -2072,10 +2892,11 @@ function abrirModalInvestimento(id = null) {
 }
 
 function fecharModalInvestimento() {
-    fecharModal(modalInvestimento);
-    formInvestimento.reset();
-    limparErros(formInvestimento);
-    investimentoEmEdicao = null;
+    fecharModal(modalInvestimento, () => {
+        formInvestimento.reset();
+        limparErros(formInvestimento);
+        investimentoEmEdicao = null;
+    });
 }
 
 // Ponto único de proteção da exclusão, incluindo movimentos históricos e futuros.
@@ -2109,15 +2930,134 @@ function fecharExclusaoInvestimento() {
     investimentoEmExclusao = null;
 }
 
+function apresentarValorInvestimento(elemento, centavos) {
+    elemento.textContent = formatarCentavos(centavos);
+    elemento.classList.toggle("valor-investimento-extenso", elemento.textContent.length > 18);
+}
+
+function prepararRetornoFocoInvestimento(id, acao) {
+    const item = [...document.getElementById("lista-investimentos").children]
+        .find((elemento) => elemento.dataset.investimentoId === id);
+    focoAnteriorModal = item?.querySelector(`[data-acao="${acao}"]`)
+        ?? document.getElementById("novo-investimento");
+    const administracao = focoAnteriorModal.closest(".gerenciar-investimento");
+    if (administracao) {
+        definirMenuAcoes(administracao, true, false);
+    }
+}
+
+function posicionarAcoesAdministrativasInvestimento(menu) {
+    const posicao = menu.getBoundingClientRect();
+    const altura = menu.querySelector(".acoes-administrativas-investimento").getBoundingClientRect().height || 110;
+    const limiteInferior = larguraMobileTransacoes.matches
+        ? navegacaoPrincipal.getBoundingClientRect().top : window.innerHeight;
+    menu.classList.toggle("abre-acima", posicao.bottom + altura + 6 > limiteInferior && posicao.top > altura + 6);
+}
+
+const transicoesMenusAcoes = new Map();
+const movimentoReduzidoMenus = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+function definirMenuAcoes(menu, aberto, animar = true) {
+    const painel = menu.querySelector(".painel-menu-acoes");
+    if (!aberto && menu.classList.contains("menu-acoes-saindo")) return;
+    const estavaAberto = menu.open;
+    transicoesMenusAcoes.get(menu)?.cancelar();
+    transicoesMenusAcoes.delete(menu);
+
+    const concluir = () => {
+        transicoesMenusAcoes.get(menu)?.cancelar();
+        transicoesMenusAcoes.delete(menu);
+        menu.open = aberto;
+        menu.classList.remove("menu-acoes-animando", "menu-acoes-entrando", "menu-acoes-saindo");
+        painel.inert = false;
+    };
+    if (!aberto && painel.contains(document.activeElement)) {
+        menu.querySelector("summary").focus({ preventScroll: true });
+    }
+    if (!animar || movimentoReduzidoMenus.matches || (!aberto && !estavaAberto)) {
+        concluir();
+        if (aberto) posicionarAcoesAdministrativasInvestimento(menu);
+        return;
+    }
+
+    menu.classList.add("menu-acoes-animando");
+    if (aberto) {
+        menu.open = true;
+        painel.inert = false;
+        posicionarAcoesAdministrativasInvestimento(menu);
+        if (!estavaAberto) {
+            menu.classList.add("menu-acoes-entrando");
+            void painel.offsetWidth;
+        }
+        menu.classList.remove("menu-acoes-entrando", "menu-acoes-saindo");
+    } else {
+        painel.inert = true;
+        menu.classList.add("menu-acoes-saindo");
+    }
+    const aoTerminar = (evento) => {
+        if (evento.target === painel && evento.propertyName === "opacity") concluir();
+    };
+    const temporizador = setTimeout(concluir, (aberto ? 170 : 120) + 50);
+    painel.addEventListener("transitionend", aoTerminar);
+    transicoesMenusAcoes.set(menu, {
+        concluir,
+        cancelar: () => {
+            clearTimeout(temporizador);
+            painel.removeEventListener("transitionend", aoTerminar);
+        }
+    });
+}
+
+movimentoReduzidoMenus.addEventListener("change", () => {
+    if (movimentoReduzidoMenus.matches) {
+        for (const transicao of [...transicoesMenusAcoes.values()]) transicao.concluir();
+    }
+});
+
+function fecharAcoesAdministrativasInvestimentos(exceto = null, restaurarFoco = false) {
+    document.querySelectorAll("#lista-investimentos .gerenciar-investimento[open]").forEach((menu) => {
+        if (menu === exceto) return;
+        const focoDentro = menu.contains(document.activeElement);
+        definirMenuAcoes(menu, false);
+        if (restaurarFoco && focoDentro) menu.querySelector("summary").focus({ preventScroll: true });
+    });
+}
+
+document.addEventListener("click", (evento) => {
+    if (modalAtivo || evento.target.closest(".modal-overlay")) return;
+    const menu = evento.target.closest(".gerenciar-investimento");
+    if (menu && evento.target.closest("summary")) {
+        evento.preventDefault();
+        definirMenuAcoes(menu, !menu.open || menu.classList.contains("menu-acoes-saindo"));
+    }
+    fecharAcoesAdministrativasInvestimentos(menu, true);
+});
+document.addEventListener("keydown", (evento) => {
+    if (evento.key !== "Escape" || modalAtivo || evento.target.closest(".modal-overlay")) return;
+    if (document.querySelector("#lista-investimentos .gerenciar-investimento[open]")) {
+        fecharAcoesAdministrativasInvestimentos(null, true);
+        evento.preventDefault();
+    }
+});
+
+// O painel acompanha o card; ao mudar a área visível, evita permanecer
+// aberto sobre a navegação inferior ou fora dos limites da janela.
+function fecharAcoesInvestimentosAoMudarViewport() {
+    if (!modalAtivo) fecharAcoesAdministrativasInvestimentos(null, true);
+}
+window.addEventListener("scroll", fecharAcoesInvestimentosAoMudarViewport, { passive: true });
+window.addEventListener("resize", fecharAcoesInvestimentosAoMudarViewport);
+
 function renderizarInvestimentos() {
     const acompanhamento = obterAcompanhamentoInvestimentos();
     const { capitais, valores: estimativas, totalCapitalCentavos } = acompanhamento;
-    document.getElementById("total-capital-investimentos").textContent = totalCapitalCentavos === null
-        ? "Indisponível" : formatarCentavos(totalCapitalCentavos);
-    document.getElementById("total-valor-investimentos").textContent = estimativas.disponivel
-        ? formatarCentavos(estimativas.totalValorCentavos) : "Indisponível";
+    apresentarValorInvestimento(document.getElementById("total-capital-investimentos"), totalCapitalCentavos);
+    apresentarValorInvestimento(document.getElementById("total-valor-investimentos"),
+        estimativas.disponivel ? estimativas.totalValorCentavos : null);
     renderizarHistoricoInvestimentos();
     const lista = document.getElementById("lista-investimentos");
+    // Encerra saídas pendentes antes de descartar os cards; sem clones ou timers órfãos.
+    for (const transicao of [...transicoesMenusAcoes.values()]) transicao.concluir();
     lista.replaceChildren();
     if (colecoesBloqueadas.has("investimentos") || investimentos.length === 0) {
         const mensagem = document.createElement("p");
@@ -2128,9 +3068,11 @@ function renderizarInvestimentos() {
         lista.appendChild(mensagem);
         return;
     }
+    const restricaoMovimentacao = obterRestricaoMovimentacaoInvestimentos();
     investimentos.forEach((investimento) => {
         const item = document.createElement("article");
         item.classList.add("item-investimento");
+        item.dataset.investimentoId = investimento.id;
         const nome = document.createElement("h3");
         nome.textContent = investimento.nome;
         const detalhes = document.createElement("p");
@@ -2138,39 +3080,93 @@ function renderizarInvestimentos() {
         const valores = document.createElement("dl");
         const posicao = estimativas.valoresPorInvestimento?.get(investimento.id);
         const capital = capitais.disponivel ? capitais.capitaisPorInvestimentoCentavos.get(investimento.id) : null;
-        [["Capital aplicado", capital], [posicao?.ajustado ? "Valor estimado" : "Valor informado manualmente",
-            posicao?.disponivel ? posicao.valorCentavos : null]].forEach(([rotulo, valor]) => {
+        [["Capital aplicado atual", capital, "Inicial", investimento.capitalInicial, investimento.dataReferenciaCapital],
+            ["Valor estimado atual",
+                posicao?.disponivel ? posicao.valorCentavos : null, "Manual",
+                investimento.valorInformado, investimento.dataReferenciaValor]].forEach(([rotulo, valor, rotuloBase, base, dataBase]) => {
             const grupo = document.createElement("div");
             const termo = document.createElement("dt");
             termo.textContent = rotulo;
             const descricao = document.createElement("dd");
-            descricao.textContent = formatarCentavos(valor);
+            const quantia = document.createElement("span");
+            quantia.className = "valor-investimento";
+            apresentarValorInvestimento(quantia, valor);
+            const referenciaBase = document.createElement("p");
+            referenciaBase.className = "base-investimento";
+            const quantiaBase = document.createElement("span");
+            quantiaBase.className = "valor-base-investimento";
+            quantiaBase.textContent = formatarCentavos(converterParaCentavos(base));
+            referenciaBase.append(`${rotuloBase}: `, quantiaBase,
+                ` · fim de ${formatarDataInvestimento(dataBase)}`);
+            descricao.append(quantia, referenciaBase);
             grupo.append(termo, descricao);
             valores.appendChild(grupo);
         });
         const referencia = document.createElement("p");
         referencia.classList.add("referencia-investimento");
         const dataAtualizacao = obterDataLocal(new Date(investimento.atualizadoEm));
-        referencia.textContent = `Valor informado manualmente: ${formatadorMoeda.format(investimento.valorInformado)} · Referência: ${formatarDataInvestimento(investimento.dataReferenciaValor)} · Atualização manual: ${formatarDataInvestimento(dataAtualizacao)}.`;
+        referencia.textContent = `Atualização manual: ${formatarDataInvestimento(dataAtualizacao)}`;
         const aviso = document.createElement("p");
         aviso.classList.add("aviso-investimento");
         aviso.textContent = posicao && !posicao.disponivel ? posicao.motivo
             : !capitais.disponivel ? capitais.motivo : "";
         const acoes = document.createElement("div");
         acoes.classList.add("acoes-investimento");
-        [["Aporte", (id) => abrirModalMovimentacao("aporte", id)],
-            ["Resgate", (id) => abrirModalMovimentacao("resgate", id)],
-            ["Atualizar valor", abrirAtualizacaoValor],
-            ["Editar", abrirModalInvestimento], ["Excluir", solicitarExclusaoInvestimento]].forEach(([rotulo, acao]) => {
+        const administracao = document.createElement("details");
+        administracao.className = "gerenciar-investimento menu-acoes";
+        const abrirAdministracao = document.createElement("summary");
+        abrirAdministracao.textContent = "Mais ações";
+        abrirAdministracao.setAttribute("aria-label", `Mais ações do investimento ${investimento.nome}`);
+        const acoesAdministrativas = document.createElement("div");
+        acoesAdministrativas.className = "acoes-administrativas-investimento painel-menu-acoes";
+        acoesAdministrativas.id = `administracao-investimento-${investimento.id}`;
+        abrirAdministracao.setAttribute("aria-controls", acoesAdministrativas.id);
+        administracao.append(abrirAdministracao, acoesAdministrativas);
+        [["Aporte", "aporte", (id) => abrirModalMovimentacao("aporte", id)],
+            ["Resgate", "resgate", (id) => abrirModalMovimentacao("resgate", id)],
+            ["Atualizar valor", "atualizar", abrirAtualizacaoValor],
+            ["Editar", "editar", abrirModalInvestimento], ["Excluir", "excluir", solicitarExclusaoInvestimento]].forEach(([rotulo, chave, acao]) => {
             const botao = document.createElement("button");
             botao.type = "button";
             botao.textContent = rotulo;
+            botao.dataset.acao = chave;
+            if (chave === "atualizar") botao.classList.add("btn-primario");
             botao.setAttribute("aria-label", `${rotulo} investimento ${investimento.nome}`);
             if (rotulo === "Excluir") botao.classList.add("btn-excluir");
-            botao.addEventListener("click", () => acao(investimento.id));
-            acoes.appendChild(botao);
+            if (restricaoMovimentacao && (chave === "aporte" || chave === "resgate")) {
+                botao.disabled = true;
+                botao.setAttribute("aria-describedby", `restricao-movimentacao-${investimento.id}`);
+            }
+            const administrativa = chave === "editar" || chave === "excluir";
+            botao.addEventListener("click", () => {
+                if (!administrativa) fecharAcoesAdministrativasInvestimentos();
+                else definirMenuAcoes(administracao, true, false);
+                acao(investimento.id);
+            });
+            (administrativa ? acoesAdministrativas : acoes).appendChild(botao);
         });
-        item.append(nome, detalhes, valores, referencia, aviso, acoes);
+        const identidade = document.createElement("header");
+        identidade.className = "identidade-investimento";
+        identidade.append(nome, detalhes);
+        item.append(identidade, valores, administracao);
+        if (investimento.observacoes) {
+            const nota = document.createElement("p");
+            nota.className = "nota-investimento";
+            nota.textContent = investimento.observacoes;
+            item.appendChild(nota);
+        }
+        if (aviso.textContent) item.appendChild(aviso);
+        if (restricaoMovimentacao) {
+            const explicacao = document.createElement("p");
+            explicacao.className = "restricao-movimentacao-investimento";
+            explicacao.id = `restricao-movimentacao-${investimento.id}`;
+            explicacao.textContent = restricaoMovimentacao.mensagem;
+            item.appendChild(explicacao);
+        }
+        const rodape = document.createElement("footer");
+        rodape.className = "rodape-investimento";
+        rodape.append(referencia, acoes);
+        item.appendChild(rodape);
         lista.appendChild(item);
     });
 }
@@ -2186,7 +3182,7 @@ formInvestimento.addEventListener("submit", (evento) => {
     if (!campos.tipo.value.trim()) erro(campos.tipo, "Informe o tipo do investimento ou escolha uma sugestão.");
     [campos.capital, campos.valor].forEach((campo) => {
         if (campo.value === "" || !valorMonetarioValido(campo.value) || !campo.validity.valid) {
-            erro(campo, "Informe um valor não negativo, em centavos e dentro do limite numérico seguro.");
+            erro(campo, "Informe um valor zero ou positivo, com até duas casas decimais, dentro do limite permitido.");
         }
     });
     const referencia = campos.referencia.value;
@@ -2224,6 +3220,7 @@ formInvestimento.addEventListener("submit", (evento) => {
     // Resolve os nomes atuais pelos IDs, preservando os registros e o estado da listagem.
     renderizarTransacoes(listaTransacoes, 5);
     atualizarTabelaCompleta();
+    if (editando) prepararRetornoFocoInvestimento(registro.id, "editar");
     fecharModalInvestimento();
     mostrarToast(editando ? "Investimento atualizado." : "Investimento cadastrado.", "sucesso");
 });
@@ -2274,6 +3271,8 @@ function abrirAtualizacaoValor(id) {
     formValorInvestimento.reset();
     limparErros(formValorInvestimento);
     document.getElementById("titulo-valor-investimento").textContent = `Atualizar valor · ${investimento.nome}`;
+    document.getElementById("avaliacao-anterior-investimento").textContent =
+        `Avaliação anterior: ${formatarCentavos(converterParaCentavos(investimento.valorInformado))}, referente ao final de ${formatarDataInvestimento(investimento.dataReferenciaValor)}. Registro atualizado em ${formatarDataInvestimento(obterDataLocal(new Date(investimento.atualizadoEm)))}.`;
     campoValorManual.value = investimento.valorInformado;
     campoDataValorManual.max = obterDataLocal();
     campoDataValorManual.value = investimento.dataReferenciaValor;
@@ -2283,10 +3282,11 @@ function abrirAtualizacaoValor(id) {
 }
 
 function fecharAtualizacaoValor() {
-    fecharModal(modalValorInvestimento);
-    formValorInvestimento.reset();
-    limparErros(formValorInvestimento);
-    investimentoEmAtualizacao = null;
+    fecharModal(modalValorInvestimento, () => {
+        formValorInvestimento.reset();
+        limparErros(formValorInvestimento);
+        investimentoEmAtualizacao = null;
+    });
 }
 
 formValorInvestimento.addEventListener("submit", (evento) => {
@@ -2296,7 +3296,7 @@ formValorInvestimento.addEventListener("submit", (evento) => {
     if (!investimentosDisponiveis() || !anterior) return;
     let valido = true;
     if (campoValorManual.value === "" || !valorMonetarioValido(campoValorManual.value) || !campoValorManual.validity.valid) {
-        mostrarErro(campoValorManual, "Informe um valor não negativo, em centavos e dentro do limite seguro.");
+        mostrarErro(campoValorManual, "Informe um valor zero ou positivo, com até duas casas decimais, dentro do limite permitido.");
         valido = false;
     }
     const data = campoDataValorManual.value;
@@ -2314,6 +3314,7 @@ formValorInvestimento.addEventListener("submit", (evento) => {
     if (!persistirColecao("investimentos", candidatos)) return;
     investimentos = candidatos;
     renderizarInvestimentos();
+    prepararRetornoFocoInvestimento(atualizado.id, "atualizar");
     fecharAtualizacaoValor();
     mostrarToast("Valor informado atualizado. As estimativas foram recalculadas.", "sucesso");
 });
@@ -2353,10 +3354,12 @@ function renderizarHistoricoInvestimentos() {
         const conta = contas.find((registro) => registro.id === movimento.contaId);
         const resgate = movimento.tipo === "resgate";
         const titulo = document.createElement("strong");
+        item.classList.add(resgate ? "movimento-resgate" : "movimento-aporte");
         titulo.textContent = `${resgate ? "Resgate" : "Aporte"} · ${investimento.nome}`;
         const contexto = document.createElement("p");
         contexto.textContent = `${formatarDataInvestimento(movimento.data)} · ${conta.nome}${movimento.data > obterDataLocal() ? " · Data futura" : ""}`;
         const valor = document.createElement("p");
+        valor.className = "valor-movimento-investimento";
         valor.textContent = resgate
             ? `−${formatadorMoeda.format(movimento.valorRetiradoInvestimento)} da posição · Recebido na conta: ${formatadorMoeda.format(movimento.valor)}`
             : `+${formatadorMoeda.format(movimento.valor)} na posição`;
@@ -2388,13 +3391,20 @@ const camposMovimentacao = Object.fromEntries(
 let tipoMovimentacao = "aporte";
 let movimentacaoEmEdicao = null;
 
-function podeMovimentarInvestimentos() {
+function obterRestricaoMovimentacaoInvestimentos() {
     if (["transacoes", "contas", "investimentos"].some((chave) => colecoesBloqueadas.has(chave))) {
-        mostrarToast("Não é possível movimentar: contas, investimentos ou transações estão indisponíveis. Os dados armazenados foram preservados.", "erro");
-        return false;
+        return { mensagem: "Não é possível movimentar: contas, investimentos ou transações estão indisponíveis. Os dados armazenados foram preservados.", tipo: "erro" };
     }
     if (!contas.length || !investimentos.length) {
-        mostrarToast("Cadastre pelo menos uma conta e um investimento antes de registrar aportes ou resgates.", "informacao");
+        return { mensagem: "Cadastre pelo menos uma conta e um investimento antes de registrar aportes ou resgates.", tipo: "informacao" };
+    }
+    return null;
+}
+
+function podeMovimentarInvestimentos() {
+    const restricao = obterRestricaoMovimentacaoInvestimentos();
+    if (restricao) {
+        mostrarToast(restricao.mensagem, restricao.tipo);
         return false;
     }
     return true;
@@ -2437,10 +3447,11 @@ function abrirModalMovimentacao(tipo, investimentoId = null, id = null) {
 }
 
 function fecharModalMovimentacao() {
-    fecharModal(modalMovimentacao);
-    formMovimentacao.reset();
-    limparErros(formMovimentacao);
-    movimentacaoEmEdicao = null;
+    fecharModal(modalMovimentacao, () => {
+        formMovimentacao.reset();
+        limparErros(formMovimentacao);
+        movimentacaoEmEdicao = null;
+    });
 }
 
 formMovimentacao.addEventListener("submit", (evento) => {
@@ -2461,7 +3472,7 @@ formMovimentacao.addEventListener("submit", (evento) => {
     for (const campo of monetarios) {
         if (campo.value === "" || !valorMonetarioValido(campo.value)
             || Number(campo.value) <= 0 || !campo.validity.valid) {
-            erro(campo, "Informe um valor positivo em centavos, dentro do limite permitido.");
+            erro(campo, "Informe um valor maior que zero, com até duas casas decimais, dentro do limite permitido.");
         }
     }
     if (!dataValida(campos.data.value) || !campos.data.validity.valid) erro(campos.data, "Selecione uma data válida.");
@@ -2513,15 +3524,30 @@ Object.values(camposMovimentacao).forEach((campo) => {
     campo.addEventListener("change", () => limparErroCampo(campo));
 });
 
-document.getElementById("historico-anterior").addEventListener("click", () => {
-    const historico = obterHistoricoMensal(blocoHistoricoAnalises);
-    if (!historico.disponivel || !historico.temAnterior) return;
-    blocoHistoricoAnalises++;
-    atualizarGraficosHistorico();
+// Um único listener atende as instâncias atuais, sem listeners retidos após destroy().
+document.addEventListener("pointerdown", (evento) => {
+    for (const grafico of Object.values(graficosHistorico)) {
+        if (!grafico || grafico.canvas.contains(evento.target) || !grafico.getActiveElements().length) continue;
+        try {
+            grafico.setActiveElements([]);
+            grafico.tooltip?.setActiveElements([], { x: 0, y: 0 });
+            grafico.draw();
+        } catch (erro) {
+            // Reutiliza o tratamento de falhas visuais, sem gravar dados.
+            atualizarGraficosHistorico();
+            break;
+        }
+    }
+}, { passive: true });
+
+document.querySelectorAll("[data-duracao-historico]").forEach((botao) => {
+    botao.addEventListener("click", () => {
+        duracaoHistoricoAnalises = Number(botao.dataset.duracaoHistorico);
+        atualizarGraficosHistorico();
+    });
 });
-document.getElementById("historico-proximo").addEventListener("click", () => {
-    if (blocoHistoricoAnalises === 0) return;
-    blocoHistoricoAnalises--;
+document.getElementById("mes-final-historico").addEventListener("change", (evento) => {
+    mesFinalHistoricoAnalises = evento.target.value;
     atualizarGraficosHistorico();
 });
 
@@ -2532,6 +3558,23 @@ document.getElementById("mes-final-distribuicao").value = mesAtualDistribuicao;
     document.getElementById(id).addEventListener("change", atualizarDistribuicaoDespesas);
 });
 
+acoesContextuais.forEach((original, contextual) => {
+    contextual.addEventListener("click", () => original.click());
+});
+observarBarraSuperior();
+if ("ResizeObserver" in window) {
+    const observadorDimensoesAcoes = new ResizeObserver((entradas) => {
+        for (const entrada of entradas) {
+            if (entrada.target === navegacaoPrincipal && larguraMobileTransacoes.matches
+                && Math.ceil(navegacaoPrincipal.getBoundingClientRect().height) !== alturaNavegacaoAcoes) {
+                observarBarraSuperior();
+            }
+        }
+    });
+    observadorDimensoesAcoes.observe(navegacaoPrincipal);
+}
+
+observarFormacoesAnalises();
 navegarPara("resumo");
 atualizarOpcoesContas();
 renderizarTransacoes(listaTransacoes, 5);
@@ -2539,6 +3582,11 @@ atualizarCategorias();
 atualizarTabelaCompleta();
 atualizarResumo();
 atualizarBarraAcoes();
+
+// A carga inicial já começa no Resumo; não precisa trocar de página ou mover o foco.
+if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    document.getElementById("pagina-resumo").classList.add("entrada-pagina");
+}
 
 // Usa o dia local atualizado ao retornar à aplicação ou restaurar a página.
 window.addEventListener("pageshow", () => {
@@ -2548,6 +3596,7 @@ window.addEventListener("pageshow", () => {
     atualizarDistribuicaoDespesas();
 });
 document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible") concluirFormacoesAnalises();
     if (document.visibilityState === "visible") {
         renderizarInvestimentos();
         atualizarVisualizacoesSaldos();

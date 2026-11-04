@@ -2,42 +2,47 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Nexo</title>
     <link rel="stylesheet" href="css/style.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js" defer></script>
     <script src="js/script.js" defer></script>
 </head>
-<body>
+<body class="nexo-app">
     <div class="container">
         <aside class="sidebar">
-            <a href="#">
-            <div class="logo"><img src="assets/logo-black.png" alt="logo-nexo"><h3>Nexo</h3></div>
-            </a>
-            <nav>
-                <ul>
-                    <li><a href="#resumo" data-pagina="resumo" >Resumo</a></li>
-                    <li><a href="#transacoes" data-pagina="transacoes">Transações</a></li>
-                    <li><a href="#" data-pagina="contas">Contas</a></li>
-                    <li><a href="#analises" data-pagina="analises">Análises</a></li>
-                    <li><a href="#investimentos" data-pagina="investimentos">Investimentos</a></li>
-                </ul>
-            </nav>
+            <a class="marca-nexo" href="#resumo" data-pagina="resumo" aria-label="Nexo — Resumo"><div class="logo"><img src="assets/logo-black.png" alt=""><span>Nexo</span></div></a>
+            <nav aria-label="Navegação principal"><ul>
+                <li><a href="#resumo" data-pagina="resumo" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>Resumo</span></a></li>
+                <li><a href="#transacoes" data-pagina="transacoes"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h15m-4-4 4 4-4 4M20 17H5m4-4-4 4 4 4"/></svg><span>Transações</span></a></li>
+                <li><a href="#contas" data-pagina="contas"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="15" rx="3"/><path d="M3 9h18m-5 5h2"/></svg><span>Contas</span></a></li>
+                <li><a href="#analises" data-pagina="analises"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v16h16M8 14l4-5 4 2 4-7"/></svg><span>Análises</span></a></li>
+                <li><a href="#investimentos" data-pagina="investimentos"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21v-8m0 3c-6 0-8-4-8-8 6 0 8 3 8 8Zm0-3c0-6 3-9 8-10 1 6-2 10-8 10Z"/></svg><span class="rotulo-investimentos">Investimentos</span><span class="rotulo-investimentos-curto">Investir</span></a></li>
+            </ul></nav>
+            <p class="sidebar-nota">Finanças pessoais<span>Armazenamento local</span></p>
         </aside>
 
         <div class="main-area">
             <header class="topbar">
-                <button id="add_receita" aria-label="Add Receita">+Receita</button>
-                <button id="add_despesa" aria-label="Add Despesa">+Despesa</button>
-                <button class="menu-config" aria-label="Toggle Menu">☰</button>
+                <span class="topbar-contexto">Organização financeira</span>
+                <div class="topbar-acoes">
+                    <button id="add_receita" aria-label="Adicionar receita"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg><span>Receita</span></button>
+                    <button class="btn-primario" id="add_despesa" aria-label="Adicionar despesa"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg><span>Despesa</span></button>
+                </div>
             </header>
 
             <main class="content">
                 <!-- =========================
                     PÁGINA RESUMO
                 ========================= -->
-                <div id="pagina-resumo" class="pagina ativa">
-                    <section class="resumo">
+                <div id="pagina-resumo" class="pagina ativa" aria-labelledby="titulo-resumo">
+                    <header class="resumo-abertura"><div><h1 id="titulo-resumo">Resumo</h1><p>Acompanhe suas contas e movimentações.</p></div><a href="#contas" data-pagina="contas">Gerenciar contas <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg></a></header>
+                    <section class="resumo" aria-label="Indicadores financeiros">
+                        <div class="card card-saldo">
+                            <span>Saldo disponível</span>
+                            <h3 id="valor-saldo" aria-describedby="ajuda-saldo-disponivel">R$ 0,00</h3>
+                            <p id="ajuda-saldo-disponivel" class="periodo-historico ajuda-indicador">Contas marcadas para inclusão, até hoje.</p>
+                        </div>
                         <div class="card card-recebido">
                             <span>Receitas registradas</span>
                             <h3 id="valor-recebido" aria-describedby="ajuda-receitas">R$ 0,00</h3>
@@ -47,11 +52,6 @@
                             <span>Despesas registradas</span>
                             <h3 id="valor-despesas" aria-describedby="ajuda-despesas">R$ 0,00</h3>
                             <p id="ajuda-despesas" class="periodo-historico ajuda-indicador">Todo o histórico, inclusive datas futuras.</p>
-                        </div>
-                        <div class="card card-saldo">
-                            <span>Saldo disponível</span>
-                            <h3 id="valor-saldo" aria-describedby="ajuda-saldo-disponivel">R$ 0,00</h3>
-                            <p id="ajuda-saldo-disponivel" class="periodo-historico ajuda-indicador">Contas marcadas para inclusão, até hoje.</p>
                         </div>
                     </section>
 
@@ -71,8 +71,8 @@
 
                         <div class="card">
                             <div class="transacoes-header cabecalho-contas-resumo">
-                                <h2>Contas e Reservas</h2>
-                                <a href="#contas" data-pagina="contas">Ver contas ➜</a>
+                                <h2>Contas e reservas</h2>
+                                <a href="#contas" data-pagina="contas">Ver contas <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg></a>
                             </div>
                             <div id="contas-resumo"></div>
                         </div>
@@ -81,8 +81,8 @@
                     <section class="transacoes">
                         <div class="card">
                             <div class="transacoes-header">
-                                <h2>Transações Recentes</h2>
-                                <a href="#transacoes" data-pagina="transacoes">Ver tudo ➜</a>
+                                <h2>Transações recentes</h2>
+                                <a href="#transacoes" data-pagina="transacoes">Ver tudo <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg></a>
                             </div>
                             <div class="area-acoes" id="area-acoes">
                                 <div class="barra-acoes" id="barra-acoes">
@@ -101,7 +101,8 @@
                                     </div>
                                 </div>
                             </div>
-                            <table>
+                            <div class="tabela-resumo" role="region" aria-label="Transações recentes" tabindex="0">
+                            <table role="table" aria-label="Transações recentes">
                                 <thead>
                                     <tr>
                                         <th class="coluna-selecao"></th>
@@ -118,46 +119,61 @@
                                     <!-- As transações serão renderizadas aqui pelo JavaScript -->
                                 </tbody>
                             </table>
+                            </div>
                         </div>
                     </section>
                 </div>
                 <!-- =========================
                     PÁGINA TRANSACOES
                 ========================= -->
-                <div id="pagina-transacoes" class="pagina">
-                    <div class="card">
-                        <h1>Transações</h1>
+                <div id="pagina-transacoes" class="pagina" aria-labelledby="titulo-transacoes">
+                    <header class="transacoes-abertura">
+                        <div><h1 id="titulo-transacoes">Transações</h1><p>Seu histórico de entradas, saídas e investimentos.</p></div>
                         <div class="acoes-movimentacoes" aria-label="Movimentações de investimentos">
-                            <button type="button" data-movimentacao="aporte">+ Aporte</button>
-                            <button type="button" data-movimentacao="resgate">+ Resgate</button>
+                            <button type="button" data-movimentacao="aporte"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14m-5-5 5 5 5-5M5 5h14"/></svg>Aporte</button>
+                            <button type="button" data-movimentacao="resgate"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5m-5 5 5-5 5 5M5 19h14"/></svg>Resgate</button>
                         </div>
+                    </header>
+                    <div class="card transacoes-painel">
                         <div class="area-pesquisa">
+                            <div class="busca-transacoes">
+                            <label for="pesquisa-transacoes">Buscar no histórico</label>
+                            <div class="entrada-busca"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg>
                             <input
                                 type="search"
                                 id="pesquisa-transacoes"
-                                aria-label="Buscar transações pelo nome"
-                                placeholder="Buscar transação pelo nome..."
+                                placeholder="Nome ou investimento..."
                             >
-
+                            </div></div>
+                            <div class="campo-filtro">
+                            <label for="filtro-tipo">Tipo</label>
                             <select id="filtro-tipo" aria-label="Filtrar por tipo de transação">
-                                <option value="todos">Todas</option>
+                                <option value="todos">Todos os tipos</option>
                                 <option value="receita">Receitas</option>
                                 <option value="despesa">Despesas</option>
                                 <option value="aporte">Aportes</option>
                                 <option value="resgate">Resgates</option>
                             </select>
-
+                            </div>
+                            <div class="campo-filtro">
+                            <label for="filtro-categoria">Categoria</label>
                             <select id="filtro-categoria" aria-label="Filtrar por categoria">
                                 <option value="todas">Todas as categorias</option>
                             </select>
-
+                            </div>
+                            <div class="campo-filtro campo-filtro-classificacao">
+                                <label for="filtro-classificacao">Classificação</label>
+                                <select id="filtro-classificacao" aria-label="Filtrar por classificação">
+                                    <option value="todas">Todas as classificações</option>
+                                </select>
+                            </div>
                             <div class="filtro-data">
-                                <label for="data-inicial">De:</label>
+                                <label for="data-inicial">Data inicial</label>
                                 <input type="date" id="data-inicial" aria-label="Data inicial das transações" aria-describedby="erro-filtro-datas">
                             </div>
 
                             <div class="filtro-data">
-                                <label for="data-final">Até:</label>
+                                <label for="data-final">Data final</label>
                                 <input type="date" id="data-final" aria-label="Data final das transações" aria-describedby="erro-filtro-datas">
                             </div>
 
@@ -166,11 +182,14 @@
                             </button>
                         </div>
                         <p id="erro-filtro-datas" class="erro-campo" role="status" aria-live="polite" aria-atomic="true"></p>
-
+                        <div class="transacoes-lista-header">
+                            <label class="selecao-pagina"><input type="checkbox" id="selecionar-pagina"> <span>Selecionar transações desta página</span></label>
+                            <div class="transacoes-contagem"><span id="total-resultados" role="status" aria-live="polite"></span><span>Mais recentes primeiro</span></div>
+                        </div>
                         <div class="area-acoes" id="area-acoes-completa">
-                            <div class="barra-acoes" id="barra-acoes-completa">
+                            <div class="barra-acoes" id="barra-acoes-completa" role="group" aria-label="Ações das transações selecionadas">
                                 <div class="conteudo-acoes">
-                                    <span id="transacoes-selecionadas-completa">
+                                    <span id="transacoes-selecionadas-completa" role="status" aria-live="polite">
                                         0 transações selecionadas
                                     </span>
 
@@ -182,14 +201,24 @@
                                         <button type="button" id="btn-excluir-completa" class="btn-excluir">
                                             Excluir
                                         </button>
+                                        <button type="button" id="limpar-selecao-completa">Cancelar seleção</button>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                        <table>
+                        <div id="barra-contextual-transacoes" role="group" aria-label="Ações das transações selecionadas" aria-hidden="true" inert>
+                            <span id="quantidade-contextual-transacoes" role="status" aria-live="polite"></span>
+                            <div class="botoes-acoes">
+                                <button type="button" id="editar-selecao-contextual" disabled>Editar</button>
+                                <button type="button" id="excluir-selecao-contextual" class="btn-excluir" disabled>Excluir</button>
+                                <button type="button" id="cancelar-selecao-contextual">Cancelar seleção</button>
+                            </div>
+                        </div>
+                        <div class="tabela-transacoes">
+                        <table role="table" aria-label="Histórico de transações, da mais recente à mais antiga">
                             <thead>
                                 <tr>
-                                    <th class="coluna-selecao"></th>
+                                    <th scope="col" class="coluna-selecao"><span class="sr-only">Selecionar</span></th>
                                     <th scope="col">Nome</th>
                                     <th scope="col">Categoria</th>
                                     <th scope="col">Data</th>
@@ -204,6 +233,7 @@
                                 <!-- Todas as transações -->
                             </tbody>
                         </table>
+                        </div>
                         <div class="paginacao">
                             <span id="info-paginacao">Página 1 de 1</span>
 
@@ -222,46 +252,23 @@
                 <!-- =========================
                     PÁGINA CONTAS
                 ========================= -->
-                <div id="pagina-contas" class="pagina">
-
-                    <div class="card-resumo">
-                        <div class="cabecalho-contas">
-                            <div>
-                                <h1>Minhas Contas</h1>
-                                <p>Gerencie suas contas e reservas.</p>
-                            </div>
-                        </div>
-
-                        <!-- Resumo financeiro das contas -->
-                        <section class="resumo-contas">
-                            <div class="card-conta-resumo">
-                                <span>Saldo total</span>
-                                <h2 id="saldo-total-contas" aria-describedby="ajuda-saldo-total">R$ 0,00</h2>
-                                <p id="ajuda-saldo-total" class="periodo-historico ajuda-indicador">Todas as contas, até hoje.</p>
-                            </div>
-
-                        </section>
-                    </div>
-
-                    <!-- Listagem de contas -->
-                    <section class="secao-contas">
-                        <div class="secao-contas-header">
-                            <h2>Contas e Reservas</h2>
-
-                            <button type="button" id="btn-nova-conta">
-                                + Nova conta
-                            </button>
-                        </div>
-
-                        <div id="lista-contas" class="lista-contas">
-                            <p class="mensagem-vazia">
-                                Nenhuma conta cadastrada.
-                            </p>
+                <section id="pagina-contas" class="pagina" aria-labelledby="titulo-contas">
+                    <header class="contas-abertura">
+                        <div><h1 id="titulo-contas">Contas</h1><p>Seu dinheiro, organizado por conta.</p></div>
+                        <button class="btn-primario" type="button" id="btn-nova-conta"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 5v14M5 12h14"/></svg>Nova conta</button>
+                    </header>
+                    <section class="resumo-contas" aria-label="Saldo de todas as contas">
+                        <div class="card-conta-resumo">
+                            <span>Saldo total</span>
+                            <h2 id="saldo-total-contas" aria-describedby="ajuda-saldo-total">R$ 0,00</h2>
+                            <p id="ajuda-saldo-total" class="periodo-historico ajuda-indicador">Todas as contas, até hoje. Inclui contas fora do saldo disponível.</p>
                         </div>
                     </section>
-
-
-                </div>
+                    <section class="secao-contas" aria-labelledby="titulo-lista-contas">
+                        <div class="secao-contas-header"><div><h2 id="titulo-lista-contas">Contas e reservas</h2><p>Saldos atuais calculados a partir das movimentações.</p></div></div>
+                        <div id="lista-contas" class="lista-contas"><p class="mensagem-vazia">Nenhuma conta cadastrada.</p></div>
+                    </section>
+                </section>
                 <!-- =========================
                     PÁGINA ANÁLISES
                 ========================= -->
@@ -272,12 +279,22 @@
                     </header>
 
                     <section class="card card-historico" aria-labelledby="titulo-historico-financeiro">
-                        <h2 id="titulo-historico-financeiro">Histórico financeiro</h2>
-                        <div class="controles-historico" role="group" aria-label="Período do histórico financeiro">
-                            <button type="button" id="historico-anterior" disabled>Período anterior</button>
-                            <p id="periodo-historico-analises" class="periodo-historico" aria-live="polite" aria-atomic="true"></p>
-                            <button type="button" id="historico-proximo" disabled>Período seguinte</button>
-                        </div>
+                        <header class="historico-abertura">
+                            <div class="analise-titulo"><h2 id="titulo-historico-financeiro">Histórico financeiro</h2><p>Evolução mensal de receitas e despesas</p></div>
+                            <div class="controles-historico" role="group" aria-label="Período do histórico financeiro">
+                                <div class="duracoes-historico" role="group" aria-label="Duração do histórico">
+                                    <button type="button" data-duracao-historico="3" aria-pressed="false" disabled>3 meses</button>
+                                    <button type="button" data-duracao-historico="6" aria-pressed="true" disabled>6 meses</button>
+                                    <button type="button" data-duracao-historico="12" aria-pressed="false" disabled>12 meses</button>
+                                </div>
+                                <label class="seletor-mes-historico" for="mes-final-historico">
+                                    <span class="texto-acessivel">Mês final</span>
+                                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>
+                                    <select id="mes-final-historico" aria-describedby="periodo-historico-analises" disabled><option>Sem histórico</option></select>
+                                </label>
+                            </div>
+                        </header>
+                        <p id="periodo-historico-analises" class="periodo-historico" aria-live="polite" aria-atomic="true"></p>
                         <p id="estado-historico-analises" class="mensagem-vazia" role="status"></p>
                         <div id="area-historico-analises" class="area-grafico" hidden>
                             <canvas id="grafico-historico-analises" role="img" aria-label="Histórico mensal de receitas e despesas" aria-describedby="dados-historico-analises"></canvas>
@@ -285,9 +302,9 @@
                         <p id="dados-historico-analises" class="texto-acessivel"></p>
                     </section>
                     <section class="card card-distribuicao" aria-labelledby="titulo-distribuicao">
-                        <h2 id="titulo-distribuicao">Distribuição de despesas</h2>
-                        <div class="filtros-distribuicao">
-                            <div class="form-group">
+                        <header class="distribuicao-abertura">
+                            <div class="analise-titulo"><h2 id="titulo-distribuicao">Distribuição de despesas</h2><p id="intervalo-distribuicao" class="periodo-historico"></p></div>
+                            <div class="controle-periodo-distribuicao">
                                 <label for="periodo-distribuicao">Período</label>
                                 <select id="periodo-distribuicao">
                                     <option value="atual">Mês atual</option>
@@ -295,6 +312,9 @@
                                     <option value="personalizado">Personalizado</option>
                                 </select>
                             </div>
+                            <div id="total-distribuicao" hidden><span>Total de despesas</span><strong id="valor-total-distribuicao"></strong></div>
+                        </header>
+                        <div class="filtros-distribuicao">
                             <div id="meses-distribuicao" hidden>
                                 <div class="form-group">
                                     <label for="mes-inicial-distribuicao">Mês inicial</label>
@@ -308,12 +328,7 @@
                                 </div>
                             </div>
                         </div>
-                        <p id="intervalo-distribuicao" class="periodo-historico"></p>
                         <p id="estado-distribuicao" class="mensagem-vazia" role="status"></p>
-                        <div id="total-distribuicao" hidden>
-                            <span>Total de despesas</span>
-                            <strong id="valor-total-distribuicao"></strong>
-                        </div>
                         <div class="conteudo-distribuicao">
                             <div id="area-distribuicao" class="area-grafico-distribuicao" hidden>
                                 <canvas id="grafico-distribuicao" role="img" aria-label="Distribuição das despesas por classificação" aria-describedby="legenda-distribuicao total-distribuicao"></canvas>
@@ -324,8 +339,8 @@
                 </section>
                 <section id="pagina-investimentos" class="pagina" aria-labelledby="titulo-investimentos">
                     <header class="cabecalho-investimentos">
-                        <h1 id="titulo-investimentos">Investimentos</h1>
-                        <p>Cadastre seus investimentos e mantenha os valores informados atualizados.</p>
+                        <div><h1 id="titulo-investimentos">Investimentos</h1><p>Cadastre seus investimentos e mantenha os valores informados atualizados.</p></div>
+                        <button class="btn-primario" type="button" id="novo-investimento"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 5v14M5 12h14"/></svg>Novo investimento</button>
                     </header>
                     <div class="totais-investimentos" aria-label="Totais da carteira">
                         <div class="secao-investimentos"><span>Capital aplicado</span><h2 id="total-capital-investimentos" aria-describedby="ajuda-capital-aplicado">Indisponível</h2><p id="ajuda-capital-aplicado" class="periodo-historico ajuda-indicador">Capital inicial e movimentações de capital após a referência, até hoje.</p></div>
@@ -335,7 +350,7 @@
                     <section class="secao-investimentos" aria-labelledby="titulo-lista-investimentos">
                         <div class="secao-investimentos-header">
                             <h2 id="titulo-lista-investimentos">Meus investimentos</h2>
-                            <button type="button" id="novo-investimento">+ Novo investimento</button>
+
                         </div>
                         <div id="lista-investimentos"></div>
                     </section>
@@ -356,11 +371,13 @@
             <div class="modal" role="dialog" aria-modal="true" aria-labelledby="titulo-modal-transacao" tabindex="-1">
                 <div class="modal-header">
                     <h2 class="modal-title" id="titulo-modal-transacao">Adicionar Transação</h2>
-                    <button class="close-modal" aria-label="Fechar Modal">&#10060;</button>
+                    <p class="modal-descricao">Registre uma movimentação vinculada à sua conta.</p>
+                    <button type="button" class="close-modal" aria-label="Fechar modal de transação"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
                 </div>
                 
                 <form class="form-transacao" novalidate>
-                    <div class="form-group">
+                    <div class="campos-transacao">
+                    <div class="form-group campo-nome">
                         <label for="nome">Nome</label>
                         <input type="text" id="nome" name="nome" placeholder="Digite o nome da transação" required aria-describedby="erro-nome">
                         <small class="erro-campo" id="erro-nome"></small>
@@ -368,8 +385,14 @@
 
                     <div class="form-group">
                         <label for="valor">Valor</label>
-                        <input type="number" id="valor" name="valor" min="0.01" step="0.01" placeholder="Digite o valor da transação" required aria-describedby="erro-valor">
+                        <div class="entrada-moeda"><span aria-hidden="true">R$</span><input type="number" id="valor" name="valor" min="0.01" step="0.01" placeholder="0,00" required aria-describedby="erro-valor"></div>
                         <small class="erro-campo" id="erro-valor"></small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="data">Data</label>
+                        <input type="date" id="data" name="data" required aria-describedby="erro-data">
+                        <small class="erro-campo" id="erro-data"></small>
                     </div>
 
                     <div class="form-group">
@@ -392,8 +415,8 @@
                     </div>
 
                     <div class="form-group campo-classificacao">
-                        <label for="classificacao">Classificação (obrigatória para despesas)</label>
-                        <select id="classificacao" name="classificacao" aria-describedby="erro-classificacao">
+                        <label for="classificacao">Classificação</label>
+                        <select id="classificacao" name="classificacao" aria-describedby="ajuda-classificacao erro-classificacao">
                             <option value="">Selecione...</option>
                             <option value="Essencial">Essencial / Necessidade</option>
                             <option value="Desejo">Desejo</option>
@@ -401,9 +424,18 @@
                             <option value="Imprevisto">Imprevisto</option>
                             <option value="Desnecessario">Desnecessário</option>
                         </select>
+                        <small class="ajuda-transacao" id="ajuda-classificacao">Obrigatória para despesas.</small>
                         <small class="erro-campo" id="erro-classificacao"></small>
                     </div>
-                    
+
+                    <div class="form-group">
+                        <label for="conta">Conta</label>
+                        <select id="conta" name="conta" required aria-describedby="erro-conta">
+                            <option value="">Selecione uma conta...</option>
+                        </select>
+                        <small class="erro-campo" id="erro-conta"></small>
+                    </div>
+
                     <div class="form-group campo-pagamento hidden">
                         <label for="pagamento">Forma de Pagamento</label>
                         <select id="pagamento" name="pagamento" aria-describedby="erro-pagamento">
@@ -417,24 +449,10 @@
                         </select>
                         <small class="erro-campo" id="erro-pagamento"></small>
                     </div>
-
-                    <div class="form-group">
-                        <label for="conta">Conta</label>
-                        <select id="conta" name="conta" required aria-describedby="erro-conta">
-                            <option value="">Selecione uma conta...</option>
-                        </select>
-                        <small class="erro-campo" id="erro-conta"></small>
                     </div>
-
-                    <div class="form-group">
-                        <label for="data">Data</label>
-                        <input type="date" id="data" name="data" required aria-describedby="erro-data">
-                        <small class="erro-campo" id="erro-data"></small>
-                    </div>
-
                     <div class="form-actions">
                         <button type="button" class="cancel-modal">Cancelar</button>
-                        <button type="submit" class="save-modal">Salvar</button>
+                        <button type="submit" class="btn-primario save-modal">Salvar</button>
                     </div>
                 </form>
             </div>
@@ -450,10 +468,11 @@
 
             <div class="modal-header">
                 <h2 id="titulo-modal-conta">Adicionar Conta</h2>
-                <button type="button" id="fechar-modal-conta" class="close-modal" aria-label="Fechar modal"> &#10060; </button>
+                <button type="button" id="fechar-modal-conta" class="close-modal" aria-label="Fechar modal"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
             </div>
 
             <form id="form-conta" novalidate>
+                <div class="campos-conta">
                 <div class="form-group">
                     <label for="nome-conta">Nome da conta</label>
                     <input
@@ -522,12 +541,13 @@
 
                 <small class="ajuda-campo" id="ajuda-inclusao-saldo">Define se esta conta entra no Saldo disponível do Resumo; o Saldo total sempre a inclui.</small>
 
+                </div>
                 <div class="modal-footer">
                     <button type="button" id="cancelar-modal-conta">
                         Cancelar
                     </button>
 
-                    <button type="submit" id="salvar-conta">
+                    <button class="btn-primario" type="submit" id="salvar-conta">
                         Salvar Conta
                     </button>
                 </div>
@@ -571,9 +591,10 @@
         <div class="modal" role="dialog" aria-modal="true" aria-labelledby="titulo-modal-investimento" tabindex="-1">
             <div class="modal-header">
                 <h2 id="titulo-modal-investimento">Adicionar investimento</h2>
-                <button type="button" id="fechar-investimento" aria-label="Fechar modal de investimento" class="close-modal">&#10060;</button>
+                <button type="button" id="fechar-investimento" aria-label="Fechar modal de investimento" class="close-modal"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
             </div>
             <form id="form-investimento" novalidate>
+                <div class="campos-investimento">
                 <div class="form-group">
                     <label for="nome-investimento">Nome do investimento</label>
                     <input id="nome-investimento" required aria-describedby="erro-nome-investimento">
@@ -620,9 +641,10 @@
                     <small id="ajuda-observacoes-investimento">Máximo de 500 caracteres.</small>
                     <small class="erro-campo" id="erro-observacoes-investimento"></small>
                 </div>
+                </div>
                 <div class="form-actions">
                     <button type="button" id="cancelar-investimento">Cancelar</button>
-                    <button type="submit" id="salvar-investimento">Salvar investimento</button>
+                    <button class="btn-primario" type="submit" id="salvar-investimento">Salvar investimento</button>
                 </div>
             </form>
         </div>
@@ -631,24 +653,29 @@
         <div class="modal" role="dialog" aria-modal="true" aria-labelledby="titulo-valor-investimento" aria-describedby="ajuda-valor-manual" tabindex="-1">
             <div class="modal-header">
                 <h2 id="titulo-valor-investimento">Atualizar valor</h2>
-                <button type="button" id="fechar-valor-investimento" class="close-modal" aria-label="Fechar atualização de valor">&#10060;</button>
+                <button type="button" id="fechar-valor-investimento" class="close-modal" aria-label="Fechar atualização de valor"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
             </div>
-            <p id="ajuda-valor-manual">O valor substitui a avaliação anterior e representa a posição ao final da data informada. Movimentações dessa data não serão reaplicadas. Capital e contas não são alterados.</p>
+
             <form id="form-valor-investimento" novalidate>
+                <div class="campos-investimento">
+                <p id="avaliacao-anterior-investimento" class="avaliacao-anterior-investimento"></p>
+                <p id="ajuda-valor-manual">Informe a posição ao final da data da avaliação. Essa referência não é a data em que você está editando o registro. O valor substitui a avaliação anterior; somente movimentações posteriores à referência serão reaplicadas. Capital e contas não são alterados.</p>
                 <div class="form-group">
                     <label for="valor-manual-investimento">Valor informado manualmente</label>
-                    <input type="number" id="valor-manual-investimento" min="0" step="0.01" required aria-describedby="erro-valor-manual-investimento">
+                    <input type="number" id="valor-manual-investimento" min="0" step="0.01" required aria-describedby="avaliacao-anterior-investimento ajuda-valor-manual erro-valor-manual-investimento">
                     <small class="erro-campo" id="erro-valor-manual-investimento"></small>
                 </div>
                 <div class="form-group">
                     <label for="data-valor-manual">Data de referência do valor</label>
-                    <input type="date" id="data-valor-manual" required aria-describedby="erro-data-valor-manual">
+                    <input type="date" id="data-valor-manual" required aria-describedby="ajuda-data-valor-manual erro-data-valor-manual">
+                    <small id="ajuda-data-valor-manual">Use a data à qual o valor consultado se refere. A referência anterior foi mantida; confira antes de salvar.</small>
                     <small class="erro-campo" id="erro-data-valor-manual"></small>
                 </div>
                 <label id="aviso-retroativo-manual" class="confirmacao-retroativa hidden"><input type="checkbox" id="confirmar-retroativo-manual"> Confirmo substituir a referência por uma data anterior. Todas as movimentações posteriores serão reaplicadas ao novo valor; a avaliação anterior não será mantida.</label>
+                </div>
                 <div class="form-actions">
                     <button type="button" id="cancelar-valor-investimento">Cancelar</button>
-                    <button type="submit">Salvar valor</button>
+                    <button class="btn-primario" type="submit">Salvar valor</button>
                 </div>
             </form>
         </div>
@@ -657,9 +684,10 @@
         <div class="modal" role="dialog" aria-modal="true" aria-labelledby="titulo-modal-movimentacao" tabindex="-1">
             <div class="modal-header">
                 <h2 id="titulo-modal-movimentacao">Adicionar aporte</h2>
-                <button type="button" id="fechar-movimentacao" class="close-modal" aria-label="Fechar movimentação">&#10060;</button>
+                <button type="button" id="fechar-movimentacao" class="close-modal" aria-label="Fechar movimentação"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
             </div>
             <form id="form-movimentacao" novalidate>
+                <div class="campos-investimento">
                 <div class="form-group">
                     <label for="investimento-movimentacao" id="rotulo-investimento-movimentacao">Investimento de destino</label>
                     <select id="investimento-movimentacao" required aria-describedby="erro-investimento-movimentacao"></select>
@@ -699,9 +727,10 @@
                     <textarea id="observacoes-movimentacao" rows="3" maxlength="500" aria-describedby="erro-observacoes-movimentacao"></textarea>
                     <small class="erro-campo" id="erro-observacoes-movimentacao"></small>
                 </div>
+                </div>
                 <div class="form-actions">
                     <button type="button" id="cancelar-movimentacao">Cancelar</button>
-                    <button type="submit" id="salvar-movimentacao">Salvar aporte</button>
+                    <button class="btn-primario" type="submit" id="salvar-movimentacao">Salvar aporte</button>
                 </div>
             </form>
         </div>
