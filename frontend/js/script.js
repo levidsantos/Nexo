@@ -22,6 +22,13 @@ const notificacoesAtivas = [];
 const filaNotificacoes = [];
 let mensagensParaAnunciar = [];
 let anuncioPendente = null;
+const transicoesToasts = new Map();
+const movimentoReduzidoToasts = window.matchMedia("(prefers-reduced-motion: reduce)");
+movimentoReduzidoToasts.addEventListener("change", () => {
+    if (movimentoReduzidoToasts.matches) {
+        for (const transicao of [...transicoesToasts.values()]) transicao.concluir();
+    }
+});
 const colecoesBloqueadas = new Set();
 let duracaoHistoricoAnalises = 6;
 let mesFinalHistoricoAnalises = null;
@@ -62,6 +69,15 @@ const filtroDataFinal = document.getElementById("data-final");
 const erroFiltroDatas = document.getElementById("erro-filtro-datas");
 const botaoLimparFiltros = document.getElementById("limpar-filtros");
 let paginaAtual = 1;
+let totalPaginasTransacoes = 1;
+let transicaoPaginacao = null;
+const movimentoReduzidoPaginacao = window.matchMedia("(prefers-reduced-motion: reduce)");
+movimentoReduzidoPaginacao.addEventListener("change", () => {
+    if (movimentoReduzidoPaginacao.matches && transicaoPaginacao) atualizarTabelaCompleta();
+});
+window.addEventListener("resize", () => {
+    if (transicaoPaginacao) atualizarTabelaCompleta();
+}, { passive: true });
 const larguraMobileTransacoes = window.matchMedia("(max-width: 850px)");
 let transacoesPorPagina = larguraMobileTransacoes.matches ? 6 : 8;
 const paginaTransacoes = document.getElementById("pagina-transacoes");
@@ -105,6 +121,9 @@ const saldoTotalContas = document.getElementById("saldo-total-contas");
 let modalAtivo = null;
 let focoAnteriorModal = null;
 let elementosInertes = [];
+let transicaoModal = null;
+let limpezaModal = null;
+const movimentoReduzidoModais = window.matchMedia("(prefers-reduced-motion: reduce)");
 
 // botoes para abrir e fechar o modal
 addReceita.addEventListener("click", () => {
@@ -153,6 +172,7 @@ function mostrarToast(mensagem, tipo = "informacao") {
     if (notificacoesAtivas.length === 3) {
         const temporaria = notificacoesAtivas.find((notificacao) => {
             return notificacao.tipo !== "erro"
+                && !notificacao.saindo
                 && !notificacao.elemento.contains(document.activeElement);
         });
         if (temporaria) {
@@ -164,6 +184,10 @@ function mostrarToast(mensagem, tipo = "informacao") {
 }
 
 function exibirProximosToasts() {
+    // O overlay está desaparecendo; seu fade não deve esconder o novo toast.
+    if (areaNotificacoes.parentElement?.classList.contains("modal-saindo")) {
+        document.body.appendChild(areaNotificacoes);
+    }
     const titulos = { sucesso: "Sucesso", erro: "Erro", informacao: "Informação" };
     while (notificacoesAtivas.length < 3 && filaNotificacoes.length > 0) {
         const notificacao = filaNotificacoes.shift();
@@ -192,6 +216,7 @@ function exibirProximosToasts() {
         notificacao.restante = 4000;
         notificacao.temporizador = null;
         notificacoesAtivas.push(notificacao);
+        animarToast(notificacao);
 
         elemento.addEventListener("mouseenter", () => pausarToast(notificacao));
         elemento.addEventListener("mouseleave", () => retomarToast(notificacao));
@@ -224,7 +249,7 @@ function pausarToast(notificacao) {
 }
 
 function retomarToast(notificacao) {
-    if (!notificacao.elemento.isConnected || notificacao.tipo === "erro" || notificacao.temporizador !== null
+    if (notificacao.saindo || !notificacao.elemento.isConnected || notificacao.tipo === "erro" || notificacao.temporizador !== null
         || notificacao.elemento.matches(":hover")
         || notificacao.elemento.contains(document.activeElement)) return;
     notificacao.inicio = Date.now();
@@ -233,14 +258,14 @@ function retomarToast(notificacao) {
 
 function fecharToast(notificacao) {
     const indice = notificacoesAtivas.indexOf(notificacao);
-    if (indice === -1) return;
+    if (indice === -1 || notificacao.saindo) return;
+    notificacao.saindo = true;
     const tinhaFoco = notificacao.elemento.contains(document.activeElement);
     clearTimeout(notificacao.temporizador);
-    notificacoesAtivas.splice(indice, 1);
-    notificacao.elemento.remove();
-    exibirProximosToasts();
+    notificacao.temporizador = null;
     if (tinhaFoco) {
-        const proxima = notificacoesAtivas[Math.min(indice, notificacoesAtivas.length - 1)];
+        const restantes = notificacoesAtivas.filter((item) => !item.saindo);
+        const proxima = restantes[Math.min(indice, restantes.length - 1)];
         if (proxima) {
             proxima.elemento.querySelector("button").focus();
         } else if (podeReceberFoco(notificacao.focoAnterior)) {
@@ -251,6 +276,57 @@ function fecharToast(notificacao) {
             addReceita.focus();
         }
     }
+    notificacao.elemento.inert = true;
+    animarToast(notificacao, true, () => {
+        // Resolve o índice atual: outras notificações podem ter saído antes desta.
+        const atual = notificacoesAtivas.indexOf(notificacao);
+        if (atual !== -1) notificacoesAtivas.splice(atual, 1);
+        notificacao.elemento.remove();
+        exibirProximosToasts();
+    });
+}
+
+function animarToast(notificacao, saindo = false, aoTerminar = () => {}) {
+    const elemento = notificacao.elemento;
+    let quadroEntrada = null;
+    transicoesToasts.get(notificacao)?.cancelar();
+    transicoesToasts.delete(notificacao);
+    const concluir = () => {
+        transicoesToasts.get(notificacao)?.cancelar();
+        transicoesToasts.delete(notificacao);
+        elemento.classList.remove("notificacao-animando", "notificacao-entrando", "notificacao-saindo");
+        aoTerminar();
+    };
+    if (movimentoReduzidoToasts.matches) {
+        concluir();
+        return;
+    }
+    elemento.classList.add("notificacao-animando");
+    if (saindo) {
+        elemento.classList.remove("notificacao-entrando");
+        elemento.classList.add("notificacao-saindo");
+    }
+    else {
+        elemento.classList.add("notificacao-entrando");
+        void elemento.offsetWidth;
+        quadroEntrada = requestAnimationFrame(() => {
+            quadroEntrada = null;
+            elemento.classList.remove("notificacao-entrando");
+        });
+    }
+    const aoFinalizarTransicao = (evento) => {
+        if (evento.target === elemento && evento.propertyName === "opacity") concluir();
+    };
+    const temporizador = setTimeout(concluir, (saindo ? 150 : 220) + 50);
+    elemento.addEventListener("transitionend", aoFinalizarTransicao);
+    transicoesToasts.set(notificacao, {
+        concluir,
+        cancelar: () => {
+            if (quadroEntrada !== null) cancelAnimationFrame(quadroEntrada);
+            clearTimeout(temporizador);
+            elemento.removeEventListener("transitionend", aoFinalizarTransicao);
+        }
+    });
 }
 
 function textoPreenchido(valor) {
@@ -1424,43 +1500,138 @@ function podeReceberFoco(elemento) {
         && getComputedStyle(elemento).visibility !== "hidden";
 }
 
-function abrirModal(modal, focoInicial) {
-    focoAnteriorModal = document.activeElement;
-    modalAtivo = modal;
-    modal.classList.remove("hidden");
-    modal.querySelector('[role="dialog"]').appendChild(areaNotificacoes);
+function posicionarNotificacoesModal(modal, noPainel) {
+    const painel = modal.querySelector('[role="dialog"]');
+    const foco = areaNotificacoes.contains(document.activeElement) ? document.activeElement : null;
+    // O anúncio permanece no diálogo mesmo enquanto os toasts escapam do transform.
+    (noPainel ? areaNotificacoes : painel).appendChild(anuncioNotificacoes);
+    (noPainel ? painel : modal).appendChild(areaNotificacoes);
+    if (foco) foco.focus({ preventScroll: true });
+}
 
-    // Inativa apenas irmãos no caminho até o body, nunca um ancestral do modal.
-    let elemento = modal;
-    while (elemento !== document.body) {
-        for (const irmao of elemento.parentElement.children) {
-            if (irmao !== elemento) {
-                elementosInertes.push({ elemento: irmao, inert: irmao.inert });
-                irmao.inert = true;
+function abrirModal(modal, focoInicial) {
+    const focoRetorno = focoAnteriorModal;
+    if (modalAtivo && modalAtivo !== modal) concluirFechamentoModal(modalAtivo, false);
+    const reabrindo = modalAtivo === modal;
+    cancelarTransicaoModal();
+    limpezaModal = null;
+    if (!reabrindo) {
+        focoAnteriorModal = document.activeElement;
+        if (focoRetorno) focoAnteriorModal = focoRetorno;
+        modalAtivo = modal;
+        modal.classList.remove("hidden");
+        modal.querySelector('[role="dialog"]').appendChild(areaNotificacoes);
+
+        // Inativa apenas irmãos no caminho até o body, nunca um ancestral do modal.
+        let elemento = modal;
+        while (elemento !== document.body) {
+            for (const irmao of elemento.parentElement.children) {
+                if (irmao !== elemento) {
+                    elementosInertes.push({ elemento: irmao, inert: irmao.inert });
+                    irmao.inert = true;
+                }
             }
+            elemento = elemento.parentElement;
         }
-        elemento = elemento.parentElement;
+    }
+    modal.classList.remove("modal-saindo", "modal-entrando");
+    modal.classList.add("modal-abrindo");
+    if (!movimentoReduzidoModais.matches) {
+        // Fora do painel transformado, os toasts continuam fixos na viewport.
+        posicionarNotificacoesModal(modal, false);
+        if (!reabrindo) {
+            modal.classList.add("modal-entrando");
+            void modal.offsetWidth;
+            modal.classList.remove("modal-entrando");
+        }
+        aguardarTransicaoModal(modal, 200, () => {
+            modal.classList.remove("modal-abrindo");
+            posicionarNotificacoesModal(modal, true);
+        });
+    } else {
+        modal.classList.remove("modal-abrindo");
+        posicionarNotificacoesModal(modal, true);
     }
     focoInicial.focus();
 }
 
-function fecharModal(modal) {
+function cancelarTransicaoModal() {
+    if (transicaoModal) transicaoModal();
+    transicaoModal = null;
+}
+
+function aguardarTransicaoModal(modal, duracao, concluir) {
+    const finalizar = () => {
+        cancelarTransicaoModal();
+        concluir();
+    };
+    const aoTerminar = (evento) => {
+        if (evento.target === modal && evento.propertyName === "opacity") finalizar();
+    };
+    // Fallback para abas suspensas ou ausência de transitionend.
+    const temporizador = setTimeout(finalizar, duracao + 50);
+    modal.addEventListener("transitionend", aoTerminar);
+    transicaoModal = () => {
+        clearTimeout(temporizador);
+        modal.removeEventListener("transitionend", aoTerminar);
+    };
+}
+
+function fecharModal(modal, aoFechar = null) {
+    if (modal !== modalAtivo || modal.classList.contains("modal-saindo")) return;
+    cancelarTransicaoModal();
+    limpezaModal = aoFechar;
+    if (movimentoReduzidoModais.matches) {
+        concluirFechamentoModal(modal);
+        return;
+    }
+    posicionarNotificacoesModal(modal, false);
+    modal.classList.add("modal-saindo");
+    aguardarTransicaoModal(modal, 150, () => concluirFechamentoModal(modal));
+}
+
+function concluirFechamentoModal(modal, restaurarFoco = true) {
+    cancelarTransicaoModal();
     modal.classList.add("hidden");
+    modal.classList.remove("modal-abrindo", "modal-entrando", "modal-saindo");
+    const limpar = limpezaModal;
+    limpezaModal = null;
+    if (limpar) limpar();
     for (const estado of elementosInertes) {
         estado.elemento.inert = estado.inert;
     }
     elementosInertes = [];
     modalAtivo = null;
-    document.body.appendChild(areaNotificacoes);
+    areaNotificacoes.appendChild(anuncioNotificacoes);
+    if (areaNotificacoes.parentElement !== document.body) document.body.appendChild(areaNotificacoes);
 
     const destino = podeReceberFoco(focoAnteriorModal) ? focoAnteriorModal
         : document.getElementById("pagina-transacoes").classList.contains("ativa") ? campoPesquisa
         : document.getElementById("pagina-contas").classList.contains("ativa") ? botaoNovaConta
         : document.getElementById("pagina-investimentos").classList.contains("ativa") ? document.getElementById("novo-investimento")
         : addReceita;
-    destino.focus({ preventScroll: Boolean(destino.closest("#lista-investimentos")) });
+    if (restaurarFoco) destino.focus({ preventScroll: Boolean(destino.closest("#lista-investimentos")) });
     focoAnteriorModal = null;
 }
+
+// Mantém o foco contido, mas impede novas ações durante a saída.
+for (const tipo of ["click", "submit", "keydown"]) {
+    document.addEventListener(tipo, (evento) => {
+        if (!modalAtivo?.classList.contains("modal-saindo")
+            || (tipo === "keydown" && evento.key === "Tab")) return;
+        evento.preventDefault();
+        evento.stopImmediatePropagation();
+    }, true);
+}
+movimentoReduzidoModais.addEventListener("change", () => {
+    if (!movimentoReduzidoModais.matches || !modalAtivo) return;
+    if (modalAtivo.classList.contains("modal-saindo")) concluirFechamentoModal(modalAtivo);
+    else {
+        cancelarTransicaoModal();
+        modalAtivo.classList.remove("modal-abrindo", "modal-entrando");
+        posicionarNotificacoesModal(modalAtivo, true);
+    }
+});
 const formatadorMoeda = new Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL"
@@ -1508,6 +1679,7 @@ function renderizarTransacoes(tabelaDestino, limite=null, pesquisa="", tipo="tod
             1,
             Math.ceil(transacoesFiltradas.length / transacoesPorPagina)
         );
+        totalPaginasTransacoes = totalPaginas;
 
         // Impede que a página atual ultrapasse a última disponível
         paginaAtual = Math.min(paginaAtual, totalPaginas);
@@ -1837,10 +2009,11 @@ function preencherFormulario(transacao) {
 }
 
 function fecharModalTransacao() {
-    fecharModal(modalOverlay);
-    formTransacao.reset();
-    limparErros(formTransacao);
-    transacaoEmEdicao = null;
+    fecharModal(modalOverlay, () => {
+        formTransacao.reset();
+        limparErros(formTransacao);
+        transacaoEmEdicao = null;
+    });
 }
 
 function navegarPara(paginaDestino) {
@@ -1851,6 +2024,7 @@ function navegarPara(paginaDestino) {
     if (!paginaSelecionada) return;
 
     const mudouPagina = !paginaSelecionada.classList.contains("ativa");
+    if (mudouPagina && transicaoPaginacao) atualizarTabelaCompleta();
     if (mudouPagina) {
         concluirFormacoesAnalises();
         prepararFormacoesPagina(paginaDestino);
@@ -1917,7 +2091,88 @@ function navegarPara(paginaDestino) {
     }
 }
 
-function atualizarTabelaCompleta() {
+function cancelarTransicaoPaginacao() {
+    if (!transicaoPaginacao) return;
+    const anterior = transicaoPaginacao;
+    transicaoPaginacao = null;
+    anterior.animacoes.forEach((animacao) => animacao.cancel());
+    anterior.animacaoAltura?.cancel();
+    listaTransacoesCompleta.inert = anterior.inert;
+    anterior.area.style.minHeight = anterior.alturaAnterior;
+    anterior.area.style.height = anterior.alturaExplicitaAnterior;
+    anterior.area.classList.remove("paginando-registros");
+}
+
+async function mudarPaginaTransacoes(direcao) {
+    const destino = Math.max(1, Math.min(totalPaginasTransacoes, paginaAtual + direcao));
+    if (destino === paginaAtual) return;
+    cancelarTransicaoPaginacao();
+    paginaAtual = destino;
+    limparSelecao();
+    const elementos = () => [...listaTransacoesCompleta.querySelectorAll(
+        larguraMobileTransacoes.matches ? ":scope > tr" : "td"
+    )];
+    if (movimentoReduzidoPaginacao.matches || !paginaTransacoes.classList.contains("ativa")
+        || !elementos().length || typeof elementos()[0].animate !== "function") {
+        atualizarTabelaCompleta();
+        return;
+    }
+    const area = listaTransacoesCompleta.closest(".tabela-transacoes");
+    const estado = { area, alturaAnterior: area.style.minHeight,
+        alturaExplicitaAnterior: area.style.height, alturaInicial: area.getBoundingClientRect().height,
+        inert: listaTransacoesCompleta.inert, animacoes: [] };
+    transicaoPaginacao = estado;
+    area.style.minHeight = `${estado.alturaInicial}px`;
+    area.classList.add("paginando-registros");
+    if (listaTransacoesCompleta.contains(document.activeElement)) {
+        (direcao > 0 ? botaoProximaPagina : botaoPaginaAnterior).focus({ preventScroll: true });
+    }
+    listaTransacoesCompleta.inert = true;
+    const animar = (quadros, duracao) => {
+        estado.animacoes = [];
+        for (const elemento of elementos()) {
+            const animacao = elemento.animate(quadros,
+                { duration: duracao, easing: "ease-out", fill: "both" });
+            estado.animacoes.push(animacao);
+            // Também cobre cancelamento se a criação de uma animação seguinte falhar.
+            animacao.finished.catch(() => {});
+        }
+        return Promise.all(estado.animacoes.map((animacao) => animacao.finished));
+    };
+    try {
+        await animar([{ opacity: 1, transform: "translateX(0)" },
+            { opacity: 0, transform: `translateX(${-direcao * 8}px)` }], 100);
+        if (transicaoPaginacao !== estado) return;
+        atualizarTabelaCompleta(true);
+        estado.animacoes.forEach((animacao) => animacao.cancel());
+        // Mede o layout natural já com os novos registros, antes do próximo paint.
+        area.style.minHeight = estado.alturaAnterior;
+        area.style.height = estado.alturaExplicitaAnterior;
+        // Inclui a barra de rolagem horizontal, quando o layout desktop precisar dela.
+        area.classList.remove("paginando-registros");
+        const alturaFinal = area.getBoundingClientRect().height;
+        area.classList.add("paginando-registros");
+        area.style.height = `${estado.alturaInicial}px`;
+        let fimAltura = Promise.resolve();
+        if (Math.abs(alturaFinal - estado.alturaInicial) > 0.5) {
+            estado.animacaoAltura = area.animate([
+                { height: `${estado.alturaInicial}px` }, { height: `${alturaFinal}px` }
+            ], { duration: 250, easing: "cubic-bezier(0.23, 1, 0.32, 1)", fill: "both" });
+            fimAltura = estado.animacaoAltura.finished;
+            fimAltura.catch(() => {});
+        }
+        await Promise.all([fimAltura,
+            animar([{ opacity: 0, transform: `translateX(${direcao * 8}px)` },
+                { opacity: 1, transform: "translateX(0)" }], 180)]);
+        if (transicaoPaginacao === estado) cancelarTransicaoPaginacao();
+    } catch {
+        // Cancelamentos antigos não podem sobrescrever uma navegação mais recente.
+        if (transicaoPaginacao === estado) atualizarTabelaCompleta();
+    }
+}
+
+function atualizarTabelaCompleta(preservarTransicao = false) {
+    if (!preservarTransicao) cancelarTransicaoPaginacao();
     const pesquisa = campoPesquisa.value.trim().toLowerCase();
     const tipo = filtroTipo.value;
     const categoria = filtroCategoria.value;
@@ -2020,11 +2275,12 @@ function prepararContasTransacao() {
 }
 
 function fecharModalConta() {
-    fecharModal(modalConta);
-    formConta.reset();
-    limparErros(formConta);
-    contaEmEdicao = null;
-    inclusaoSaldoAlterada = false;
+    fecharModal(modalConta, () => {
+        formConta.reset();
+        limparErros(formConta);
+        contaEmEdicao = null;
+        inclusaoSaldoAlterada = false;
+    });
 }
 
 function podeExcluirConta(contaId) {
@@ -2333,19 +2589,11 @@ botaoLimparFiltros.addEventListener("click", () => {
 });
 
 botaoPaginaAnterior.addEventListener("click", () => {
-    if (paginaAtual <= 1) return;
-
-    paginaAtual--;
-    limparSelecao();
-    atualizarTabelaCompleta();
+    mudarPaginaTransacoes(-1);
 });
 
 botaoProximaPagina.addEventListener("click", () => {
-    if (botaoProximaPagina.disabled) return;
-
-    paginaAtual++;
-    limparSelecao();
-    atualizarTabelaCompleta();
+    mudarPaginaTransacoes(1);
 });
 
 larguraMobileTransacoes.addEventListener("change", ({ matches }) => {
@@ -2644,10 +2892,11 @@ function abrirModalInvestimento(id = null) {
 }
 
 function fecharModalInvestimento() {
-    fecharModal(modalInvestimento);
-    formInvestimento.reset();
-    limparErros(formInvestimento);
-    investimentoEmEdicao = null;
+    fecharModal(modalInvestimento, () => {
+        formInvestimento.reset();
+        limparErros(formInvestimento);
+        investimentoEmEdicao = null;
+    });
 }
 
 // Ponto único de proteção da exclusão, incluindo movimentos históricos e futuros.
@@ -2693,8 +2942,7 @@ function prepararRetornoFocoInvestimento(id, acao) {
         ?? document.getElementById("novo-investimento");
     const administracao = focoAnteriorModal.closest(".gerenciar-investimento");
     if (administracao) {
-        posicionarAcoesAdministrativasInvestimento(administracao);
-        administracao.open = true;
+        definirMenuAcoes(administracao, true, false);
     }
 }
 
@@ -2706,11 +2954,71 @@ function posicionarAcoesAdministrativasInvestimento(menu) {
     menu.classList.toggle("abre-acima", posicao.bottom + altura + 6 > limiteInferior && posicao.top > altura + 6);
 }
 
+const transicoesMenusAcoes = new Map();
+const movimentoReduzidoMenus = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+function definirMenuAcoes(menu, aberto, animar = true) {
+    const painel = menu.querySelector(".painel-menu-acoes");
+    if (!aberto && menu.classList.contains("menu-acoes-saindo")) return;
+    const estavaAberto = menu.open;
+    transicoesMenusAcoes.get(menu)?.cancelar();
+    transicoesMenusAcoes.delete(menu);
+
+    const concluir = () => {
+        transicoesMenusAcoes.get(menu)?.cancelar();
+        transicoesMenusAcoes.delete(menu);
+        menu.open = aberto;
+        menu.classList.remove("menu-acoes-animando", "menu-acoes-entrando", "menu-acoes-saindo");
+        painel.inert = false;
+    };
+    if (!aberto && painel.contains(document.activeElement)) {
+        menu.querySelector("summary").focus({ preventScroll: true });
+    }
+    if (!animar || movimentoReduzidoMenus.matches || (!aberto && !estavaAberto)) {
+        concluir();
+        if (aberto) posicionarAcoesAdministrativasInvestimento(menu);
+        return;
+    }
+
+    menu.classList.add("menu-acoes-animando");
+    if (aberto) {
+        menu.open = true;
+        painel.inert = false;
+        posicionarAcoesAdministrativasInvestimento(menu);
+        if (!estavaAberto) {
+            menu.classList.add("menu-acoes-entrando");
+            void painel.offsetWidth;
+        }
+        menu.classList.remove("menu-acoes-entrando", "menu-acoes-saindo");
+    } else {
+        painel.inert = true;
+        menu.classList.add("menu-acoes-saindo");
+    }
+    const aoTerminar = (evento) => {
+        if (evento.target === painel && evento.propertyName === "opacity") concluir();
+    };
+    const temporizador = setTimeout(concluir, (aberto ? 170 : 120) + 50);
+    painel.addEventListener("transitionend", aoTerminar);
+    transicoesMenusAcoes.set(menu, {
+        concluir,
+        cancelar: () => {
+            clearTimeout(temporizador);
+            painel.removeEventListener("transitionend", aoTerminar);
+        }
+    });
+}
+
+movimentoReduzidoMenus.addEventListener("change", () => {
+    if (movimentoReduzidoMenus.matches) {
+        for (const transicao of [...transicoesMenusAcoes.values()]) transicao.concluir();
+    }
+});
+
 function fecharAcoesAdministrativasInvestimentos(exceto = null, restaurarFoco = false) {
     document.querySelectorAll("#lista-investimentos .gerenciar-investimento[open]").forEach((menu) => {
         if (menu === exceto) return;
         const focoDentro = menu.contains(document.activeElement);
-        menu.open = false;
+        definirMenuAcoes(menu, false);
         if (restaurarFoco && focoDentro) menu.querySelector("summary").focus({ preventScroll: true });
     });
 }
@@ -2718,7 +3026,10 @@ function fecharAcoesAdministrativasInvestimentos(exceto = null, restaurarFoco = 
 document.addEventListener("click", (evento) => {
     if (modalAtivo || evento.target.closest(".modal-overlay")) return;
     const menu = evento.target.closest(".gerenciar-investimento");
-    if (menu && evento.target.closest("summary")) posicionarAcoesAdministrativasInvestimento(menu);
+    if (menu && evento.target.closest("summary")) {
+        evento.preventDefault();
+        definirMenuAcoes(menu, !menu.open || menu.classList.contains("menu-acoes-saindo"));
+    }
     fecharAcoesAdministrativasInvestimentos(menu, true);
 });
 document.addEventListener("keydown", (evento) => {
@@ -2745,6 +3056,8 @@ function renderizarInvestimentos() {
         estimativas.disponivel ? estimativas.totalValorCentavos : null);
     renderizarHistoricoInvestimentos();
     const lista = document.getElementById("lista-investimentos");
+    // Encerra saídas pendentes antes de descartar os cards; sem clones ou timers órfãos.
+    for (const transicao of [...transicoesMenusAcoes.values()]) transicao.concluir();
     lista.replaceChildren();
     if (colecoesBloqueadas.has("investimentos") || investimentos.length === 0) {
         const mensagem = document.createElement("p");
@@ -2800,12 +3113,12 @@ function renderizarInvestimentos() {
         const acoes = document.createElement("div");
         acoes.classList.add("acoes-investimento");
         const administracao = document.createElement("details");
-        administracao.className = "gerenciar-investimento";
+        administracao.className = "gerenciar-investimento menu-acoes";
         const abrirAdministracao = document.createElement("summary");
         abrirAdministracao.textContent = "Mais ações";
         abrirAdministracao.setAttribute("aria-label", `Mais ações do investimento ${investimento.nome}`);
         const acoesAdministrativas = document.createElement("div");
-        acoesAdministrativas.className = "acoes-administrativas-investimento";
+        acoesAdministrativas.className = "acoes-administrativas-investimento painel-menu-acoes";
         acoesAdministrativas.id = `administracao-investimento-${investimento.id}`;
         abrirAdministracao.setAttribute("aria-controls", acoesAdministrativas.id);
         administracao.append(abrirAdministracao, acoesAdministrativas);
@@ -2827,6 +3140,7 @@ function renderizarInvestimentos() {
             const administrativa = chave === "editar" || chave === "excluir";
             botao.addEventListener("click", () => {
                 if (!administrativa) fecharAcoesAdministrativasInvestimentos();
+                else definirMenuAcoes(administracao, true, false);
                 acao(investimento.id);
             });
             (administrativa ? acoesAdministrativas : acoes).appendChild(botao);
@@ -2968,10 +3282,11 @@ function abrirAtualizacaoValor(id) {
 }
 
 function fecharAtualizacaoValor() {
-    fecharModal(modalValorInvestimento);
-    formValorInvestimento.reset();
-    limparErros(formValorInvestimento);
-    investimentoEmAtualizacao = null;
+    fecharModal(modalValorInvestimento, () => {
+        formValorInvestimento.reset();
+        limparErros(formValorInvestimento);
+        investimentoEmAtualizacao = null;
+    });
 }
 
 formValorInvestimento.addEventListener("submit", (evento) => {
@@ -3132,10 +3447,11 @@ function abrirModalMovimentacao(tipo, investimentoId = null, id = null) {
 }
 
 function fecharModalMovimentacao() {
-    fecharModal(modalMovimentacao);
-    formMovimentacao.reset();
-    limparErros(formMovimentacao);
-    movimentacaoEmEdicao = null;
+    fecharModal(modalMovimentacao, () => {
+        formMovimentacao.reset();
+        limparErros(formMovimentacao);
+        movimentacaoEmEdicao = null;
+    });
 }
 
 formMovimentacao.addEventListener("submit", (evento) => {
