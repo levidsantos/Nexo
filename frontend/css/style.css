@@ -1762,6 +1762,41 @@ td.despesa {
 #pagina-analises #estado-historico-analises:empty { display:none; }
 #pagina-analises button:focus-visible { outline:2px solid var(--exp-roxo); outline-offset:3px; }
 #pagina-analises ::selection { background:#e6dcf5; color:#35204e; }
+/* Três áreas apenas quando há espaço para valores, rosca e controles sem compressão. */
+@media (min-width:1350px) {
+ #pagina-analises .card-distribuicao {
+    display:grid;
+    grid-template-columns:minmax(0,1fr) 240px minmax(0,1fr);
+    grid-template-rows:auto auto 1fr;
+    gap:12px 28px;
+    align-items:start;
+ }
+ #pagina-analises .card-distribuicao .distribuicao-abertura { display:contents; }
+ #pagina-analises .card-distribuicao .analise-titulo { grid-column:1/3; grid-row:1; margin-bottom:8px; }
+ #pagina-analises .card-distribuicao #total-distribuicao { grid-column:1; grid-row:2; }
+ #pagina-analises .card-distribuicao .controle-periodo-distribuicao { grid-column:3; grid-row:2; width:200px; max-width:100%; justify-self:end; }
+ #pagina-analises .card-distribuicao .filtros-distribuicao,
+ #pagina-analises .card-distribuicao .filtros-distribuicao:has(#meses-distribuicao:not([hidden])) {
+    grid-column:3;
+    grid-row:3;
+    width:200px;
+    max-width:100%;
+    justify-self:end;
+    min-width:0;
+    margin:0;
+    padding:0;
+    border:0;
+ }
+ #pagina-analises .card-distribuicao .filtros-distribuicao:has(#meses-distribuicao[hidden]) { display:none; }
+ #pagina-analises .card-distribuicao #meses-distribuicao:not([hidden]) { display:flex; flex-direction:column; width:100%; gap:16px; }
+ #pagina-analises .card-distribuicao #meses-distribuicao .form-group { width:100%; min-width:0; }
+ #pagina-analises .card-distribuicao .conteudo-distribuicao { display:contents; }
+ #pagina-analises .card-distribuicao #area-distribuicao { grid-column:2; grid-row:2/4; align-self:start; }
+ #pagina-analises .card-distribuicao #legenda-distribuicao { grid-column:1; grid-row:3; align-self:start; max-width: 460px; }
+ #pagina-analises .card-distribuicao .valor-classificacao,
+ #pagina-analises .card-distribuicao .percentual-classificacao { white-space:nowrap; }
+ #pagina-analises .card-distribuicao #estado-distribuicao { grid-column:1/3; grid-row:4; padding:12px 0 0; }
+}
 @media(max-width:1100px) {
  #pagina-analises .conteudo-distribuicao { grid-template-columns:minmax(0,460px); justify-content:center; gap:24px; }
 }
