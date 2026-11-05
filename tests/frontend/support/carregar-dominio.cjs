@@ -1,24 +1,19 @@
 const { readFileSync } = require('node:fs');
 const { resolve } = require('node:path');
 const { Script, createContext } = require('node:vm');
-const utilitarios = require('../../../frontend/js/dominio/valores-datas.js');
+const validacoes = require('../../../frontend/js/dominio/validacoes.js');
+const calculos = require('../../../frontend/js/dominio/calculos.js');
+const { beforeEach } = require('node:test');
+
+// O relógio é fixado no teste, sem substituir as implementações importadas.
+beforeEach((t) => t.mock.timers.enable({ apis: ['Date'], now: new Date(2026, 10, 5, 12) }));
 
 // Ponte temporária para as funções ainda não extraídas do ponto de entrada ESM.
-// Node 24 carrega sincronamente o módulo real de utilitários (sem top-level await).
+// Node 24 carrega os módulos reais; apenas dois adaptadores permanecem na VM.
 // Não executa o bootstrap, não fornece DOM/storage e não copia regras financeiras.
 const arquivo = resolve(__dirname, '../../../frontend/js/script.js');
 const fonte = readFileSync(arquivo, 'utf8');
-const funcoes = [
-    'textoPreenchido', 'textoOpcional', 'ehMovimentacaoInvestimento',
-    'validarVinculosTransacoes', 'validarTransacao',
-    'prepararMovimentacaoInvestimento', 'validarConta', 'validarColecao',
-    'valorInvestimentoValido', 'valorMonetarioValido', 'validarInvestimento',
-    'saldosIndisponiveis',
-    'capitaisIndisponiveis', 'calcularCapitaisAplicados', 'verificarIntegridadeTransacoes',
-    'valoresInvestimentosIndisponiveis', 'calcularValoresInvestimentos',
-    'movimentoBancarioCentavos', 'calcularSaldos', 'classificacaoDespesaValida',
-    'validarTransacaoParaGravacao', 'calcularTotaisResumo'
-];
+const funcoes = ['prepararMovimentacaoInvestimento', 'validarTransacaoParaGravacao'];
 
 function declaracao(nome, padrao) {
     const correspondencias = [...fonte.matchAll(padrao)];
@@ -34,33 +29,21 @@ function declaracao(nome, padrao) {
 
 const trechos = funcoes.map((nome) => declaracao(nome,
     new RegExp(`^function ${nome}\\([^]*?^\\}`, 'gm')));
-trechos.push(declaracao('CLASSIFICACOES_DESPESAS',
-    /^const CLASSIFICACOES_DESPESAS = Object\.freeze\([^]*?^\}\);/gm));
+
 trechos.push(declaracao('despesasLegadasSemClassificacao',
     /^const despesasLegadasSemClassificacao = new Map\([^]*?;/gm));
 
 function carregarDominio({ transacoesLegadas = [] } = {}) {
-    // Meio-dia local: determinístico também quando a suíte roda em outro fuso.
-    class DataFixa extends Date {
-        constructor(...argumentos) {
-            if (argumentos.length) super(...argumentos);
-            else super(2026, 10, 5, 12, 0, 0, 0);
-        }
-        static now() { return new DataFixa().getTime(); }
-    }
     const contexto = createContext({
-        ...utilitarios,
-        Date: DataFixa,
-        // Injeta apenas o relógio; a implementação de data local é a do módulo real.
-        obterDataLocal: (data = new DataFixa()) => utilitarios.obterDataLocal(data),
+        ...validacoes,
         transacoes: structuredClone(transacoesLegadas)
     });
     const programa = `${trechos.join('\n\n')}\n({ ${funcoes.join(', ')} })`;
     const dominio = new Script(programa, { filename: `${arquivo}#dominio-selecionado` })
         .runInContext(contexto, { timeout: 1000 });
     // Normaliza apenas os protótipos dos resultados para assert/strict entre realms.
-    return Object.fromEntries(funcoes.map((nome) => [nome,
-        (...argumentos) => structuredClone(dominio[nome](...argumentos))]));
+    return { ...validacoes, ...calculos, ...Object.fromEntries(funcoes.map((nome) => [nome,
+        (...argumentos) => structuredClone(dominio[nome](...argumentos))])) };
 }
 
 module.exports = { carregarDominio };

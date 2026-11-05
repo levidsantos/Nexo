@@ -41,8 +41,7 @@ for (const data of ['2026-02-29', '1900-02-29', '2026-04-31', '2026-00-01',
     test(`data inválida: ${data}`, () => assert.equal(d.dataValida(data), false));
 }
 
-test('data local usa calendário local, inclusive meia-noite e virada do ano', (t) => {
-    t.mock.timers.enable({ apis: ['Date'], now: new Date(2026, 10, 5, 12) });
+test('data local usa calendário local, inclusive meia-noite e virada do ano', () => {
     assert.equal(d.obterDataLocal(), '2026-11-05');
     assert.equal(d.obterDataLocal(new Date(2026, 0, 1, 0, 5)), '2026-01-01');
     assert.equal(d.obterDataLocal(new Date(2025, 11, 31, 23, 59)), '2025-12-31');
