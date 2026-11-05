@@ -1,21 +1,23 @@
 const { readFileSync } = require('node:fs');
 const { resolve } = require('node:path');
 const { Script, createContext } = require('node:vm');
+const utilitarios = require('../../../frontend/js/dominio/valores-datas.js');
 
-// Ponte temporária para o script clássico. Ao extrair ESM, substituir por imports.
+// Ponte temporária para as funções ainda não extraídas do ponto de entrada ESM.
+// Node 24 carrega sincronamente o módulo real de utilitários (sem top-level await).
 // Não executa o bootstrap, não fornece DOM/storage e não copia regras financeiras.
 const arquivo = resolve(__dirname, '../../../frontend/js/script.js');
 const fonte = readFileSync(arquivo, 'utf8');
 const funcoes = [
     'textoPreenchido', 'textoOpcional', 'ehMovimentacaoInvestimento',
-    'validarVinculosTransacoes', 'dataValida', 'validarTransacao',
+    'validarVinculosTransacoes', 'validarTransacao',
     'prepararMovimentacaoInvestimento', 'validarConta', 'validarColecao',
     'valorInvestimentoValido', 'valorMonetarioValido', 'validarInvestimento',
-    'obterDataLocal', 'converterParaCentavos', 'saldosIndisponiveis',
+    'saldosIndisponiveis',
     'capitaisIndisponiveis', 'calcularCapitaisAplicados', 'verificarIntegridadeTransacoes',
     'valoresInvestimentosIndisponiveis', 'calcularValoresInvestimentos',
     'movimentoBancarioCentavos', 'calcularSaldos', 'classificacaoDespesaValida',
-    'validarTransacaoParaGravacao', 'formatarCentavos', 'calcularTotaisResumo'
+    'validarTransacaoParaGravacao', 'calcularTotaisResumo'
 ];
 
 function declaracao(nome, padrao) {
@@ -34,8 +36,6 @@ const trechos = funcoes.map((nome) => declaracao(nome,
     new RegExp(`^function ${nome}\\([^]*?^\\}`, 'gm')));
 trechos.push(declaracao('CLASSIFICACOES_DESPESAS',
     /^const CLASSIFICACOES_DESPESAS = Object\.freeze\([^]*?^\}\);/gm));
-trechos.push(declaracao('formatadorMoeda',
-    /^const formatadorMoeda = new Intl\.NumberFormat\([^]*?^\}\);/gm));
 trechos.push(declaracao('despesasLegadasSemClassificacao',
     /^const despesasLegadasSemClassificacao = new Map\([^]*?;/gm));
 
@@ -48,7 +48,13 @@ function carregarDominio({ transacoesLegadas = [] } = {}) {
         }
         static now() { return new DataFixa().getTime(); }
     }
-    const contexto = createContext({ Date: DataFixa, transacoes: structuredClone(transacoesLegadas) });
+    const contexto = createContext({
+        ...utilitarios,
+        Date: DataFixa,
+        // Injeta apenas o relógio; a implementação de data local é a do módulo real.
+        obterDataLocal: (data = new DataFixa()) => utilitarios.obterDataLocal(data),
+        transacoes: structuredClone(transacoesLegadas)
+    });
     const programa = `${trechos.join('\n\n')}\n({ ${funcoes.join(', ')} })`;
     const dominio = new Script(programa, { filename: `${arquivo}#dominio-selecionado` })
         .runInContext(contexto, { timeout: 1000 });

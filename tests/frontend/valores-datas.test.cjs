@@ -1,7 +1,8 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { carregarDominio } = require('./support/carregar-dominio.cjs');
-const d = carregarDominio();
+const utilitarios = require('../../frontend/js/dominio/valores-datas.js');
+const d = { ...utilitarios, valorMonetarioValido: carregarDominio().valorMonetarioValido };
 
 for (const [entrada, esperado] of [[0, 0], [0.01, 1], [12.34, 1234], ['1.2300', 123],
     [' 0.50 ', 50], ['1e-2', 1], ['+1.20', 120], [90071992547409.9, 9007199254740990]]) {
@@ -40,7 +41,8 @@ for (const data of ['2026-02-29', '1900-02-29', '2026-04-31', '2026-00-01',
     test(`data inválida: ${data}`, () => assert.equal(d.dataValida(data), false));
 }
 
-test('data local usa calendário local, inclusive meia-noite e virada do ano', () => {
+test('data local usa calendário local, inclusive meia-noite e virada do ano', (t) => {
+    t.mock.timers.enable({ apis: ['Date'], now: new Date(2026, 10, 5, 12) });
     assert.equal(d.obterDataLocal(), '2026-11-05');
     assert.equal(d.obterDataLocal(new Date(2026, 0, 1, 0, 5)), '2026-01-01');
     assert.equal(d.obterDataLocal(new Date(2025, 11, 31, 23, 59)), '2025-12-31');
