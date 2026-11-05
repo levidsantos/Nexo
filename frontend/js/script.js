@@ -1,4 +1,5 @@
 import { dataValida, obterDataLocal, converterParaCentavos, formatarCentavos, formatadorMoeda } from "./dominio/valores-datas.js";
+import { lerDados, gravarDados } from "./dados/repositorio.js";
 import {
     textoPreenchido, ehMovimentacaoInvestimento, validarVinculosTransacoes,
     validarTransacao, validarConta, validarColecao,
@@ -976,9 +977,10 @@ function atualizarGraficosHistorico() {
 
 function carregarColecao(chave, validarRegistro) {
     try {
-        const conteudo = localStorage.getItem(chave);
-        if (conteudo === null) return [];
-        const registros = JSON.parse(conteudo);
+        const leitura = lerDados(chave);
+        if (!leitura.sucesso) throw leitura.erro;
+        if (leitura.ausente) return [];
+        const registros = leitura.dados;
         if (!validarColecao(registros, validarRegistro)) {
             throw new Error("A coleção não é um array válido ou há registros inválidos/IDs repetidos.");
         }
@@ -1026,7 +1028,8 @@ function persistirColecao(chave, registros) {
         const legadosMantidos = chave === "transacoes" ? new Set(registros
             .filter((registro) => despesasLegadasSemClassificacao.get(registro.id) === JSON.stringify(registro))
             .map((registro) => registro.id)) : null;
-        localStorage.setItem(chave, JSON.stringify(registros));
+        const gravacao = gravarDados(chave, registros);
+        if (!gravacao.sucesso) throw gravacao.erro;
         if (legadosMantidos) {
             for (const id of despesasLegadasSemClassificacao.keys()) {
                 if (!legadosMantidos.has(id)) despesasLegadasSemClassificacao.delete(id);
