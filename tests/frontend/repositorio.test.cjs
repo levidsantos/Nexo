@@ -4,6 +4,7 @@ const { readFileSync } = require('node:fs');
 const { resolve } = require('node:path');
 const { Script, createContext } = require('node:vm');
 const { lerDados, gravarDados } = require('../../frontend/js/dados/repositorio.js');
+const { criarEstadoDisponibilidade } = require('../../frontend/js/dados/estado.js');
 const validacoes = require('../../frontend/js/dominio/validacoes.js');
 const calculos = require('../../frontend/js/dominio/calculos.js');
 const { conta, transacao } = require('./support/fixtures.cjs');
@@ -120,13 +121,13 @@ const adaptadores = ['carregarColecao', 'persistirColecao', 'validarTransacaoPar
 
 function aplicacaoSimulada(storage, registros = []) {
     const mensagens = [];
-    const bloqueios = new Set();
+    const disponibilidadeColecoes = criarEstadoDisponibilidade();
     const legados = new Map(registros
         .filter((registro) => registro.tipo === 'despesa' && !validacoes.classificacaoDespesaValida(registro.classificacao))
         .map((registro) => [registro.id, JSON.stringify(registro)]));
     const contexto = createContext({
         ...validacoes, ...calculos,
-        colecoesBloqueadas: bloqueios,
+        disponibilidadeColecoes,
         despesasLegadasSemClassificacao: legados,
         transacoes: registros, contas: [conta()], investimentos: [],
         lerDados: (chave) => lerDados(chave, storage),
@@ -135,7 +136,7 @@ function aplicacaoSimulada(storage, registros = []) {
     });
     const funcoes = new Script(`${adaptadores}\n({ carregarColecao, persistirColecao })`)
         .runInContext(contexto, { timeout: 1000 });
-    return { ...funcoes, mensagens, bloqueios, legados };
+    return { ...funcoes, mensagens, disponibilidadeColecoes, legados };
 }
 
 test('adaptador mantém ausente/vazio disponíveis e bloqueia dados incompatíveis sem alterá-los', () => {
@@ -144,7 +145,7 @@ test('adaptador mantém ausente/vazio disponíveis e bloqueia dados incompatíve
         const app = aplicacaoSimulada(storage);
         assert.equal(app.carregarColecao('contas', validacoes.validarConta).length, 0);
         const invalido = conteudo !== undefined && conteudo !== '[]';
-        assert.equal(app.bloqueios.has('contas'), invalido);
+        assert.equal(app.disponibilidadeColecoes.colecaoEstaBloqueada('contas'), invalido);
         assert.equal(app.mensagens.length, invalido ? 1 : 0);
         assert.equal(storage.valores.get('contas'), conteudo);
         assert.equal(storage.gravacoes.length, 0);
@@ -157,7 +158,7 @@ test('adaptador preserva leitura válida e bloqueia gravações inválidas ou co
     assert.deepEqual(structuredClone(app.carregarColecao('contas', validacoes.validarConta)), [conta()]);
     assert.equal(app.persistirColecao('contas', [{}]), false);
     assert.equal(app.persistirColecao('chave-desconhecida', []), false);
-    app.bloqueios.add('contas');
+    app.disponibilidadeColecoes.bloquearColecao('contas');
     assert.equal(app.persistirColecao('contas', [conta()]), false);
     assert.equal(storage.gravacoes.length, 0);
 });
@@ -167,7 +168,7 @@ test('adaptador mantém dados indisponíveis após falha de leitura e recusa sob
     storage.getItem = () => { throw new Error('Acesso negado'); };
     const app = aplicacaoSimulada(storage);
     assert.equal(app.carregarColecao('contas', validacoes.validarConta).length, 0);
-    assert.equal(app.bloqueios.has('contas'), true);
+    assert.equal(app.disponibilidadeColecoes.colecaoEstaBloqueada('contas'), true);
     assert.equal(app.persistirColecao('contas', [conta()]), false);
     assert.equal(storage.gravacoes.length, 0);
 });
@@ -177,7 +178,7 @@ test('adaptador valida vínculos e novas despesas antes de tentar a gravação',
     const app = aplicacaoSimulada(storage);
     assert.equal(app.persistirColecao('transacoes', [transacao({ contaId: 'inexistente' })]), false);
     assert.equal(app.persistirColecao('transacoes', [transacao({ tipo: 'despesa', classificacao: '' })]), false);
-    app.bloqueios.add('transacoes');
+    app.disponibilidadeColecoes.bloquearColecao('transacoes');
     assert.equal(app.persistirColecao('investimentos', []), false);
     assert.equal(storage.gravacoes.length, 0);
 });
