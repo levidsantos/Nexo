@@ -52,7 +52,7 @@ let mesFinalHistoricoAnalises = null;
 const graficosHistorico = { resumo: null, analises: null };
 let graficoDistribuicao = null;
 let transacoes = carregarColecao("transacoes", validarTransacao);
-let contas = carregarColecao("contas", validarConta);
+carregarColecao("contas", validarConta);
 let investimentos = carregarColecao("investimentos", validarInvestimento);
 verificarVinculosCarregados();
 const listaTransacoes = document.getElementById("lista-transacoes");
@@ -348,12 +348,12 @@ function animarToast(notificacao, saindo = false, aoTerminar = () => {}) {
 
 function validarContaTransacao(contaId) {
     return !disponibilidadeColecoes.colecaoEstaBloqueada("contas") && textoPreenchido(contaId)
-        && contas.some((conta) => conta.id === contaId);
+        && disponibilidadeColecoes.consultarContas().some((conta) => conta.id === contaId);
 }
 
 function verificarVinculosCarregados() {
     if (disponibilidadeColecoes.colecaoEstaBloqueada("transacoes")) return;
-    const integridade = verificarIntegridadeTransacoes(transacoes, contas, investimentos);
+    const integridade = verificarIntegridadeTransacoes(transacoes, disponibilidadeColecoes.consultarContas(), investimentos);
     if (disponibilidadeColecoes.colecaoEstaBloqueada("contas") || !integridade.disponivel) {
         disponibilidadeColecoes.bloquearColecao("transacoes");
         // Não apresentar um histórico parcial nem gravar sobre a coleção original.
@@ -375,7 +375,7 @@ function obterCapitaisAplicados(hoje = obterDataLocal()) {
     if (["investimentos", "transacoes", "contas"].some((chave) => disponibilidadeColecoes.colecaoEstaBloqueada(chave))) {
         return capitaisIndisponiveis("Dados necessários ao cálculo de capital indisponíveis nesta sessão.");
     }
-    const integridade = verificarIntegridadeTransacoes(transacoes, contas, investimentos);
+    const integridade = verificarIntegridadeTransacoes(transacoes, disponibilidadeColecoes.consultarContas(), investimentos);
     if (!integridade.disponivel) return capitaisIndisponiveis(integridade.motivo);
     return calcularCapitaisAplicados(investimentos, transacoes, hoje);
 }
@@ -397,7 +397,7 @@ function obterSaldosContas(hoje = obterDataLocal()) {
     if (disponibilidadeColecoes.colecaoEstaBloqueada("contas") || disponibilidadeColecoes.colecaoEstaBloqueada("transacoes")) {
         return saldosIndisponiveis("Dados de contas ou transações indisponíveis nesta sessão.");
     }
-    return calcularSaldos(contas, transacoes, hoje, investimentos);
+    return calcularSaldos(disponibilidadeColecoes.consultarContas(), transacoes, hoje, investimentos);
 }
 
 // Entrada da aplicação: utiliza a coleção completa e respeita os bloqueios existentes.
@@ -405,8 +405,8 @@ function obterHistoricoMensal(mesFinal = null, duracao = 6, hoje = obterDataLoca
     if (disponibilidadeColecoes.colecaoEstaBloqueada("transacoes") || disponibilidadeColecoes.colecaoEstaBloqueada("contas")) {
         return historicoMensalIndisponivel("Dados de transações ou seus vínculos indisponíveis nesta sessão.");
     }
-    if (!validarColecao(transacoes, validarTransacao) || !validarColecao(contas, validarConta)
-        || !validarVinculosTransacoes(transacoes, contas, investimentos)) {
+    if (!validarColecao(transacoes, validarTransacao) || !validarColecao(disponibilidadeColecoes.consultarContas(), validarConta)
+        || !validarVinculosTransacoes(transacoes, disponibilidadeColecoes.consultarContas(), investimentos)) {
         return historicoMensalIndisponivel("Não foi possível validar as transações e seus vínculos.");
     }
     return prepararHistoricoMensal(transacoes, hoje, mesFinal, duracao);
@@ -436,8 +436,8 @@ function obterDistribuicaoDespesas(tipo = "atual", mesInicial = null, mesFinal =
     if (disponibilidadeColecoes.colecaoEstaBloqueada("transacoes") || disponibilidadeColecoes.colecaoEstaBloqueada("contas")) {
         return distribuicaoDespesasIndisponivel("Dados de transações ou seus vínculos indisponíveis nesta sessão.");
     }
-    if (!validarColecao(transacoes, validarTransacao) || !validarColecao(contas, validarConta)
-        || !validarVinculosTransacoes(transacoes, contas, investimentos)) {
+    if (!validarColecao(transacoes, validarTransacao) || !validarColecao(disponibilidadeColecoes.consultarContas(), validarConta)
+        || !validarVinculosTransacoes(transacoes, disponibilidadeColecoes.consultarContas(), investimentos)) {
         return distribuicaoDespesasIndisponivel("Não foi possível validar as transações e seus vínculos.");
     }
     const periodo = definirPeriodoDespesas(tipo, mesInicial, mesFinal, hoje);
@@ -978,6 +978,11 @@ function atualizarGraficosHistorico() {
 
 function carregarColecao(chave, validarRegistro) {
     try {
+        if (chave === "contas") {
+            const inicializacao = disponibilidadeColecoes.inicializarContas();
+            if (!inicializacao.sucesso) throw inicializacao.erro;
+            return disponibilidadeColecoes.consultarContas();
+        }
         const leitura = lerDados(chave);
         if (!leitura.sucesso) throw leitura.erro;
         if (leitura.ausente) return [];
@@ -996,13 +1001,27 @@ function carregarColecao(chave, validarRegistro) {
 }
 
 function persistirColecao(chave, registros) {
+    if (chave === "contas") {
+        const resultado = disponibilidadeColecoes.confirmarContas(registros);
+        if (resultado.sucesso) return true;
+        if (resultado.motivo === "bloqueada") {
+            mostrarToast(`Não é possível salvar ${chave}: os dados estão indisponíveis e a coleção está bloqueada. `
+                + "O conteúdo armazenado não foi alterado.", "erro");
+        } else if (resultado.motivo === "invalida") {
+            mostrarToast("Não foi possível salvar: a coleção contém dados incompatíveis com o modelo atual. "
+                + "A alteração não foi confirmada e os dados anteriores foram preservados.", "erro");
+        } else {
+            mostrarToast(`Não foi possível salvar ${chave}. A alteração não foi confirmada. `
+                + "Os dados anteriores e os campos preenchidos foram mantidos. Tente novamente.", "erro");
+        }
+        return false;
+    }
     if (disponibilidadeColecoes.colecaoEstaBloqueada(chave)) {
         mostrarToast(`Não é possível salvar ${chave}: os dados estão indisponíveis e a coleção está bloqueada. `
             + "O conteúdo armazenado não foi alterado.", "erro");
         return false;
     }
-    const validarRegistro = chave === "contas" ? validarConta
-        : chave === "transacoes" ? validarTransacaoParaGravacao
+    const validarRegistro = chave === "transacoes" ? validarTransacaoParaGravacao
         : chave === "investimentos" ? validarInvestimento : null;
     if (!validarRegistro || !validarColecao(registros, validarRegistro)) {
         mostrarToast("Não foi possível salvar: a coleção contém dados incompatíveis com o modelo atual. "
@@ -1019,7 +1038,7 @@ function persistirColecao(chave, registros) {
             mostrarToast("Não foi possível confirmar os vínculos e o capital: uma coleção necessária está indisponível. A alteração não foi confirmada.", "erro");
             return false;
         }
-        const integridade = verificarIntegridadeTransacoes(candidatos, contas, investimentosCandidatos);
+        const integridade = verificarIntegridadeTransacoes(candidatos, disponibilidadeColecoes.consultarContas(), investimentosCandidatos);
         if (!integridade.disponivel) {
             mostrarToast(`Não foi possível salvar: ${integridade.motivo} A alteração não foi confirmada.`, "erro");
             return false;
@@ -1355,7 +1374,7 @@ function renderizarTransacoes(tabelaDestino, limite=null, pesquisa="", tipo="tod
         linha.appendChild(celulaClassificacao);
 
         const celulaConta = document.createElement("td");
-        const conta = contas.find((conta) => conta.id === transacao.contaId);
+        const conta = disponibilidadeColecoes.consultarContas().find((conta) => conta.id === transacao.contaId);
         celulaConta.textContent = conta ? conta.nome : "Conta indisponível";
         linha.appendChild(celulaConta);
 
@@ -1777,7 +1796,7 @@ function aplicarFiltros() {
 }
 
 function abrirModalConta(contaId = null) {
-    const conta = contaId === null ? null : contas.find((registro) => registro.id === contaId);
+    const conta = contaId === null ? null : disponibilidadeColecoes.consultarContas().find((registro) => registro.id === contaId);
     if (contaId !== null && !conta) {
         mostrarToast("Não foi possível editar: a conta não está disponível.", "erro");
         return;
@@ -1803,13 +1822,13 @@ function atualizarOpcoesContas() {
     const contaAtual = campoConta.value;
     campoConta.innerHTML = '<option value="">Selecione uma conta...</option>';
     if (disponibilidadeColecoes.colecaoEstaBloqueada("contas")) return;
-    contas.forEach((conta) => {
+    disponibilidadeColecoes.consultarContas().forEach((conta) => {
         const option = document.createElement("option");
         option.value = conta.id;
         option.textContent = conta.nome;
         campoConta.appendChild(option);
     });
-    campoConta.value = contas.some((conta) => conta.id === contaAtual) ? contaAtual : "";
+    campoConta.value = disponibilidadeColecoes.consultarContas().some((conta) => conta.id === contaAtual) ? contaAtual : "";
 }
 
 function prepararContasTransacao() {
@@ -1818,7 +1837,7 @@ function prepararContasTransacao() {
             + "Os dados armazenados foram preservados.", "erro");
         return false;
     }
-    if (contas.length === 0) {
+    if (disponibilidadeColecoes.consultarContas().length === 0) {
         mostrarToast("É necessário cadastrar uma conta antes de criar transações. "
             + "Cadastre a primeira conta na página Contas.", "informacao");
         return false;
@@ -1842,7 +1861,7 @@ function podeExcluirConta(contaId) {
             + "Não foi possível confirmar a ausência de vínculos.", "erro");
         return false;
     }
-    if (!contas.some((conta) => conta.id === contaId)) {
+    if (!disponibilidadeColecoes.consultarContas().some((conta) => conta.id === contaId)) {
         mostrarToast("Não foi possível excluir: a conta não está disponível.", "erro");
         return false;
     }
@@ -1856,7 +1875,7 @@ function podeExcluirConta(contaId) {
 
 function solicitarExclusaoConta(contaId) {
     if (!podeExcluirConta(contaId)) return;
-    const conta = contas.find((registro) => registro.id === contaId);
+    const conta = disponibilidadeColecoes.consultarContas().find((registro) => registro.id === contaId);
     contaEmExclusao = conta.id;
     mensagemExclusaoConta.textContent = `Deseja excluir a conta "${conta.nome}"? Esta ação não poderá ser desfeita.`;
     abrirModal(modalExclusaoConta, botaoCancelarExclusaoConta);
@@ -1885,7 +1904,7 @@ function renderizarContas(saldos) {
         listaContas.appendChild(mensagem);
     }
 
-    if (contas.length === 0) {
+    if (disponibilidadeColecoes.consultarContas().length === 0) {
         if (!saldos.disponivel) return;
         listaContas.innerHTML = `
             <p class="mensagem-vazia">
@@ -1895,7 +1914,7 @@ function renderizarContas(saldos) {
         return;
     }
 
-    contas.forEach((conta) => {
+    disponibilidadeColecoes.consultarContas().forEach((conta) => {
         const item = document.createElement("div");
         item.classList.add("item-conta");
 
@@ -1963,7 +1982,7 @@ function atualizarVisualizacoesSaldos() {
 function renderizarContasResumo(saldos) {
     const lista = document.getElementById("contas-resumo");
     lista.replaceChildren();
-    if (!saldos.disponivel || contas.length === 0) {
+    if (!saldos.disponivel || disponibilidadeColecoes.consultarContas().length === 0) {
         const mensagem = document.createElement("p");
         mensagem.classList.add("mensagem-vazia");
         mensagem.textContent = !saldos.disponivel
@@ -1982,7 +2001,7 @@ function renderizarContasResumo(saldos) {
     }
     const itens = document.createElement("ul");
     itens.classList.add("lista-contas-resumo");
-    contas.slice(0, 3).forEach((conta) => {
+    disponibilidadeColecoes.consultarContas().slice(0, 3).forEach((conta) => {
         const item = document.createElement("li");
         const nome = document.createElement("span");
         nome.textContent = conta.nome;
@@ -2057,7 +2076,7 @@ formConta.addEventListener("submit", (evento) => {
     }
 
     const estavaEditando = contaEmEdicao !== null;
-    const contaExistente = estavaEditando ? contas.find((conta) => conta.id === contaEmEdicao) : null;
+    const contaExistente = estavaEditando ? disponibilidadeColecoes.consultarContas().find((conta) => conta.id === contaEmEdicao) : null;
     if (estavaEditando && !contaExistente) {
         mostrarToast("Não foi possível salvar: a conta em edição não está disponível.", "erro");
         return;
@@ -2074,10 +2093,9 @@ formConta.addEventListener("submit", (evento) => {
     };
 
     const proximasContas = estavaEditando
-        ? contas.map((conta) => conta.id === contaEmEdicao ? contaAtualizada : conta)
-        : [...contas, contaAtualizada];
+        ? disponibilidadeColecoes.consultarContas().map((conta) => conta.id === contaEmEdicao ? contaAtualizada : conta)
+        : [...disponibilidadeColecoes.consultarContas(), contaAtualizada];
     if (!persistirColecao("contas", proximasContas)) return;
-    contas = proximasContas;
     atualizarOpcoesContas();
     atualizarVisualizacoesSaldos();
     // O nome exibido muda; os vínculos e a seleção continuam baseados nos IDs.
@@ -2094,9 +2112,8 @@ modalExclusaoConta.addEventListener("click", (evento) => {
 });
 botaoConfirmarExclusaoConta.addEventListener("click", () => {
     if (contaEmExclusao === null || !podeExcluirConta(contaEmExclusao)) return;
-    const proximasContas = contas.filter((conta) => conta.id !== contaEmExclusao);
+    const proximasContas = disponibilidadeColecoes.consultarContas().filter((conta) => conta.id !== contaEmExclusao);
     if (!persistirColecao("contas", proximasContas)) return;
-    contas = proximasContas;
     atualizarOpcoesContas();
     atualizarVisualizacoesSaldos();
     fecharModalExclusaoConta();
@@ -2888,7 +2905,7 @@ function renderizarHistoricoInvestimentos() {
     const lista = document.getElementById("historico-investimentos");
     lista.replaceChildren();
     const disponivel = !["investimentos", "transacoes", "contas"].some((chave) => disponibilidadeColecoes.colecaoEstaBloqueada(chave))
-        && verificarIntegridadeTransacoes(transacoes, contas, investimentos).disponivel;
+        && verificarIntegridadeTransacoes(transacoes, disponibilidadeColecoes.consultarContas(), investimentos).disponivel;
     const movimentos = disponivel ? transacoes.filter(ehMovimentacaoInvestimento)
         .slice().sort((a, b) => b.data.localeCompare(a.data)) : [];
     if (!disponivel || !movimentos.length) {
@@ -2904,7 +2921,7 @@ function renderizarHistoricoInvestimentos() {
     for (const movimento of movimentos) {
         const item = document.createElement("li");
         const investimento = investimentos.find((registro) => registro.id === movimento.investimentoId);
-        const conta = contas.find((registro) => registro.id === movimento.contaId);
+        const conta = disponibilidadeColecoes.consultarContas().find((registro) => registro.id === movimento.contaId);
         const resgate = movimento.tipo === "resgate";
         const titulo = document.createElement("strong");
         item.classList.add(resgate ? "movimento-resgate" : "movimento-aporte");
@@ -2948,7 +2965,7 @@ function obterRestricaoMovimentacaoInvestimentos() {
     if (["transacoes", "contas", "investimentos"].some((chave) => disponibilidadeColecoes.colecaoEstaBloqueada(chave))) {
         return { mensagem: "Não é possível movimentar: contas, investimentos ou transações estão indisponíveis. Os dados armazenados foram preservados.", tipo: "erro" };
     }
-    if (!contas.length || !investimentos.length) {
+    if (!disponibilidadeColecoes.consultarContas().length || !investimentos.length) {
         return { mensagem: "Cadastre pelo menos uma conta e um investimento antes de registrar aportes ou resgates.", tipo: "informacao" };
     }
     return null;
@@ -2984,7 +3001,7 @@ function abrirModalMovimentacao(tipo, investimentoId = null, id = null) {
     camposMovimentacao.capital.required = resgate;
     camposMovimentacao.capital.disabled = !resgate;
     camposMovimentacao.baixa.disabled = !resgate;
-    for (const [nome, colecao] of [["investimento", investimentos], ["conta", contas]]) {
+    for (const [nome, colecao] of [["investimento", investimentos], ["conta", disponibilidadeColecoes.consultarContas()]]) {
         const select = camposMovimentacao[nome];
         select.replaceChildren(new Option("Selecione...", ""));
         colecao.forEach((item) => select.add(new Option(item.nome, item.id)));

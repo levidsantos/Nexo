@@ -15,7 +15,7 @@ beforeEach((t) => t.mock.timers.enable({ apis: ['Date'], now: new Date(2026, 10,
 
 test('disponibilidade começa sem bloqueios e não expõe o Set ou desbloqueio', () => {
     const estado = criarEstadoDisponibilidade();
-    assert.deepEqual(Object.keys(estado).sort(), ['bloquearColecao', 'colecaoEstaBloqueada']);
+    assert.deepEqual(Object.keys(estado).sort(), ['bloquearColecao', 'colecaoEstaBloqueada', 'confirmarContas', 'consultarContas', 'contasEstaoDisponiveis', 'inicializarContas']);
     for (const chave of ['contas', 'transacoes', 'investimentos']) {
         assert.equal(estado.colecaoEstaBloqueada(chave), false);
     }
@@ -69,14 +69,17 @@ const declaracoes = nomes.map((nome) => {
 }).join('\n\n');
 
 function aplicacao(bloqueios = [], registros = [transacao()], carteira = [investimento()]) {
-    const disponibilidadeColecoes = criarEstadoDisponibilidade();
+    const disponibilidadeColecoes = criarEstadoDisponibilidade({
+        ler: () => ({ sucesso: true, ausente: false, dados: [conta()] })
+    });
+    disponibilidadeColecoes.inicializarContas();
     bloqueios.forEach((chave) => disponibilidadeColecoes.bloquearColecao(chave));
     const gravacoes = [];
     const mensagens = [];
     const contexto = createContext({
         ...utilitarios, ...validacoes, ...calculos,
         disponibilidadeColecoes,
-        contas: [conta()], transacoes: registros, investimentos: carteira,
+        transacoes: registros, investimentos: carteira,
         despesasLegadasSemClassificacao: new Map(),
         mostrarToast: (...argumentos) => mensagens.push(argumentos),
         gravarDados: (...argumentos) => { gravacoes.push(argumentos); return { sucesso: true }; }

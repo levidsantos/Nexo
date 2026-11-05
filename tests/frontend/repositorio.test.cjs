@@ -121,7 +121,10 @@ const adaptadores = ['carregarColecao', 'persistirColecao', 'validarTransacaoPar
 
 function aplicacaoSimulada(storage, registros = []) {
     const mensagens = [];
-    const disponibilidadeColecoes = criarEstadoDisponibilidade();
+    const disponibilidadeColecoes = criarEstadoDisponibilidade({
+        ler: (chave) => lerDados(chave, storage),
+        gravar: (chave, dados) => gravarDados(chave, dados, storage)
+    });
     const legados = new Map(registros
         .filter((registro) => registro.tipo === 'despesa' && !validacoes.classificacaoDespesaValida(registro.classificacao))
         .map((registro) => [registro.id, JSON.stringify(registro)]));
@@ -129,7 +132,7 @@ function aplicacaoSimulada(storage, registros = []) {
         ...validacoes, ...calculos,
         disponibilidadeColecoes,
         despesasLegadasSemClassificacao: legados,
-        transacoes: registros, contas: [conta()], investimentos: [],
+        transacoes: registros, investimentos: [],
         lerDados: (chave) => lerDados(chave, storage),
         gravarDados: (chave, dados) => gravarDados(chave, dados, storage),
         mostrarToast: (...argumentos) => mensagens.push(argumentos)
@@ -174,8 +177,9 @@ test('adaptador mantém dados indisponíveis após falha de leitura e recusa sob
 });
 
 test('adaptador valida vínculos e novas despesas antes de tentar a gravação', () => {
-    const storage = armazenamentoSimulado({ transacoes: '[]' });
+    const storage = armazenamentoSimulado({ contas: JSON.stringify([conta()]), transacoes: '[]' });
     const app = aplicacaoSimulada(storage);
+    app.carregarColecao('contas', validacoes.validarConta);
     assert.equal(app.persistirColecao('transacoes', [transacao({ contaId: 'inexistente' })]), false);
     assert.equal(app.persistirColecao('transacoes', [transacao({ tipo: 'despesa', classificacao: '' })]), false);
     app.disponibilidadeColecoes.bloquearColecao('transacoes');
@@ -186,8 +190,9 @@ test('adaptador valida vínculos e novas despesas antes de tentar a gravação',
 test('falha de escrita mantém retrato dos legados; limpeza ocorre somente após sucesso', () => {
     const legado = transacao({ tipo: 'despesa', classificacao: '' });
     const anterior = JSON.stringify([legado]);
-    const storage = armazenamentoSimulado({ transacoes: anterior });
+    const storage = armazenamentoSimulado({ contas: JSON.stringify([conta()]), transacoes: anterior });
     const app = aplicacaoSimulada(storage, [legado]);
+    app.carregarColecao('contas', validacoes.validarConta);
     const escrever = storage.setItem;
     storage.setItem = () => { throw new Error('Quota excedida'); };
     assert.equal(app.persistirColecao('transacoes', []), false);
