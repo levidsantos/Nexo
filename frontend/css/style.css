@@ -1513,7 +1513,7 @@ td.despesa {
 #pagina-resumo .coluna-selecao { width: 28px; padding-left: 0; }
 #pagina-resumo .checkbox-transacao { width: 16px; height: 16px; }
 #pagina-resumo .mensagem-vazia, #pagina-resumo .mensagem-sem-resultados { padding: 24px 8px; color: var(--nexo-texto-secundario); font-size: 13px; line-height: 1.6; }
-#pagina-resumo #contas-resumo button { padding: 8px 12px; height: auto; border-width: 1px; border-style: solid; box-shadow: none; font-size: 13px; }
+#pagina-resumo #contas-resumo button { display: block; margin-inline: auto; padding: 8px 12px; height: auto; border-width: 1px; border-style: solid; box-shadow: none; font-size: 13px; }
 #pagina-resumo .barra-acoes { box-shadow: none; border-color: var(--nexo-borda); background: #faf8fd; }
 #pagina-resumo ::selection, #modal-overlay ::selection { background: #e6dcf5; color: #35204e; }
 

@@ -1,3 +1,4 @@
+import { mostrarErro, limparErros, limparErroCampo, focarPrimeiroErro } from "./ui/formularios.js";
 import { dataValida, obterDataLocal, converterParaCentavos, formatarCentavos, formatadorMoeda } from "./dominio/valores-datas.js";
 import { criarEstadoDisponibilidade } from "./dados/estado.js";
 import {
@@ -1010,35 +1011,6 @@ function persistirColecao(chave, registros) {
             + "A alteração não foi confirmada e os dados anteriores foram preservados.", "erro");
     }
     return false;
-}
-
-function mostrarErro(campo, mensagem) {
-    const erro = document.getElementById(`erro-${campo.id}`);
-
-    erro.textContent = mensagem;
-    campo.classList.add("invalido");
-    campo.setAttribute("aria-invalid", "true");
-}
-function limparErros(formulario) {
-    formulario.querySelectorAll(".erro-campo").forEach((erro) => {
-        erro.textContent = "";
-    });
-
-    formulario.querySelectorAll(".invalido").forEach((campo) => {
-        campo.classList.remove("invalido");
-        campo.removeAttribute("aria-invalid");
-    });
-}
-function limparErroCampo(campo) {
-    const erro = document.getElementById(`erro-${campo.id}`);
-
-    erro.textContent = "";
-    campo.classList.remove("invalido");
-    campo.removeAttribute("aria-invalid");
-}
-
-function focarPrimeiroErro(formulario) {
-    formulario.querySelector(".invalido").focus();
 }
 
 function podeReceberFoco(elemento) {
