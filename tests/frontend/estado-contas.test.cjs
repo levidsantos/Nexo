@@ -177,9 +177,12 @@ const declaracoes = nomes.map((nome) => {
 
 function adaptadores(app, registros = []) {
     const mensagens = [];
+    const ler = app.storage.getItem;
+    app.storage.getItem = (chave) => chave === "transacoes" ? JSON.stringify(registros) : ler(chave);
+    app.estado.inicializarTransacoes();
     const contexto = createContext({
         ...utilitarios, ...validacoes, ...calculos,
-        disponibilidadeColecoes: app.estado, transacoes: registros, investimentos: [],
+        disponibilidadeColecoes: app.estado, investimentos: [],
         mostrarToast: (...argumentos) => mensagens.push(argumentos)
     });
     const funcoes = new Script(`${declaracoes}\n({ ${nomes.join(', ')} })`).runInContext(contexto);

@@ -113,7 +113,7 @@ test('acesso padrão é tardio e captura inclusive falha no getter de localStora
 // Os adaptadores de estado continuam no script.js: executar suas declarações
 // reais confirma a integração sem iniciar a interface ou acessar dados reais.
 const fonte = readFileSync(resolve(__dirname, '../../frontend/js/script.js'), 'utf8');
-const adaptadores = ['carregarColecao', 'persistirColecao', 'validarTransacaoParaGravacao'].map((nome) => {
+const adaptadores = ['carregarColecao', 'persistirColecao'].map((nome) => {
     const trechos = [...fonte.matchAll(new RegExp(`^function ${nome}\\([^]*?^\\}`, 'gm'))];
     assert.equal(trechos.length, 1, `Declaração única de ${nome}`);
     return trechos[0][0];
@@ -125,21 +125,18 @@ function aplicacaoSimulada(storage, registros = []) {
         ler: (chave) => lerDados(chave, storage),
         gravar: (chave, dados) => gravarDados(chave, dados, storage)
     });
-    const legados = new Map(registros
-        .filter((registro) => registro.tipo === 'despesa' && !validacoes.classificacaoDespesaValida(registro.classificacao))
-        .map((registro) => [registro.id, JSON.stringify(registro)]));
+    disponibilidadeColecoes.inicializarTransacoes();
     const contexto = createContext({
         ...validacoes, ...calculos,
         disponibilidadeColecoes,
-        despesasLegadasSemClassificacao: legados,
-        transacoes: registros, investimentos: [],
+        investimentos: [],
         lerDados: (chave) => lerDados(chave, storage),
         gravarDados: (chave, dados) => gravarDados(chave, dados, storage),
         mostrarToast: (...argumentos) => mensagens.push(argumentos)
     });
     const funcoes = new Script(`${adaptadores}\n({ carregarColecao, persistirColecao })`)
         .runInContext(contexto, { timeout: 1000 });
-    return { ...funcoes, mensagens, disponibilidadeColecoes, legados };
+    return { ...funcoes, mensagens, disponibilidadeColecoes };
 }
 
 test('adaptador mantém ausente/vazio disponíveis e bloqueia dados incompatíveis sem alterá-los', () => {
@@ -180,6 +177,8 @@ test('adaptador valida vínculos e novas despesas antes de tentar a gravação',
     const storage = armazenamentoSimulado({ contas: JSON.stringify([conta()]), transacoes: '[]' });
     const app = aplicacaoSimulada(storage);
     app.carregarColecao('contas', validacoes.validarConta);
+    app.disponibilidadeColecoes.verificarTransacoesCarregadas([]);
+    app.disponibilidadeColecoes.prepararCompatibilidadeTransacoes();
     assert.equal(app.persistirColecao('transacoes', [transacao({ contaId: 'inexistente' })]), false);
     assert.equal(app.persistirColecao('transacoes', [transacao({ tipo: 'despesa', classificacao: '' })]), false);
     app.disponibilidadeColecoes.bloquearColecao('transacoes');
@@ -193,16 +192,18 @@ test('falha de escrita mantém retrato dos legados; limpeza ocorre somente após
     const storage = armazenamentoSimulado({ contas: JSON.stringify([conta()]), transacoes: anterior });
     const app = aplicacaoSimulada(storage, [legado]);
     app.carregarColecao('contas', validacoes.validarConta);
+    app.disponibilidadeColecoes.verificarTransacoesCarregadas([]);
+    app.disponibilidadeColecoes.prepararCompatibilidadeTransacoes();
     const escrever = storage.setItem;
     storage.setItem = () => { throw new Error('Quota excedida'); };
     assert.equal(app.persistirColecao('transacoes', []), false);
-    assert.equal(app.legados.has(legado.id), true);
+    assert.equal(app.disponibilidadeColecoes.validarTransacaoParaGravacao(legado), true);
     assert.equal(storage.valores.get('transacoes'), anterior);
     assert.equal(app.mensagens.at(-1)[1], 'erro');
     storage.setItem = escrever;
     assert.equal(app.persistirColecao('transacoes', [legado]), true);
-    assert.equal(app.legados.has(legado.id), true);
+    assert.equal(app.disponibilidadeColecoes.validarTransacaoParaGravacao(legado), true);
     assert.equal(app.persistirColecao('transacoes', []), true);
-    assert.equal(app.legados.has(legado.id), false);
+    assert.equal(app.disponibilidadeColecoes.validarTransacaoParaGravacao(legado), false);
     assert.equal(storage.valores.get('transacoes'), '[]');
 });

@@ -15,7 +15,7 @@ beforeEach((t) => t.mock.timers.enable({ apis: ['Date'], now: new Date(2026, 10,
 
 test('disponibilidade começa sem bloqueios e não expõe o Set ou desbloqueio', () => {
     const estado = criarEstadoDisponibilidade();
-    assert.deepEqual(Object.keys(estado).sort(), ['bloquearColecao', 'colecaoEstaBloqueada', 'confirmarContas', 'consultarContas', 'contasEstaoDisponiveis', 'inicializarContas']);
+    assert.deepEqual(Object.keys(estado).sort(), ['bloquearColecao', 'colecaoEstaBloqueada', 'confirmarContas', 'consultarContas', 'contasEstaoDisponiveis', 'inicializarContas', 'inicializarTransacoes', 'consultarTransacoes', 'transacoesEstaoDisponiveis', 'verificarTransacoesCarregadas', 'prepararCompatibilidadeTransacoes', 'validarTransacaoParaGravacao', 'confirmarTransacoes'].sort());
     for (const chave of ['contas', 'transacoes', 'investimentos']) {
         assert.equal(estado.colecaoEstaBloqueada(chave), false);
     }
@@ -60,7 +60,7 @@ const fonte = readFileSync(arquivo, 'utf8');
 const nomes = [
     'validarContaTransacao', 'verificarVinculosCarregados', 'obterCapitaisAplicados',
     'obterSaldosContas', 'obterHistoricoMensal', 'obterDistribuicaoDespesas',
-    'validarTransacaoParaGravacao', 'persistirColecao', 'obterRestricaoMovimentacaoInvestimentos'
+    'persistirColecao', 'obterRestricaoMovimentacaoInvestimentos'
 ];
 const declaracoes = nomes.map((nome) => {
     const correspondencias = [...fonte.matchAll(new RegExp(`^function ${nome}\\([^]*?^\\}`, 'gm'))];
@@ -69,18 +69,23 @@ const declaracoes = nomes.map((nome) => {
 }).join('\n\n');
 
 function aplicacao(bloqueios = [], registros = [transacao()], carteira = [investimento()]) {
-    const disponibilidadeColecoes = criarEstadoDisponibilidade({
-        ler: () => ({ sucesso: true, ausente: false, dados: [conta()] })
-    });
-    disponibilidadeColecoes.inicializarContas();
-    bloqueios.forEach((chave) => disponibilidadeColecoes.bloquearColecao(chave));
     const gravacoes = [];
+    const disponibilidadeColecoes = criarEstadoDisponibilidade({
+        ler: (chave) => ({ sucesso: true, ausente: false, dados: chave === "transacoes" ? registros : [conta()] }),
+        gravar: (...argumentos) => { gravacoes.push(argumentos); return { sucesso: true }; }
+    });
+    disponibilidadeColecoes.inicializarTransacoes();
+    disponibilidadeColecoes.inicializarContas();
+    if (validacoes.validarVinculosTransacoes(registros, [conta()], carteira)) {
+        disponibilidadeColecoes.verificarTransacoesCarregadas(carteira);
+        disponibilidadeColecoes.prepararCompatibilidadeTransacoes();
+    }
+    bloqueios.forEach((chave) => disponibilidadeColecoes.bloquearColecao(chave));
     const mensagens = [];
     const contexto = createContext({
         ...utilitarios, ...validacoes, ...calculos,
         disponibilidadeColecoes,
-        transacoes: registros, investimentos: carteira,
-        despesasLegadasSemClassificacao: new Map(),
+        investimentos: carteira,
         mostrarToast: (...argumentos) => mensagens.push(argumentos),
         gravarDados: (...argumentos) => { gravacoes.push(argumentos); return { sucesso: true }; }
     });
@@ -112,7 +117,7 @@ test('investimentos indisponíveis sem movimentações não bloqueiam receitas/d
     const app = aplicacao(['investimentos'], [transacao()], []);
     app.verificarVinculosCarregados();
     assert.equal(app.disponibilidadeColecoes.colecaoEstaBloqueada('transacoes'), false);
-    assert.equal(app.contexto.transacoes.length, 1);
+    assert.equal(app.disponibilidadeColecoes.consultarTransacoes().length, 1);
     assert.equal(app.persistirColecao('transacoes', [transacao()]), true);
 });
 
@@ -128,7 +133,7 @@ test('contas bloqueadas ou vínculos inválidos bloqueiam transações e mantêm
     for (const app of [aplicacao(['contas']), aplicacao([], [transacao({ contaId: 'inexistente' })])]) {
         app.verificarVinculosCarregados();
         assert.equal(app.disponibilidadeColecoes.colecaoEstaBloqueada('transacoes'), true);
-        assert.equal(app.contexto.transacoes.length, 0);
+        assert.equal(app.disponibilidadeColecoes.consultarTransacoes().length, 0);
         assert.equal(app.mensagens.length, 1);
         assert.equal(app.gravacoes.length, 0);
     }
