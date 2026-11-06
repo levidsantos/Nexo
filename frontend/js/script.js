@@ -1,3 +1,4 @@
+import { criarModais } from "./ui/modais.js";
 import { criarNotificacoes } from "./ui/notificacoes.js";
 import { mostrarErro, limparErros, limparErroCampo, focarPrimeiroErro } from "./ui/formularios.js";
 import { dataValida, obterDataLocal, converterParaCentavos, formatarCentavos, formatadorMoeda } from "./dominio/valores-datas.js";
@@ -40,7 +41,7 @@ const notificacoes = criarNotificacoes({
     areaNotificacoes, listaNotificacoes, anuncioNotificacoes,
     movimentoReduzido: window.matchMedia("(prefers-reduced-motion: reduce)"),
     podeReceberFoco,
-    obterFocoAlternativo: () => modalAtivo ? modalAtivo.querySelector("button, input") : addReceita,
+    obterFocoAlternativo: () => modais.obterModalAtivo() ? modais.obterModalAtivo().querySelector("button, input") : addReceita,
     antesDeExibir: () => {
         // O overlay está desaparecendo; seu fade não deve esconder o novo toast.
         if (areaNotificacoes.parentElement?.classList.contains("modal-saindo")) {
@@ -137,12 +138,26 @@ const botaoCancelarExclusaoConta = document.getElementById("cancelar-exclusao-co
 const botaoConfirmarExclusaoConta = document.getElementById("confirmar-exclusao-conta");
 const listaContas = document.getElementById("lista-contas");
 const saldoTotalContas = document.getElementById("saldo-total-contas");
-let modalAtivo = null;
-let focoAnteriorModal = null;
-let elementosInertes = [];
-let transicaoModal = null;
-let limpezaModal = null;
-const movimentoReduzidoModais = window.matchMedia("(prefers-reduced-motion: reduce)");
+const modais = criarModais({
+    document, movimentoReduzido: window.matchMedia("(prefers-reduced-motion: reduce)"),
+    podeReceberFoco,
+    obterFocoAlternativo: () => document.getElementById("pagina-transacoes").classList.contains("ativa") ? campoPesquisa
+        : document.getElementById("pagina-contas").classList.contains("ativa") ? botaoNovaConta
+        : document.getElementById("pagina-investimentos").classList.contains("ativa") ? document.getElementById("novo-investimento")
+        : addReceita,
+    focarRetorno: (destino) => destino.focus({ preventScroll: Boolean(destino.closest("#lista-investimentos")) }),
+    prepararNotificacoes: (modal) => modal.querySelector('[role="dialog"]').appendChild(areaNotificacoes),
+    posicionarNotificacoesModal,
+    concluirNotificacoes: () => {
+        areaNotificacoes.appendChild(anuncioNotificacoes);
+        if (areaNotificacoes.parentElement !== document.body) document.body.appendChild(areaNotificacoes);
+    },
+    aoEscape: (modal) => {
+        if (!modalExclusao.classList.contains("hidden")) fecharModal(modalExclusao);
+        if (modal === modalExclusaoConta) fecharModalExclusaoConta();
+        if (modal === document.getElementById("modal-exclusao-investimento")) fecharExclusaoInvestimento();
+    }
+});
 
 // botoes para abrir e fechar o modal
 addReceita.addEventListener("click", () => {
@@ -870,128 +885,13 @@ function posicionarNotificacoesModal(modal, noPainel) {
 }
 
 function abrirModal(modal, focoInicial) {
-    const focoRetorno = focoAnteriorModal;
-    if (modalAtivo && modalAtivo !== modal) concluirFechamentoModal(modalAtivo, false);
-    const reabrindo = modalAtivo === modal;
-    cancelarTransicaoModal();
-    limpezaModal = null;
-    if (!reabrindo) {
-        focoAnteriorModal = document.activeElement;
-        if (focoRetorno) focoAnteriorModal = focoRetorno;
-        modalAtivo = modal;
-        modal.classList.remove("hidden");
-        modal.querySelector('[role="dialog"]').appendChild(areaNotificacoes);
-
-        // Inativa apenas irmãos no caminho até o body, nunca um ancestral do modal.
-        let elemento = modal;
-        while (elemento !== document.body) {
-            for (const irmao of elemento.parentElement.children) {
-                if (irmao !== elemento) {
-                    elementosInertes.push({ elemento: irmao, inert: irmao.inert });
-                    irmao.inert = true;
-                }
-            }
-            elemento = elemento.parentElement;
-        }
-    }
-    modal.classList.remove("modal-saindo", "modal-entrando");
-    modal.classList.add("modal-abrindo");
-    if (!movimentoReduzidoModais.matches) {
-        // Fora do painel transformado, os toasts continuam fixos na viewport.
-        posicionarNotificacoesModal(modal, false);
-        if (!reabrindo) {
-            modal.classList.add("modal-entrando");
-            void modal.offsetWidth;
-            modal.classList.remove("modal-entrando");
-        }
-        aguardarTransicaoModal(modal, 200, () => {
-            modal.classList.remove("modal-abrindo");
-            posicionarNotificacoesModal(modal, true);
-        });
-    } else {
-        modal.classList.remove("modal-abrindo");
-        posicionarNotificacoesModal(modal, true);
-    }
-    focoInicial.focus();
-}
-
-function cancelarTransicaoModal() {
-    if (transicaoModal) transicaoModal();
-    transicaoModal = null;
-}
-
-function aguardarTransicaoModal(modal, duracao, concluir) {
-    const finalizar = () => {
-        cancelarTransicaoModal();
-        concluir();
-    };
-    const aoTerminar = (evento) => {
-        if (evento.target === modal && evento.propertyName === "opacity") finalizar();
-    };
-    // Fallback para abas suspensas ou ausência de transitionend.
-    const temporizador = setTimeout(finalizar, duracao + 50);
-    modal.addEventListener("transitionend", aoTerminar);
-    transicaoModal = () => {
-        clearTimeout(temporizador);
-        modal.removeEventListener("transitionend", aoTerminar);
-    };
+    modais.abrirModal(modal, focoInicial);
 }
 
 function fecharModal(modal, aoFechar = null) {
-    if (modal !== modalAtivo || modal.classList.contains("modal-saindo")) return;
-    cancelarTransicaoModal();
-    limpezaModal = aoFechar;
-    if (movimentoReduzidoModais.matches) {
-        concluirFechamentoModal(modal);
-        return;
-    }
-    posicionarNotificacoesModal(modal, false);
-    modal.classList.add("modal-saindo");
-    aguardarTransicaoModal(modal, 150, () => concluirFechamentoModal(modal));
+    modais.fecharModal(modal, aoFechar);
 }
 
-function concluirFechamentoModal(modal, restaurarFoco = true) {
-    cancelarTransicaoModal();
-    modal.classList.add("hidden");
-    modal.classList.remove("modal-abrindo", "modal-entrando", "modal-saindo");
-    const limpar = limpezaModal;
-    limpezaModal = null;
-    if (limpar) limpar();
-    for (const estado of elementosInertes) {
-        estado.elemento.inert = estado.inert;
-    }
-    elementosInertes = [];
-    modalAtivo = null;
-    areaNotificacoes.appendChild(anuncioNotificacoes);
-    if (areaNotificacoes.parentElement !== document.body) document.body.appendChild(areaNotificacoes);
-
-    const destino = podeReceberFoco(focoAnteriorModal) ? focoAnteriorModal
-        : document.getElementById("pagina-transacoes").classList.contains("ativa") ? campoPesquisa
-        : document.getElementById("pagina-contas").classList.contains("ativa") ? botaoNovaConta
-        : document.getElementById("pagina-investimentos").classList.contains("ativa") ? document.getElementById("novo-investimento")
-        : addReceita;
-    if (restaurarFoco) destino.focus({ preventScroll: Boolean(destino.closest("#lista-investimentos")) });
-    focoAnteriorModal = null;
-}
-
-// Mantém o foco contido, mas impede novas ações durante a saída.
-for (const tipo of ["click", "submit", "keydown"]) {
-    document.addEventListener(tipo, (evento) => {
-        if (!modalAtivo?.classList.contains("modal-saindo")
-            || (tipo === "keydown" && evento.key === "Tab")) return;
-        evento.preventDefault();
-        evento.stopImmediatePropagation();
-    }, true);
-}
-movimentoReduzidoModais.addEventListener("change", () => {
-    if (!movimentoReduzidoModais.matches || !modalAtivo) return;
-    if (modalAtivo.classList.contains("modal-saindo")) concluirFechamentoModal(modalAtivo);
-    else {
-        cancelarTransicaoModal();
-        modalAtivo.classList.remove("modal-abrindo", "modal-entrando");
-        posicionarNotificacoesModal(modalAtivo, true);
-    }
-});
 function renderizarTransacoes(tabelaDestino, limite=null, pesquisa="", tipo="todos", categoria="todas", dataInicial="", dataFinal="", classificacao="todas") {
     tabelaDestino.innerHTML = "";
     
@@ -1301,7 +1201,7 @@ function atualizarBarraContextual() {
     barraContextual.inert = !flutuante;
     barraContextual.setAttribute("aria-hidden", String(!flutuante));
     paginaTransacoes.classList.toggle("tem-selecao-mobile", temSelecaoMobile);
-    if (proximoFoco && !modalAtivo && !proximoFoco.disabled) {
+    if (proximoFoco && !modais.obterModalAtivo() && !proximoFoco.disabled) {
         // Ao trocar a representação focada, não deixa o foco em controles ocultos.
         [barraAcoesCompleta, barraContextual].forEach((barra) => barra.classList.add("troca-foco-contextual"));
         proximoFoco.focus({ preventScroll: true });
@@ -2042,33 +1942,6 @@ modalExclusao.addEventListener("click", (event) => {
     }
 });
 
-document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && !modalExclusao.classList.contains("hidden")) {
-        fecharModal(modalExclusao);
-    }
-    if (event.key === "Escape" && modalAtivo === modalExclusaoConta) {
-        fecharModalExclusaoConta();
-    }
-    if (event.key === "Escape" && modalAtivo === document.getElementById("modal-exclusao-investimento")) {
-        fecharExclusaoInvestimento();
-    }
-    if (event.key === "Tab" && modalAtivo) {
-        const campos = [...modalAtivo.querySelectorAll(
-            'button, input, select, textarea, a[href], [tabindex]:not([tabindex="-1"])'
-        )].filter(podeReceberFoco);
-        const primeiro = campos[0];
-        const ultimo = campos[campos.length - 1];
-        if (!primeiro) {
-            event.preventDefault();
-            modalAtivo.querySelector('[role="dialog"]').focus();
-        } else if (!campos.includes(document.activeElement)
-            || (event.shiftKey && document.activeElement === primeiro)
-            || (!event.shiftKey && document.activeElement === ultimo)) {
-            event.preventDefault();
-            (event.shiftKey ? ultimo : primeiro).focus();
-        }
-    }
-});
 
 // evento de envio do formulario
 formTransacao.addEventListener("submit", (enviar) => { 
@@ -2265,9 +2138,10 @@ function apresentarValorInvestimento(elemento, centavos) {
 function prepararRetornoFocoInvestimento(id, acao) {
     const item = [...document.getElementById("lista-investimentos").children]
         .find((elemento) => elemento.dataset.investimentoId === id);
-    focoAnteriorModal = item?.querySelector(`[data-acao="${acao}"]`)
+    const focoRetorno = item?.querySelector(`[data-acao="${acao}"]`)
         ?? document.getElementById("novo-investimento");
-    const administracao = focoAnteriorModal.closest(".gerenciar-investimento");
+    modais.definirFocoRetorno(focoRetorno);
+    const administracao = focoRetorno.closest(".gerenciar-investimento");
     if (administracao) {
         definirMenuAcoes(administracao, true, false);
     }
@@ -2351,7 +2225,7 @@ function fecharAcoesAdministrativasInvestimentos(exceto = null, restaurarFoco = 
 }
 
 document.addEventListener("click", (evento) => {
-    if (modalAtivo || evento.target.closest(".modal-overlay")) return;
+    if (modais.obterModalAtivo() || evento.target.closest(".modal-overlay")) return;
     const menu = evento.target.closest(".gerenciar-investimento");
     if (menu && evento.target.closest("summary")) {
         evento.preventDefault();
@@ -2360,7 +2234,7 @@ document.addEventListener("click", (evento) => {
     fecharAcoesAdministrativasInvestimentos(menu, true);
 });
 document.addEventListener("keydown", (evento) => {
-    if (evento.key !== "Escape" || modalAtivo || evento.target.closest(".modal-overlay")) return;
+    if (evento.key !== "Escape" || modais.obterModalAtivo() || evento.target.closest(".modal-overlay")) return;
     if (document.querySelector("#lista-investimentos .gerenciar-investimento[open]")) {
         fecharAcoesAdministrativasInvestimentos(null, true);
         evento.preventDefault();
@@ -2370,7 +2244,7 @@ document.addEventListener("keydown", (evento) => {
 // O painel acompanha o card; ao mudar a área visível, evita permanecer
 // aberto sobre a navegação inferior ou fora dos limites da janela.
 function fecharAcoesInvestimentosAoMudarViewport() {
-    if (!modalAtivo) fecharAcoesAdministrativasInvestimentos(null, true);
+    if (!modais.obterModalAtivo()) fecharAcoesAdministrativasInvestimentos(null, true);
 }
 window.addEventListener("scroll", fecharAcoesInvestimentosAoMudarViewport, { passive: true });
 window.addEventListener("resize", fecharAcoesInvestimentosAoMudarViewport);
