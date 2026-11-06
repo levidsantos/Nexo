@@ -15,7 +15,7 @@ beforeEach((t) => t.mock.timers.enable({ apis: ['Date'], now: new Date(2026, 10,
 
 test('disponibilidade começa sem bloqueios e não expõe o Set ou desbloqueio', () => {
     const estado = criarEstadoDisponibilidade();
-    assert.deepEqual(Object.keys(estado).sort(), ['bloquearColecao', 'colecaoEstaBloqueada', 'confirmarContas', 'consultarContas', 'contasEstaoDisponiveis', 'inicializarContas', 'inicializarTransacoes', 'consultarTransacoes', 'transacoesEstaoDisponiveis', 'verificarTransacoesCarregadas', 'prepararCompatibilidadeTransacoes', 'validarTransacaoParaGravacao', 'confirmarTransacoes'].sort());
+    assert.deepEqual(Object.keys(estado).sort(), ['bloquearColecao', 'colecaoEstaBloqueada', 'confirmarContas', 'consultarContas', 'contasEstaoDisponiveis', 'inicializarContas', 'inicializarTransacoes', 'consultarTransacoes', 'transacoesEstaoDisponiveis', 'verificarTransacoesCarregadas', 'prepararCompatibilidadeTransacoes', 'validarTransacaoParaGravacao', 'confirmarTransacoes', 'consultarInvestimentos', 'investimentosEstaoDisponiveis', 'inicializarInvestimentos', 'confirmarInvestimentos'].sort());
     for (const chave of ['contas', 'transacoes', 'investimentos']) {
         assert.equal(estado.colecaoEstaBloqueada(chave), false);
     }
@@ -71,13 +71,14 @@ const declaracoes = nomes.map((nome) => {
 function aplicacao(bloqueios = [], registros = [transacao()], carteira = [investimento()]) {
     const gravacoes = [];
     const disponibilidadeColecoes = criarEstadoDisponibilidade({
-        ler: (chave) => ({ sucesso: true, ausente: false, dados: chave === "transacoes" ? registros : [conta()] }),
+        ler: (chave) => ({ sucesso: true, ausente: false, dados: chave === "transacoes" ? registros : chave === "investimentos" ? carteira : [conta()] }),
         gravar: (...argumentos) => { gravacoes.push(argumentos); return { sucesso: true }; }
     });
     disponibilidadeColecoes.inicializarTransacoes();
     disponibilidadeColecoes.inicializarContas();
+    disponibilidadeColecoes.inicializarInvestimentos();
     if (validacoes.validarVinculosTransacoes(registros, [conta()], carteira)) {
-        disponibilidadeColecoes.verificarTransacoesCarregadas(carteira);
+        disponibilidadeColecoes.verificarTransacoesCarregadas();
         disponibilidadeColecoes.prepararCompatibilidadeTransacoes();
     }
     bloqueios.forEach((chave) => disponibilidadeColecoes.bloquearColecao(chave));
@@ -85,7 +86,6 @@ function aplicacao(bloqueios = [], registros = [transacao()], carteira = [invest
     const contexto = createContext({
         ...utilitarios, ...validacoes, ...calculos,
         disponibilidadeColecoes,
-        investimentos: carteira,
         mostrarToast: (...argumentos) => mensagens.push(argumentos),
         gravarDados: (...argumentos) => { gravacoes.push(argumentos); return { sucesso: true }; }
     });

@@ -129,7 +129,6 @@ function aplicacaoSimulada(storage, registros = []) {
     const contexto = createContext({
         ...validacoes, ...calculos,
         disponibilidadeColecoes,
-        investimentos: [],
         lerDados: (chave) => lerDados(chave, storage),
         gravarDados: (chave, dados) => gravarDados(chave, dados, storage),
         mostrarToast: (...argumentos) => mensagens.push(argumentos)
@@ -177,7 +176,8 @@ test('adaptador valida vínculos e novas despesas antes de tentar a gravação',
     const storage = armazenamentoSimulado({ contas: JSON.stringify([conta()]), transacoes: '[]' });
     const app = aplicacaoSimulada(storage);
     app.carregarColecao('contas', validacoes.validarConta);
-    app.disponibilidadeColecoes.verificarTransacoesCarregadas([]);
+    app.carregarColecao('investimentos', validacoes.validarInvestimento);
+    app.disponibilidadeColecoes.verificarTransacoesCarregadas();
     app.disponibilidadeColecoes.prepararCompatibilidadeTransacoes();
     assert.equal(app.persistirColecao('transacoes', [transacao({ contaId: 'inexistente' })]), false);
     assert.equal(app.persistirColecao('transacoes', [transacao({ tipo: 'despesa', classificacao: '' })]), false);
@@ -192,7 +192,8 @@ test('falha de escrita mantém retrato dos legados; limpeza ocorre somente após
     const storage = armazenamentoSimulado({ contas: JSON.stringify([conta()]), transacoes: anterior });
     const app = aplicacaoSimulada(storage, [legado]);
     app.carregarColecao('contas', validacoes.validarConta);
-    app.disponibilidadeColecoes.verificarTransacoesCarregadas([]);
+    app.carregarColecao('investimentos', validacoes.validarInvestimento);
+    app.disponibilidadeColecoes.verificarTransacoesCarregadas();
     app.disponibilidadeColecoes.prepararCompatibilidadeTransacoes();
     const escrever = storage.setItem;
     storage.setItem = () => { throw new Error('Quota excedida'); };

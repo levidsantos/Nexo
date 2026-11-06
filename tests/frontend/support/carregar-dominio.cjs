@@ -34,11 +34,12 @@ const trechos = funcoes.map((nome) => declaracao(nome,
 
 function carregarDominio({ transacoesLegadas = [] } = {}) {
     const estado = criarEstadoDisponibilidade({
-        ler: (chave) => ({ sucesso: true, dados: chave === "transacoes" ? transacoesLegadas : [conta()] })
+        ler: (chave) => ({ sucesso: true, dados: chave === "transacoes" ? transacoesLegadas : chave === "investimentos" ? [] : [conta()] })
     });
     estado.inicializarTransacoes();
     estado.inicializarContas();
-    estado.verificarTransacoesCarregadas([]);
+    estado.inicializarInvestimentos();
+    estado.verificarTransacoesCarregadas();
     estado.prepararCompatibilidadeTransacoes();
     const contexto = createContext({
         ...validacoes

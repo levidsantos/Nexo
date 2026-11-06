@@ -1,5 +1,4 @@
 import { dataValida, obterDataLocal, converterParaCentavos, formatarCentavos, formatadorMoeda } from "./dominio/valores-datas.js";
-import { lerDados, gravarDados } from "./dados/repositorio.js";
 import { criarEstadoDisponibilidade } from "./dados/estado.js";
 import {
     textoPreenchido, ehMovimentacaoInvestimento, validarVinculosTransacoes,
@@ -53,7 +52,7 @@ const graficosHistorico = { resumo: null, analises: null };
 let graficoDistribuicao = null;
 carregarColecao("transacoes", validarTransacao);
 carregarColecao("contas", validarConta);
-let investimentos = carregarColecao("investimentos", validarInvestimento);
+carregarColecao("investimentos", validarInvestimento);
 verificarVinculosCarregados();
 const listaTransacoes = document.getElementById("lista-transacoes");
 const listaTransacoesCompleta = document.getElementById("lista-transacoes-completa");
@@ -353,7 +352,7 @@ function validarContaTransacao(contaId) {
 
 function verificarVinculosCarregados() {
     if (disponibilidadeColecoes.colecaoEstaBloqueada("transacoes")) return;
-    const integridade = disponibilidadeColecoes.verificarTransacoesCarregadas(investimentos);
+    const integridade = disponibilidadeColecoes.verificarTransacoesCarregadas();
     if (!integridade.disponivel) {
         mostrarToast("Transações indisponíveis: não foi possível confirmar os vínculos ou a integridade do capital. "
             + integridade.motivo + " "
@@ -372,9 +371,9 @@ function obterCapitaisAplicados(hoje = obterDataLocal()) {
     if (["investimentos", "transacoes", "contas"].some((chave) => disponibilidadeColecoes.colecaoEstaBloqueada(chave))) {
         return capitaisIndisponiveis("Dados necessários ao cálculo de capital indisponíveis nesta sessão.");
     }
-    const integridade = verificarIntegridadeTransacoes(disponibilidadeColecoes.consultarTransacoes(), disponibilidadeColecoes.consultarContas(), investimentos);
+    const integridade = verificarIntegridadeTransacoes(disponibilidadeColecoes.consultarTransacoes(), disponibilidadeColecoes.consultarContas(), disponibilidadeColecoes.consultarInvestimentos());
     if (!integridade.disponivel) return capitaisIndisponiveis(integridade.motivo);
-    return calcularCapitaisAplicados(investimentos, disponibilidadeColecoes.consultarTransacoes(), hoje);
+    return calcularCapitaisAplicados(disponibilidadeColecoes.consultarInvestimentos(), disponibilidadeColecoes.consultarTransacoes(), hoje);
 }
 
 function obterAcompanhamentoInvestimentos(hoje = obterDataLocal()) {
@@ -385,7 +384,7 @@ function obterAcompanhamentoInvestimentos(hoje = obterDataLocal()) {
         totalCapitalCentavos += capital;
         if (!Number.isSafeInteger(totalCapitalCentavos)) { totalCapitalCentavos = null; break; }
     }
-    return { capitais, totalCapitalCentavos, valores: calcularValoresInvestimentos(investimentos, disponibilidadeColecoes.consultarTransacoes(), hoje) };
+    return { capitais, totalCapitalCentavos, valores: calcularValoresInvestimentos(disponibilidadeColecoes.consultarInvestimentos(), disponibilidadeColecoes.consultarTransacoes(), hoje) };
 }
 
 // Ponto de entrada da aplicação: nunca calcular sobre os arrays vazios de fallback
@@ -394,7 +393,7 @@ function obterSaldosContas(hoje = obterDataLocal()) {
     if (disponibilidadeColecoes.colecaoEstaBloqueada("contas") || disponibilidadeColecoes.colecaoEstaBloqueada("transacoes")) {
         return saldosIndisponiveis("Dados de contas ou transações indisponíveis nesta sessão.");
     }
-    return calcularSaldos(disponibilidadeColecoes.consultarContas(), disponibilidadeColecoes.consultarTransacoes(), hoje, investimentos);
+    return calcularSaldos(disponibilidadeColecoes.consultarContas(), disponibilidadeColecoes.consultarTransacoes(), hoje, disponibilidadeColecoes.consultarInvestimentos());
 }
 
 // Entrada da aplicação: utiliza a coleção completa e respeita os bloqueios existentes.
@@ -403,7 +402,7 @@ function obterHistoricoMensal(mesFinal = null, duracao = 6, hoje = obterDataLoca
         return historicoMensalIndisponivel("Dados de transações ou seus vínculos indisponíveis nesta sessão.");
     }
     if (!validarColecao(disponibilidadeColecoes.consultarTransacoes(), validarTransacao) || !validarColecao(disponibilidadeColecoes.consultarContas(), validarConta)
-        || !validarVinculosTransacoes(disponibilidadeColecoes.consultarTransacoes(), disponibilidadeColecoes.consultarContas(), investimentos)) {
+        || !validarVinculosTransacoes(disponibilidadeColecoes.consultarTransacoes(), disponibilidadeColecoes.consultarContas(), disponibilidadeColecoes.consultarInvestimentos())) {
         return historicoMensalIndisponivel("Não foi possível validar as transações e seus vínculos.");
     }
     return prepararHistoricoMensal(disponibilidadeColecoes.consultarTransacoes(), hoje, mesFinal, duracao);
@@ -424,7 +423,7 @@ function obterDistribuicaoDespesas(tipo = "atual", mesInicial = null, mesFinal =
         return distribuicaoDespesasIndisponivel("Dados de transações ou seus vínculos indisponíveis nesta sessão.");
     }
     if (!validarColecao(disponibilidadeColecoes.consultarTransacoes(), validarTransacao) || !validarColecao(disponibilidadeColecoes.consultarContas(), validarConta)
-        || !validarVinculosTransacoes(disponibilidadeColecoes.consultarTransacoes(), disponibilidadeColecoes.consultarContas(), investimentos)) {
+        || !validarVinculosTransacoes(disponibilidadeColecoes.consultarTransacoes(), disponibilidadeColecoes.consultarContas(), disponibilidadeColecoes.consultarInvestimentos())) {
         return distribuicaoDespesasIndisponivel("Não foi possível validar as transações e seus vínculos.");
     }
     const periodo = definirPeriodoDespesas(tipo, mesInicial, mesFinal, hoje);
@@ -965,21 +964,13 @@ function atualizarGraficosHistorico() {
 
 function carregarColecao(chave, validarRegistro) {
     try {
-        if (chave === "contas" || chave === "transacoes") {
-            const inicializacao = chave === "contas" ? disponibilidadeColecoes.inicializarContas()
-                : disponibilidadeColecoes.inicializarTransacoes();
-            if (!inicializacao.sucesso) throw inicializacao.erro;
-            return chave === "contas" ? disponibilidadeColecoes.consultarContas()
-                : disponibilidadeColecoes.consultarTransacoes();
-        }
-        const leitura = lerDados(chave);
-        if (!leitura.sucesso) throw leitura.erro;
-        if (leitura.ausente) return [];
-        const registros = leitura.dados;
-        if (!validarColecao(registros, validarRegistro)) {
-            throw new Error("A coleção não é um array válido ou há registros inválidos/IDs repetidos.");
-        }
-        return registros;
+        const inicializacao = chave === "contas" ? disponibilidadeColecoes.inicializarContas()
+            : chave === "transacoes" ? disponibilidadeColecoes.inicializarTransacoes()
+                : disponibilidadeColecoes.inicializarInvestimentos();
+        if (!inicializacao.sucesso) throw inicializacao.erro;
+        return chave === "contas" ? disponibilidadeColecoes.consultarContas()
+            : chave === "transacoes" ? disponibilidadeColecoes.consultarTransacoes()
+                : disponibilidadeColecoes.consultarInvestimentos();
     } catch (erro) {
         disponibilidadeColecoes.bloquearColecao(chave);
         mostrarToast(`Os dados de ${chave} estão indisponíveis: não foi possível lê-los ou validá-los. `
@@ -990,9 +981,10 @@ function carregarColecao(chave, validarRegistro) {
 }
 
 function persistirColecao(chave, registros) {
-    if (chave === "contas" || chave === "transacoes") {
+    if (chave === "contas" || chave === "transacoes" || chave === "investimentos") {
         const resultado = chave === "contas" ? disponibilidadeColecoes.confirmarContas(registros)
-            : disponibilidadeColecoes.confirmarTransacoes(registros, investimentos);
+            : chave === "transacoes" ? disponibilidadeColecoes.confirmarTransacoes(registros)
+                : disponibilidadeColecoes.confirmarInvestimentos(registros);
         if (resultado.sucesso) return true;
         if (resultado.motivo === "bloqueada") {
             mostrarToast(`Não é possível salvar ${chave}: os dados estão indisponíveis e a coleção está bloqueada. `
@@ -1013,38 +1005,11 @@ function persistirColecao(chave, registros) {
     if (disponibilidadeColecoes.colecaoEstaBloqueada(chave)) {
         mostrarToast(`Não é possível salvar ${chave}: os dados estão indisponíveis e a coleção está bloqueada. `
             + "O conteúdo armazenado não foi alterado.", "erro");
-        return false;
-    }
-    const validarRegistro = chave === "investimentos" ? validarInvestimento : null;
-    if (!validarRegistro || !validarColecao(registros, validarRegistro)) {
+    } else {
         mostrarToast("Não foi possível salvar: a coleção contém dados incompatíveis com o modelo atual. "
             + "A alteração não foi confirmada e os dados anteriores foram preservados.", "erro");
-        return false;
     }
-    if (chave === "investimentos") {
-        const candidatos = disponibilidadeColecoes.consultarTransacoes();
-        const investimentosCandidatos = registros;
-        const dependenciasBloqueadas = chave === "investimentos" && disponibilidadeColecoes.colecaoEstaBloqueada("transacoes")
-            || candidatos.some(ehMovimentacaoInvestimento) && disponibilidadeColecoes.colecaoEstaBloqueada("investimentos");
-        if (dependenciasBloqueadas) {
-            mostrarToast("Não foi possível confirmar os vínculos e o capital: uma coleção necessária está indisponível. A alteração não foi confirmada.", "erro");
-            return false;
-        }
-        const integridade = verificarIntegridadeTransacoes(candidatos, disponibilidadeColecoes.consultarContas(), investimentosCandidatos);
-        if (!integridade.disponivel) {
-            mostrarToast(`Não foi possível salvar: ${integridade.motivo} A alteração não foi confirmada.`, "erro");
-            return false;
-        }
-    }
-    try {
-        const gravacao = gravarDados(chave, registros);
-        if (!gravacao.sucesso) throw gravacao.erro;
-        return true;
-    } catch (erro) {
-        mostrarToast(`Não foi possível salvar ${chave}. A alteração não foi confirmada. `
-            + "Os dados anteriores e os campos preenchidos foram mantidos. Tente novamente.", "erro");
-        return false;
-    }
+    return false;
 }
 
 function mostrarErro(campo, mensagem) {
@@ -1225,7 +1190,7 @@ function renderizarTransacoes(tabelaDestino, limite=null, pesquisa="", tipo="tod
     });
     const transacoesFiltradas = transacoesOrdenadas.filter((transacao) => {
         const investimento = ehMovimentacaoInvestimento(transacao) && !disponibilidadeColecoes.colecaoEstaBloqueada("investimentos")
-            ? investimentos.find((item) => item.id === transacao.investimentoId) : null;
+            ? disponibilidadeColecoes.consultarInvestimentos().find((item) => item.id === transacao.investimentoId) : null;
         const correspondePesquisa = transacao.nome
             .toLowerCase()
             .includes(pesquisa.toLowerCase())
@@ -1331,7 +1296,7 @@ function renderizarTransacoes(tabelaDestino, limite=null, pesquisa="", tipo="tod
         const celulaNome = document.createElement("td");
         const tipoMovimento = transacao.tipo === "aporte" ? "Aporte" : transacao.tipo === "resgate" ? "Resgate" : "";
         const investimento = ehMovimentacaoInvestimento(transacao)
-            ? investimentos.find((item) => item.id === transacao.investimentoId) : null;
+            ? disponibilidadeColecoes.consultarInvestimentos().find((item) => item.id === transacao.investimentoId) : null;
         celulaNome.textContent = tipoMovimento
             ? transacao.nome === `${tipoMovimento} - ${investimento?.nome}`
                 ? `${tipoMovimento} · ${investimento.nome}`
@@ -2418,7 +2383,7 @@ function investimentosDisponiveis() {
 
 function abrirModalInvestimento(id = null) {
     if (!investimentosDisponiveis()) return;
-    const investimento = id === null ? null : investimentos.find((item) => item.id === id);
+    const investimento = id === null ? null : disponibilidadeColecoes.consultarInvestimentos().find((item) => item.id === id);
     if (id !== null && !investimento) {
         mostrarToast("O investimento não está disponível para edição.", "erro");
         return;
@@ -2462,7 +2427,7 @@ function podeExcluirInvestimento(id) {
         mostrarToast("Este investimento possui aportes ou resgates vinculados e não pode ser excluído, inclusive quando os registros são históricos ou futuros.", "erro");
         return false;
     }
-    if (!investimentos.some((item) => item.id === id)) {
+    if (!disponibilidadeColecoes.consultarInvestimentos().some((item) => item.id === id)) {
         mostrarToast("O investimento não está disponível para exclusão.", "erro");
         return false;
     }
@@ -2472,7 +2437,7 @@ function podeExcluirInvestimento(id) {
 function solicitarExclusaoInvestimento(id) {
     if (!podeExcluirInvestimento(id)) return;
     investimentoEmExclusao = id;
-    const investimento = investimentos.find((item) => item.id === id);
+    const investimento = disponibilidadeColecoes.consultarInvestimentos().find((item) => item.id === id);
     document.getElementById("mensagem-exclusao-investimento").textContent = `Deseja excluir o investimento "${investimento.nome}"? Esta ação não poderá ser desfeita.`;
     abrirModal(modalExclusaoInvestimento, document.getElementById("cancelar-exclusao-investimento"));
 }
@@ -2611,7 +2576,7 @@ function renderizarInvestimentos() {
     // Encerra saídas pendentes antes de descartar os cards; sem clones ou timers órfãos.
     for (const transicao of [...transicoesMenusAcoes.values()]) transicao.concluir();
     lista.replaceChildren();
-    if (disponibilidadeColecoes.colecaoEstaBloqueada("investimentos") || investimentos.length === 0) {
+    if (disponibilidadeColecoes.colecaoEstaBloqueada("investimentos") || disponibilidadeColecoes.consultarInvestimentos().length === 0) {
         const mensagem = document.createElement("p");
         mensagem.classList.add("mensagem-vazia");
         mensagem.textContent = disponibilidadeColecoes.colecaoEstaBloqueada("investimentos")
@@ -2621,7 +2586,7 @@ function renderizarInvestimentos() {
         return;
     }
     const restricaoMovimentacao = obterRestricaoMovimentacaoInvestimentos();
-    investimentos.forEach((investimento) => {
+    disponibilidadeColecoes.consultarInvestimentos().forEach((investimento) => {
         const item = document.createElement("article");
         item.classList.add("item-investimento");
         item.dataset.investimentoId = investimento.id;
@@ -2746,14 +2711,14 @@ formInvestimento.addEventListener("submit", (evento) => {
     if (!dataValida(referenciaValor) || referenciaValor > obterDataLocal() || !campos.referenciaValor.validity.valid) {
         erro(campos.referenciaValor, "Informe uma data válida, igual ou anterior a hoje.");
     }
-    const investimentoAnterior = investimentos.find((item) => item.id === investimentoEmEdicao);
+    const investimentoAnterior = disponibilidadeColecoes.consultarInvestimentos().find((item) => item.id === investimentoEmEdicao);
     if (investimentoAnterior && referenciaValor < investimentoAnterior.dataReferenciaValor
         && !document.getElementById("confirmar-retroativo-investimento").checked) {
         erro(campos.referenciaValor, "Confirme abaixo a substituição retroativa e o recálculo das movimentações.");
     }
     if (!valido) { focarPrimeiroErro(formInvestimento); return; }
     const editando = investimentoEmEdicao !== null;
-    const anterior = editando ? investimentos.find((item) => item.id === investimentoEmEdicao) : null;
+    const anterior = editando ? disponibilidadeColecoes.consultarInvestimentos().find((item) => item.id === investimentoEmEdicao) : null;
     if (editando && !anterior) { mostrarToast("O investimento em edição não está disponível.", "erro"); return; }
     const valorInformado = Number(campos.valor.value);
     const atualizouValor = !anterior || anterior.valorInformado !== valorInformado || anterior.dataReferenciaValor !== referenciaValor;
@@ -2765,9 +2730,8 @@ formInvestimento.addEventListener("submit", (evento) => {
         atualizadoEm: atualizouValor ? new Date().toISOString() : anterior.atualizadoEm,
         observacoes: campos.observacoes.value.trim()
     };
-    const proximos = editando ? investimentos.map((item) => item.id === anterior.id ? registro : item) : [...investimentos, registro];
+    const proximos = editando ? disponibilidadeColecoes.consultarInvestimentos().map((item) => item.id === anterior.id ? registro : item) : [...disponibilidadeColecoes.consultarInvestimentos(), registro];
     if (!persistirColecao("investimentos", proximos)) return;
-    investimentos = proximos;
     renderizarInvestimentos();
     // Resolve os nomes atuais pelos IDs, preservando os registros e o estado da listagem.
     renderizarTransacoes(listaTransacoes, 5);
@@ -2788,9 +2752,8 @@ modalExclusaoInvestimento.addEventListener("click", (evento) => {
 });
 document.getElementById("confirmar-exclusao-investimento").addEventListener("click", () => {
     if (investimentoEmExclusao === null || !podeExcluirInvestimento(investimentoEmExclusao)) return;
-    const proximos = investimentos.filter((item) => item.id !== investimentoEmExclusao);
+    const proximos = disponibilidadeColecoes.consultarInvestimentos().filter((item) => item.id !== investimentoEmExclusao);
     if (!persistirColecao("investimentos", proximos)) return;
-    investimentos = proximos;
     renderizarInvestimentos();
     fecharExclusaoInvestimento();
     mostrarToast("Investimento excluído.", "sucesso");
@@ -2804,7 +2767,7 @@ function atualizarAvisoRetroativo(campo, referenciaAnterior, avisoId, confirmaca
 }
 
 camposInvestimento.referenciaValor.addEventListener("input", () => {
-    const anterior = investimentos.find((item) => item.id === investimentoEmEdicao);
+    const anterior = disponibilidadeColecoes.consultarInvestimentos().find((item) => item.id === investimentoEmEdicao);
     atualizarAvisoRetroativo(camposInvestimento.referenciaValor, anterior?.dataReferenciaValor,
         "aviso-retroativo-investimento", "confirmar-retroativo-investimento");
 });
@@ -2817,7 +2780,7 @@ const campoDataValorManual = document.getElementById("data-valor-manual");
 
 function abrirAtualizacaoValor(id) {
     if (!investimentosDisponiveis()) return;
-    const investimento = investimentos.find((item) => item.id === id);
+    const investimento = disponibilidadeColecoes.consultarInvestimentos().find((item) => item.id === id);
     if (!investimento) { mostrarToast("Investimento indisponível para atualização.", "erro"); return; }
     investimentoEmAtualizacao = id;
     formValorInvestimento.reset();
@@ -2844,7 +2807,7 @@ function fecharAtualizacaoValor() {
 formValorInvestimento.addEventListener("submit", (evento) => {
     evento.preventDefault();
     limparErros(formValorInvestimento);
-    const anterior = investimentos.find((item) => item.id === investimentoEmAtualizacao);
+    const anterior = disponibilidadeColecoes.consultarInvestimentos().find((item) => item.id === investimentoEmAtualizacao);
     if (!investimentosDisponiveis() || !anterior) return;
     let valido = true;
     if (campoValorManual.value === "" || !valorMonetarioValido(campoValorManual.value) || !campoValorManual.validity.valid) {
@@ -2862,16 +2825,15 @@ formValorInvestimento.addEventListener("submit", (evento) => {
     if (!valido) { focarPrimeiroErro(formValorInvestimento); return; }
     const atualizado = { ...anterior, valorInformado: Number(campoValorManual.value),
         dataReferenciaValor: data, atualizadoEm: new Date().toISOString() };
-    const candidatos = investimentos.map((item) => item.id === anterior.id ? atualizado : item);
+    const candidatos = disponibilidadeColecoes.consultarInvestimentos().map((item) => item.id === anterior.id ? atualizado : item);
     if (!persistirColecao("investimentos", candidatos)) return;
-    investimentos = candidatos;
     renderizarInvestimentos();
     prepararRetornoFocoInvestimento(atualizado.id, "atualizar");
     fecharAtualizacaoValor();
     mostrarToast("Valor informado atualizado. As estimativas foram recalculadas.", "sucesso");
 });
 campoDataValorManual.addEventListener("input", () => {
-    const anterior = investimentos.find((item) => item.id === investimentoEmAtualizacao);
+    const anterior = disponibilidadeColecoes.consultarInvestimentos().find((item) => item.id === investimentoEmAtualizacao);
     atualizarAvisoRetroativo(campoDataValorManual, anterior?.dataReferenciaValor,
         "aviso-retroativo-manual", "confirmar-retroativo-manual");
 });
@@ -2887,7 +2849,7 @@ function renderizarHistoricoInvestimentos() {
     const lista = document.getElementById("historico-investimentos");
     lista.replaceChildren();
     const disponivel = !["investimentos", "transacoes", "contas"].some((chave) => disponibilidadeColecoes.colecaoEstaBloqueada(chave))
-        && verificarIntegridadeTransacoes(disponibilidadeColecoes.consultarTransacoes(), disponibilidadeColecoes.consultarContas(), investimentos).disponivel;
+        && verificarIntegridadeTransacoes(disponibilidadeColecoes.consultarTransacoes(), disponibilidadeColecoes.consultarContas(), disponibilidadeColecoes.consultarInvestimentos()).disponivel;
     const movimentos = disponivel ? disponibilidadeColecoes.consultarTransacoes().filter(ehMovimentacaoInvestimento)
         .slice().sort((a, b) => b.data.localeCompare(a.data)) : [];
     if (!disponivel || !movimentos.length) {
@@ -2902,7 +2864,7 @@ function renderizarHistoricoInvestimentos() {
     itens.classList.add("lista-historico-investimentos");
     for (const movimento of movimentos) {
         const item = document.createElement("li");
-        const investimento = investimentos.find((registro) => registro.id === movimento.investimentoId);
+        const investimento = disponibilidadeColecoes.consultarInvestimentos().find((registro) => registro.id === movimento.investimentoId);
         const conta = disponibilidadeColecoes.consultarContas().find((registro) => registro.id === movimento.contaId);
         const resgate = movimento.tipo === "resgate";
         const titulo = document.createElement("strong");
@@ -2947,7 +2909,7 @@ function obterRestricaoMovimentacaoInvestimentos() {
     if (["transacoes", "contas", "investimentos"].some((chave) => disponibilidadeColecoes.colecaoEstaBloqueada(chave))) {
         return { mensagem: "Não é possível movimentar: contas, investimentos ou transações estão indisponíveis. Os dados armazenados foram preservados.", tipo: "erro" };
     }
-    if (!disponibilidadeColecoes.consultarContas().length || !investimentos.length) {
+    if (!disponibilidadeColecoes.consultarContas().length || !disponibilidadeColecoes.consultarInvestimentos().length) {
         return { mensagem: "Cadastre pelo menos uma conta e um investimento antes de registrar aportes ou resgates.", tipo: "informacao" };
     }
     return null;
@@ -2983,7 +2945,7 @@ function abrirModalMovimentacao(tipo, investimentoId = null, id = null) {
     camposMovimentacao.capital.required = resgate;
     camposMovimentacao.capital.disabled = !resgate;
     camposMovimentacao.baixa.disabled = !resgate;
-    for (const [nome, colecao] of [["investimento", investimentos], ["conta", disponibilidadeColecoes.consultarContas()]]) {
+    for (const [nome, colecao] of [["investimento", disponibilidadeColecoes.consultarInvestimentos()], ["conta", disponibilidadeColecoes.consultarContas()]]) {
         const select = camposMovimentacao[nome];
         select.replaceChildren(new Option("Selecione...", ""));
         colecao.forEach((item) => select.add(new Option(item.nome, item.id)));
@@ -3013,7 +2975,7 @@ formMovimentacao.addEventListener("submit", (evento) => {
     const campos = camposMovimentacao;
     let valido = true;
     const erro = (campo, mensagem) => { mostrarErro(campo, mensagem); valido = false; };
-    const investimento = investimentos.find((item) => item.id === campos.investimento.value);
+    const investimento = disponibilidadeColecoes.consultarInvestimentos().find((item) => item.id === campos.investimento.value);
     if (!investimento) erro(campos.investimento, "Selecione um investimento cadastrado.");
     if (!validarContaTransacao(campos.conta.value)) erro(campos.conta, "Selecione uma conta cadastrada.");
     const monetarios = [campos.valor];

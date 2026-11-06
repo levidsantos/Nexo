@@ -1,5 +1,5 @@
 import { lerDados, gravarDados } from "./repositorio.js";
-import { validarConta, validarColecao, validarTransacao, classificacaoDespesaValida,
+import { validarConta, validarColecao, validarTransacao, validarInvestimento, classificacaoDespesaValida,
     ehMovimentacaoInvestimento } from "../dominio/validacoes.js";
 import { verificarIntegridadeTransacoes } from "../dominio/calculos.js";
 
@@ -17,7 +17,7 @@ function prepararColecao(registros) {
     return copia;
 }
 
-// Investimentos e decisões de exclusão permanecem no consumidor.
+// Decisões de exclusão e coordenação da interface permanecem no consumidor.
 export function criarEstadoDisponibilidade({ ler = lerDados, gravar = gravarDados } = {}) {
     const colecoesBloqueadas = new Set();
     let contas = Object.freeze([]);
@@ -26,6 +26,9 @@ export function criarEstadoDisponibilidade({ ler = lerDados, gravar = gravarDado
     let transacoes = Object.freeze([]);
     let transacoesInicializadas = false;
     let resultadoInicializacaoTransacoes = null;
+    let investimentos = Object.freeze([]);
+    let investimentosInicializados = false;
+    let resultadoInicializacaoInvestimentos = null;
     let vinculosTransacoesVerificados = false;
     let compatibilidadePreparada = false;
     const despesasLegadasSemClassificacao = new Map();
@@ -108,12 +111,55 @@ export function criarEstadoDisponibilidade({ ler = lerDados, gravar = gravarDado
             }
             return { ...resultadoInicializacaoTransacoes };
         },
-        verificarTransacoesCarregadas(investimentosCadastrados) {
+        consultarInvestimentos() {
+            return investimentos;
+        },
+        investimentosEstaoDisponiveis() {
+            return investimentosInicializados && !colecoesBloqueadas.has("investimentos");
+        },
+        inicializarInvestimentos() {
+            if (investimentosInicializados) return { ...resultadoInicializacaoInvestimentos };
+            investimentosInicializados = true;
+            try {
+                const leitura = ler("investimentos");
+                if (!leitura.sucesso) throw leitura.erro;
+                const registros = leitura.ausente ? [] : leitura.dados;
+                if (!validarColecao(registros, validarInvestimento)) {
+                    throw new Error("A coleção não é um array válido ou há registros inválidos/IDs repetidos.");
+                }
+                investimentos = prepararColecao(registros);
+                resultadoInicializacaoInvestimentos = { sucesso: true };
+            } catch (erro) {
+                colecoesBloqueadas.add("investimentos");
+                resultadoInicializacaoInvestimentos = { sucesso: false, erro };
+            }
+            return { ...resultadoInicializacaoInvestimentos };
+        },
+        confirmarInvestimentos(candidatas) {
+            if (colecoesBloqueadas.has("investimentos")) return { sucesso: false, motivo: "bloqueada" };
+            if (!investimentosInicializados || !contasInicializadas || !transacoesInicializadas) {
+                return { sucesso: false, motivo: "nao-inicializada" };
+            }
+            if (!validarColecao(candidatas, validarInvestimento)) return { sucesso: false, motivo: "invalida" };
+            if (colecoesBloqueadas.has("transacoes")) return { sucesso: false, motivo: "dependencias" };
+            const integridade = verificarIntegridadeTransacoes(transacoes, contas, candidatas);
+            if (!integridade.disponivel) return { sucesso: false, motivo: "integridade", detalhe: integridade.motivo };
+            try {
+                const proximosInvestimentos = prepararColecao(candidatas);
+                const gravacao = gravar("investimentos", proximosInvestimentos);
+                if (!gravacao.sucesso) return { sucesso: false, motivo: "gravacao", erro: gravacao.erro };
+                investimentos = proximosInvestimentos;
+                return { sucesso: true };
+            } catch (erro) {
+                return { sucesso: false, motivo: "gravacao", erro };
+            }
+        },
+        verificarTransacoesCarregadas() {
             if (colecoesBloqueadas.has("transacoes")) return { disponivel: false, motivo: "" };
-            if (!transacoesInicializadas || !contasInicializadas) {
+            if (!transacoesInicializadas || !contasInicializadas || !investimentosInicializados) {
                 return { disponivel: false, motivo: "As coleções ainda não foram inicializadas." };
             }
-            const integridade = verificarIntegridadeTransacoes(transacoes, contas, investimentosCadastrados);
+            const integridade = verificarIntegridadeTransacoes(transacoes, contas, investimentos);
             vinculosTransacoesVerificados = true;
             if (colecoesBloqueadas.has("contas") || !integridade.disponivel) {
                 colecoesBloqueadas.add("transacoes");
@@ -135,14 +181,14 @@ export function criarEstadoDisponibilidade({ ler = lerDados, gravar = gravarDado
             return { sucesso: true };
         },
         validarTransacaoParaGravacao,
-        confirmarTransacoes(candidatas, investimentosCadastrados) {
+        confirmarTransacoes(candidatas) {
             if (colecoesBloqueadas.has("transacoes")) return { sucesso: false, motivo: "bloqueada" };
             if (!transacoesInicializadas || !compatibilidadePreparada) return { sucesso: false, motivo: "nao-inicializada" };
             if (!validarColecao(candidatas, validarTransacaoParaGravacao)) return { sucesso: false, motivo: "invalida" };
             const dependenciasBloqueadas = colecoesBloqueadas.has("contas")
                 || candidatas.some(ehMovimentacaoInvestimento) && colecoesBloqueadas.has("investimentos");
             if (dependenciasBloqueadas) return { sucesso: false, motivo: "dependencias" };
-            const integridade = verificarIntegridadeTransacoes(candidatas, contas, investimentosCadastrados);
+            const integridade = verificarIntegridadeTransacoes(candidatas, contas, investimentos);
             if (!integridade.disponivel) return { sucesso: false, motivo: "integridade", detalhe: integridade.motivo };
             try {
                 const legadosMantidos = new Set(candidatas

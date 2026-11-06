@@ -182,7 +182,7 @@ function adaptadores(app, registros = []) {
     app.estado.inicializarTransacoes();
     const contexto = createContext({
         ...utilitarios, ...validacoes, ...calculos,
-        disponibilidadeColecoes: app.estado, investimentos: [],
+        disponibilidadeColecoes: app.estado,
         mostrarToast: (...argumentos) => mensagens.push(argumentos)
     });
     const funcoes = new Script(`${declaracoes}\n({ ${nomes.join(', ')} })`).runInContext(contexto);
