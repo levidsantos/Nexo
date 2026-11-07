@@ -399,20 +399,13 @@ test('adaptador real de Escape mantém os três fluxos específicos de confirma�
     assert.deepEqual(chamadas.slice(1), ['conta', 'investimento']);
 });
 
-test('adaptador de Investimentos define retorno para botão recriado e mantém reabertura do menu', () => {
+test('adaptador de Investimentos delega o retorno de foco à apresentação', () => {
     const trecho = fonte.match(/^function prepararRetornoFocoInvestimento\([^]*?^\}/m)[0];
-    const menu = {}, foco = { closest: () => menu }, alternativa = { closest: () => null }, chamadas = [];
-    const item = { dataset: { investimentoId: 'id-teste' }, querySelector(seletor) {
-        assert.equal(seletor, '[data-acao="editar"]'); return foco;
-    } };
-    const contexto = createContext({
-        document: { getElementById: (id) => id === 'lista-investimentos' ? { children: [item] } : alternativa },
-        modais: { definirFocoRetorno: (elemento) => chamadas.push(elemento) },
-        definirMenuAcoes: (...args) => chamadas.push(args)
-    });
+    const chamadas = [];
+    const contexto = createContext({ apresentacaoInvestimentos: {
+        prepararRetornoFocoInvestimento: (...args) => chamadas.push(args)
+    } });
     const preparar = new Script(trecho + '\nprepararRetornoFocoInvestimento').runInContext(contexto);
     preparar('id-teste', 'editar');
-    assert.strictEqual(chamadas[0], foco);
-    assert.deepEqual(chamadas[1], [menu, true, false]);
-    preparar('ausente', 'editar'); assert.strictEqual(chamadas[2], alternativa);
+    assert.deepEqual(chamadas, [['id-teste', 'editar']]);
 });
