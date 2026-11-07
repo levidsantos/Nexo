@@ -388,6 +388,7 @@ test('adaptador real de Escape mantém os três fluxos específicos de confirma�
         modalExclusao: a.a.modal, modalExclusaoConta: a.b.modal,
         criarModais: (recebidas) => { opcoes = recebidas; return {}; },
         fecharModal: (modal) => chamadas.push(modal),
+        operacoesTransacoes: { cancelarExclusao: () => chamadas.push(a.a.modal) },
         fecharModalExclusaoConta: () => chamadas.push('conta'),
         fecharExclusaoInvestimento: () => chamadas.push('investimento')
     });

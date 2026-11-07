@@ -1,6 +1,6 @@
 import { dataValida, obterDataLocal, formatarCentavos } from "../dominio/valores-datas.js";
 import { valorMonetarioValido } from "../dominio/validacoes.js";
-import { mostrarErro, limparErros, limparErroCampo, focarPrimeiroErro } from "../ui/formularios.js";
+import { mostrarErro, limparErros, limparErroCampo, focarPrimeiroErro, criarConfirmacaoFinanceira } from "../ui/formularios.js";
 
 // A funcionalidade mantém apenas estado visual; consulta as coleções atuais em cada operação.
 export function criarContas({ elementos, estado: disponibilidadeColecoes, confirmarContas,
@@ -19,6 +19,7 @@ export function criarContas({ elementos, estado: disponibilidadeColecoes, confir
     let contaEmExclusao = null;
     let inicializado = false;
     const removerListeners = [];
+    const confirmacaoFinanceira = criarConfirmacaoFinanceira(mostrarToast);
     const removerListenersCards = [];
     const escutar = (elemento, tipo, callback) => {
         elemento.addEventListener(tipo, callback);
@@ -30,6 +31,7 @@ export function criarContas({ elementos, estado: disponibilidadeColecoes, confir
     };
 
     function abrirModalConta(contaId = null) {
+        if (confirmacaoFinanceira.estaPendente()) return;
         const conta = contaId === null ? null : disponibilidadeColecoes.consultarContas().find((registro) => registro.id === contaId);
         if (contaId !== null && !conta) {
             mostrarToast("Não foi possível editar: a conta não está disponível.", "erro");
@@ -53,6 +55,7 @@ export function criarContas({ elementos, estado: disponibilidadeColecoes, confir
     }
 
     function fecharModalConta() {
+        if (confirmacaoFinanceira.estaPendente()) return;
         fecharModal(modalConta, () => {
             formConta.reset();
             limparErros(formConta);
@@ -80,6 +83,7 @@ export function criarContas({ elementos, estado: disponibilidadeColecoes, confir
     }
 
     function solicitarExclusaoConta(contaId) {
+        if (confirmacaoFinanceira.estaPendente()) return;
         if (!podeExcluirConta(contaId)) return;
         const conta = disponibilidadeColecoes.consultarContas().find((registro) => registro.id === contaId);
         contaEmExclusao = conta.id;
@@ -88,6 +92,7 @@ export function criarContas({ elementos, estado: disponibilidadeColecoes, confir
     }
 
     function fecharModalExclusaoConta() {
+        if (confirmacaoFinanceira.estaPendente()) return;
         fecharModal(modalExclusaoConta);
         contaEmExclusao = null;
     }
@@ -194,8 +199,9 @@ export function criarContas({ elementos, estado: disponibilidadeColecoes, confir
             inclusaoSaldoAlterada = true;
         });
 
-        escutar(formConta, "submit", (evento) => {
+        escutar(formConta, "submit", async (evento) => {
             evento.preventDefault();
+            if (confirmacaoFinanceira.estaPendente()) return;
             limparErros(formConta);
 
             const nome = campoNomeConta.value.trim();
@@ -249,7 +255,7 @@ export function criarContas({ elementos, estado: disponibilidadeColecoes, confir
             const proximasContas = estavaEditando
                 ? disponibilidadeColecoes.consultarContas().map((conta) => conta.id === contaEmEdicao ? contaAtualizada : conta)
                 : [...disponibilidadeColecoes.consultarContas(), contaAtualizada];
-            if (!confirmarContas(proximasContas)) return;
+            if (!await confirmacaoFinanceira.confirmar(confirmarContas, proximasContas, botaoSalvarConta)) return;
             aoConfirmarAlteracao("salvar");
 
             fecharModalConta();
@@ -260,10 +266,10 @@ export function criarContas({ elementos, estado: disponibilidadeColecoes, confir
         escutar(modalExclusaoConta, "click", (evento) => {
             if (evento.target === modalExclusaoConta) fecharModalExclusaoConta();
         });
-        escutar(botaoConfirmarExclusaoConta, "click", () => {
+        escutar(botaoConfirmarExclusaoConta, "click", async () => {
             if (contaEmExclusao === null || !podeExcluirConta(contaEmExclusao)) return;
             const proximasContas = disponibilidadeColecoes.consultarContas().filter((conta) => conta.id !== contaEmExclusao);
-            if (!confirmarContas(proximasContas)) return;
+            if (!await confirmacaoFinanceira.confirmar(confirmarContas, proximasContas, botaoConfirmarExclusaoConta)) return;
             aoConfirmarAlteracao("excluir");
             fecharModalExclusaoConta();
             mostrarToast("Conta excluída.", "sucesso");

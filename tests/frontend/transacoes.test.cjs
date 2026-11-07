@@ -108,7 +108,7 @@ function ambiente({ registros = [], mobile = false, reduced = true, animar = fal
 const muitos = (quantidade) => Array.from({ length: quantidade }, (_, i) => transacao({ id: `t-${i}`, nome: `Registro ${i}`, data: `2026-10-${String(i + 1).padStart(2, '0')}` }));
 const flush = async () => { for (let i = 0; i < 8; i++) await Promise.resolve(); };
 
-test('Listagens: importação não acessa DOM, armazenamento, eventos, preferência ou timers', () => {
+test('Listagens: importação não acessa DOM, armazenamento, eventos, preferência ou timers', async () => {
     const url = pathToFileURL(resolve(__dirname, '../../frontend/js/funcionalidades/transacoes.js')).href;
     execFileSync(process.execPath, ['--input-type=module', '-e', `
         for (const nome of ['document','window','localStorage']) Object.defineProperty(globalThis,nome,{get(){throw new Error(nome)}});
@@ -116,7 +116,7 @@ test('Listagens: importação não acessa DOM, armazenamento, eventos, preferên
     `]);
 });
 
-test('Listagens: inicialização explícita/idempotente, classificações únicas e encerramento dos recursos', () => {
+test('Listagens: inicialização explícita/idempotente, classificações únicas e encerramento dos recursos', async () => {
     const a = ambiente({ mobile: true });
     assert.equal(a.refs.campoPesquisa.listeners(), 0); assert.equal(a.ios.length, 0);
     a.api.prepararClassificacoes(); a.api.prepararClassificacoes(); assert.equal(a.refs.filtroClassificacao.children.length, 5);
@@ -126,7 +126,7 @@ test('Listagens: inicialização explícita/idempotente, classificações única
     a.api.inicializar(); assert.equal(a.refs.campoPesquisa.listeners(), 1);
 });
 
-test('Listagens: recentes limitadas a cinco e tabela completa com oito, ordenação decrescente estável e dados intactos', () => {
+test('Listagens: recentes limitadas a cinco e tabela completa com oito, ordenação decrescente estável e dados intactos', async () => {
     const registros = Object.freeze(muitos(12).map(Object.freeze)), antes = JSON.stringify(registros);
     const a = ambiente({ registros }); a.renderizar();
     assert.equal(a.refs.listaTransacoes.children.length, 5); assert.equal(a.refs.listaTransacoesCompleta.children.length, 8);
@@ -134,7 +134,7 @@ test('Listagens: recentes limitadas a cinco e tabela completa com oito, ordenaç
     assert.equal(a.refs.infoPaginacao.textContent, 'Página 1 de 2'); assert.equal(JSON.stringify(registros), antes);
 });
 
-test('Listagens: vazio e indisponível conservam mensagens, colspan, contagem e controles', () => {
+test('Listagens: vazio e indisponível conservam mensagens, colspan, contagem e controles', async () => {
     const a = ambiente(); a.renderizar(); assert.equal(a.refs.listaTransacoesCompleta.children[0].children[0].textContent, 'Nenhuma transação encontrada.');
     assert.equal(a.refs.listaTransacoesCompleta.children[0].children[0].colSpan, 8);
     a.bloqueadas.add('transacoes'); a.renderizar();
@@ -142,7 +142,7 @@ test('Listagens: vazio e indisponível conservam mensagens, colspan, contagem e 
     assert.equal(a.controle('total-resultados').textContent, 'Dados indisponíveis');
 });
 
-test('Listagens: quatro tipos preservam sinais, classes, data, conta, investimento e recebido do resgate', () => {
+test('Listagens: quatro tipos preservam sinais, classes, data, conta, investimento e recebido do resgate', async () => {
     const registros = [transacao({ id: 'r' }), transacao({ id: 'd', tipo: 'despesa', classificacao: 'Essencial', pagamento: 'Pix' }), aporte(), resgate()];
     const a = ambiente({ registros }); a.renderizar(); const linhas = a.refs.listaTransacoesCompleta.children;
     assert.deepEqual(linhas.map((l) => l.children[7].textContent.startsWith('+')), [true, false, false, true]);
@@ -153,27 +153,27 @@ test('Listagens: quatro tipos preservam sinais, classes, data, conta, investimen
     assert.equal(a.refs.listaTransacoes.children[0].children[1].classList.contains('recente-nome'), true);
 });
 
-test('Listagens: pesquisa preserva nome original e considera nome atual do investimento, sem pesquisar categoria', () => {
+test('Listagens: pesquisa preserva nome original e considera nome atual do investimento, sem pesquisar categoria', async () => {
     const a = ambiente({ registros: [aporte({ nome: 'Nome original' }), transacao({ nome: 'Salário', categoria: 'Categoria exclusiva' })] }); a.api.inicializar();
     a.alterar({ investimentos: [investimento({ nome: 'Carteira renomeada' })] });
     for (const termo of ['nome original', 'carteira renomeada', 'SALÁRIO']) {
-        a.refs.campoPesquisa.value = termo; a.refs.campoPesquisa.emitir('input'); assert.equal(a.checkboxes().length, 1);
+        a.refs.campoPesquisa.value = termo; await a.refs.campoPesquisa.emitir('input'); assert.equal(a.checkboxes().length, 1);
     }
-    a.refs.campoPesquisa.value = 'Categoria exclusiva'; a.refs.campoPesquisa.emitir('input'); assert.equal(a.checkboxes().length, 0);
-    a.bloqueadas.add('investimentos'); a.refs.campoPesquisa.value = 'nome original'; a.refs.campoPesquisa.emitir('input'); assert.equal(a.checkboxes().length, 1);
+    a.refs.campoPesquisa.value = 'Categoria exclusiva'; await a.refs.campoPesquisa.emitir('input'); assert.equal(a.checkboxes().length, 0);
+    a.bloqueadas.add('investimentos'); a.refs.campoPesquisa.value = 'nome original'; await a.refs.campoPesquisa.emitir('input'); assert.equal(a.checkboxes().length, 1);
 });
 
-test('Listagens: filtros combinados e limpeza preservam critérios, datas inclusivas e seleção', () => {
+test('Listagens: filtros combinados e limpeza preservam critérios, datas inclusivas e seleção', async () => {
     const a = ambiente({ registros: [transacao({ id:'r', categoria:'Casa' }), transacao({ id:'d', tipo:'despesa', categoria:'Casa', classificacao:'Essencial' }),
         transacao({ id:'d2', tipo:'despesa', categoria:'Casa', classificacao:'Desejo' }), aporte()] }); a.api.inicializar(); a.renderizar(); a.selecionar(0);
     Object.assign(a.refs.filtroTipo, { value:'despesa' }); a.refs.filtroCategoria.value='Casa'; a.refs.filtroClassificacao.value='Essencial';
-    a.refs.filtroDataInicial.value='2026-11-01'; a.refs.filtroDataFinal.value='2026-11-01'; a.refs.filtroTipo.emitir('change');
+    a.refs.filtroDataInicial.value='2026-11-01'; a.refs.filtroDataFinal.value='2026-11-01'; await a.refs.filtroTipo.emitir('change');
     assert.deepEqual(a.checkboxes().map((c)=>c.value), ['d']); assert.deepEqual(a.api.consultarSelecao(), []);
-    a.refs.filtroTipo.value='receita'; a.refs.filtroTipo.emitir('change'); assert.equal(a.checkboxes().length,0);
+    a.refs.filtroTipo.value='receita'; await a.refs.filtroTipo.emitir('change'); assert.equal(a.checkboxes().length,0);
     a.refs.botaoLimparFiltros.click(); assert.equal(a.checkboxes().length,4); assert.equal(a.refs.filtroClassificacao.value,'todas'); assert.equal(a.refs.filtroDataInicial.value,'');
 });
 
-test('Listagens: categorias e classificação legada conservam comportamento e disponibilidade', () => {
+test('Listagens: categorias e classificação legada conservam comportamento e disponibilidade', async () => {
     const a=ambiente({registros:[transacao({id:'a',categoria:' B '}),transacao({id:'b',categoria:'A',tipo:'despesa'}),aporte()]});
     a.api.atualizarCategorias(); assert.deepEqual(a.refs.filtroCategoria.children.slice(1).map((c)=>c.value),['A','B']);
     a.refs.filtroCategoria.value='A'; a.api.atualizarCategorias(); assert.equal(a.refs.filtroCategoria.value,'A');
@@ -182,20 +182,20 @@ test('Listagens: categorias e classificação legada conservam comportamento e d
     a.alterar({transacoes:[]}); a.api.atualizarCategorias(); assert.equal(a.refs.filtroCategoria.value,'todas');
 });
 
-test('Listagens: erro de datas mantém ARIA e desaparece ao corrigir sem mudar regras de filtro', () => {
+test('Listagens: erro de datas mantém ARIA e desaparece ao corrigir sem mudar regras de filtro', async () => {
     const a=ambiente(); a.refs.filtroDataInicial.value='2026-11-02'; a.refs.filtroDataFinal.value='2026-11-01'; a.api.atualizarTabelaCompleta();
     assert.match(a.refs.erroFiltroDatas.textContent,/anterior ou igual/); assert.equal(a.refs.filtroDataFinal.getAttribute('aria-invalid'),'true');
     a.refs.filtroDataFinal.value='2026-11-03'; a.api.atualizarTabelaCompleta(); assert.equal(a.refs.erroFiltroDatas.textContent,''); assert.equal(a.refs.filtroDataFinal.getAttribute('aria-invalid'),null);
 });
 
-test('Listagens: seis no mobile, oito no desktop; resize mantém página válida e cinco recentes', () => {
+test('Listagens: seis no mobile, oito no desktop; resize mantém página válida e cinco recentes', async () => {
     const a=ambiente({registros:muitos(18),mobile:true}); a.api.inicializar(); a.renderizar(); assert.equal(a.checkboxes().length,6);
     a.refs.botaoProximaPagina.click(); assert.equal(a.refs.infoPaginacao.textContent,'Página 2 de 3'); a.selecionar(0);
     a.largura.alterar(false); assert.equal(a.checkboxes().length,8); assert.equal(a.refs.infoPaginacao.textContent,'Página 1 de 3'); assert.deepEqual(a.api.consultarSelecao(),[]);
     assert.equal(a.refs.listaTransacoes.children.length,5);
 });
 
-test('Listagens: avançar/voltar limpa seleção e exclusão de dados ajusta a última página', () => {
+test('Listagens: avançar/voltar limpa seleção e exclusão de dados ajusta a última página', async () => {
     const a=ambiente({registros:muitos(18)}); a.api.inicializar(); a.renderizar(); a.selecionar(0); a.refs.botaoProximaPagina.click();
     assert.deepEqual(a.api.consultarSelecao(),[]); assert.equal(a.refs.infoPaginacao.textContent,'Página 2 de 3');
     a.refs.botaoProximaPagina.click(); assert.equal(a.refs.infoPaginacao.textContent,'Página 3 de 3');
@@ -203,7 +203,7 @@ test('Listagens: avançar/voltar limpa seleção e exclusão de dados ajusta a �
     assert.equal(a.refs.botaoProximaPagina.disabled,true); assert.equal(a.refs.botaoPaginaAnterior.disabled,true);
 });
 
-test('Listagens: seleção é compartilhada, consulta é cópia e selecionar página atua somente nas linhas visíveis', () => {
+test('Listagens: seleção é compartilhada, consulta é cópia e selecionar página atua somente nas linhas visíveis', async () => {
     const a=ambiente({registros:muitos(12)}); a.api.inicializar(); a.renderizar(); a.selecionar(0,true,a.refs.listaTransacoes);
     assert.equal(a.checkboxes()[0].checked,true); const copia=a.api.consultarSelecao(); copia.length=0; assert.equal(a.api.consultarSelecao().length,1);
     assert.equal(a.controle('selecionar-pagina').indeterminate,true); a.controle('selecionar-pagina').checked=true; a.controle('selecionar-pagina').emitir('change');
@@ -211,21 +211,21 @@ test('Listagens: seleção é compartilhada, consulta é cópia e selecionar pá
     a.controle('selecionar-pagina').checked=false; a.controle('selecionar-pagina').emitir('change'); assert.deepEqual(a.api.consultarSelecao(),[]);
 });
 
-test('Listagens: renderizar preserva seleção; limpeza e callbacks usam os mesmos fluxos das duas tabelas', () => {
+test('Listagens: renderizar preserva seleção; limpeza e callbacks usam os mesmos fluxos das duas tabelas', async () => {
     const a=ambiente({registros:muitos(3)}); a.api.inicializar(); a.renderizar(); a.selecionar(0); a.renderizar();
     assert.equal(a.checkboxes()[0].checked,true); a.refs.botaoEditar.click(); a.refs.botaoExcluirCompleta.click();
     assert.deepEqual(a.efeitos,[['editar',['t-2']],['excluir',['t-2']]]);
     a.api.limparSelecao(); assert.equal(a.checkboxes().some((c)=>c.checked),false); assert.equal(a.refs.areaAcoes.classList.contains('ativa'),false);
 });
 
-test('Listagens: linhas antigas perdem listeners, novos IDs e nomes são consultados a cada renderização', () => {
+test('Listagens: linhas antigas perdem listeners, novos IDs e nomes são consultados a cada renderização', async () => {
     const a=ambiente({registros:[transacao()]}); a.renderizar(); const antigo=a.checkboxes()[0];
     a.alterar({contas:[conta({nome:'Conta nova'})],transacoes:[transacao({nome:'Nome novo'})]}); a.renderizar();
     assert.equal(antigo.listeners(),0); assert.match(a.refs.listaTransacoesCompleta.textContent,/Conta nova/); assert.match(a.refs.listaTransacoesCompleta.textContent,/Nome novo/);
     a.api.encerrar(); assert.equal(a.checkboxes()[0].listeners(),0);
 });
 
-test('Listagens: barra contextual só acompanha seleção mobile e visibilidade, ações reutilizam originais', () => {
+test('Listagens: barra contextual só acompanha seleção mobile e visibilidade, ações reutilizam originais', async () => {
     const a=ambiente({registros:muitos(2),mobile:true}); a.api.inicializar(); a.renderizar(); a.selecionar(0);
     a.ios.at(-1).callback([{isIntersecting:false,intersectionRatio:0}]); assert.equal(a.refs.barraContextual.classList.contains('visivel'),true);
     assert.equal(a.refs.barraAcoesCompleta.inert,true); a.controle('editar-selecao-contextual').click(); assert.deepEqual(a.efeitos,[['editar',['t-1']]]);
@@ -233,12 +233,12 @@ test('Listagens: barra contextual só acompanha seleção mobile e visibilidade,
     a.api.limparSelecao(); assert.equal(a.refs.barraContextual.classList.contains('visivel'),false);
 });
 
-test('Listagens: sem IntersectionObserver a barra superior permanece como alternativa', () => {
+test('Listagens: sem IntersectionObserver a barra superior permanece como alternativa', async () => {
     const a=ambiente({registros:muitos(1),mobile:true,observadores:false}); a.api.inicializar(); a.renderizar(); a.selecionar(0);
     assert.equal(a.refs.barraContextual.classList.contains('visivel'),false); assert.equal(a.refs.areaAcoesCompleta.classList.contains('ativa'),true);
 });
 
-test('Listagens: reduced motion pagina imediatamente sem animações ou altura temporária', () => {
+test('Listagens: reduced motion pagina imediatamente sem animações ou altura temporária', async () => {
     const a=ambiente({registros:muitos(10),animar:true,reduced:true}); a.api.inicializar(); a.renderizar(); a.refs.botaoProximaPagina.click();
     assert.equal(a.animacoes.length,0); assert.equal(a.area.style.height,''); assert.equal(a.refs.infoPaginacao.textContent,'Página 2 de 2');
 });
@@ -257,8 +257,8 @@ test('Listagens: paginação mantém saída 100, entrada 180 e altura 250; final
 for(const interrupcao of ['pesquisa','resize','reduced','navegacao','encerrar']) {
     test(`Listagens: ${interrupcao} cancela saída pendente sem callback antigo ou estilos restantes`, async () => {
         const a=ambiente({registros:muitos(10),animar:true,reduced:false}); a.api.inicializar(); a.renderizar(); a.refs.botaoProximaPagina.click();
-        if(interrupcao==='pesquisa'){a.refs.campoPesquisa.value='Registro 0';a.refs.campoPesquisa.emitir('input');}
-        if(interrupcao==='resize') a.window.emitir('resize');
+        if(interrupcao==='pesquisa'){a.refs.campoPesquisa.value='Registro 0';await a.refs.campoPesquisa.emitir('input');}
+        if(interrupcao==='resize') await a.window.emitir('resize');
         if(interrupcao==='reduced') a.movimento.alterar(true);
         if(interrupcao==='navegacao') a.api.concluirPaginacaoSeAtiva();
         if(interrupcao==='encerrar') a.api.encerrar();
@@ -299,7 +299,7 @@ test('Listagens: atualização durante entrada cancela altura e não permite que
     assert.match(a.refs.listaTransacoesCompleta.textContent,/Registro posterior/); assert.equal(a.animacoes.every((n)=>n.concluida),true);
 });
 
-test('Listagens: encerramento cancela frame de transferência de foco e callbacks antigos do observador', () => {
+test('Listagens: encerramento cancela frame de transferência de foco e callbacks antigos do observador', async () => {
     const a=ambiente({registros:muitos(1),mobile:true}); a.api.inicializar(); a.renderizar(); a.selecionar(0);
     a.refs.botaoEditarCompleta.focus(); const observador=a.ios.at(-1);
     observador.callback([{isIntersecting:false,intersectionRatio:0}]); assert.equal(a.quadros.size,1);
@@ -308,15 +308,15 @@ test('Listagens: encerramento cancela frame de transferência de foco e callback
     observador.callback([{isIntersecting:true,intersectionRatio:1}]); assert.equal(a.refs.barraContextual.classList.contains('visivel'),antes);
 });
 
-test('Listagens: exclusão financeira real preserva seleção na falha e limpa após sucesso', () => {
+test('Listagens: exclusão financeira real preserva seleção na falha e limpa após sucesso', async () => {
     const a=ambiente({registros:muitos(2)}); a.renderizar(); a.selecionar(0);
     let sucesso=false; const efeitos=[];
-    const operacoes=criarOperacoesTransacoes({elementos:{campoConta:{ownerDocument:{}},modalExclusao:{}},
+    const operacoes=criarOperacoesTransacoes({elementos:{campoConta:{ownerDocument:{}},modalExclusao:{},botaoConfirmarExclusao:{disabled:false}},
         consultas:{consultarTransacoes:()=>muitos(2)},confirmarTransacoes:()=>sucesso,consultarSelecao:()=>a.api.consultarSelecao(),
         modais:{fecharModal:()=>efeitos.push('fechar')},mostrarToast:()=>efeitos.push('toast'),
         aposPersistir:()=>{a.api.definirSelecao([]);efeitos.push('recentes','categorias','tabela','resumo','acoes');},
         aposFecharExclusao:()=>efeitos.push('investimentos')});
-    operacoes.confirmarExclusao(); assert.deepEqual(a.api.consultarSelecao(),['t-1']); assert.deepEqual(efeitos,[]);
-    sucesso=true; operacoes.confirmarExclusao(); assert.deepEqual(a.api.consultarSelecao(),[]);
+    await operacoes.confirmarExclusao(); assert.deepEqual(a.api.consultarSelecao(),['t-1']); assert.deepEqual(efeitos,[]);
+    sucesso=true; await operacoes.confirmarExclusao(); assert.deepEqual(a.api.consultarSelecao(),[]);
     assert.deepEqual(efeitos,['recentes','categorias','tabela','resumo','acoes','fechar','investimentos','toast']);
 });

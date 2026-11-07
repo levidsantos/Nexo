@@ -71,7 +71,7 @@ export function criarEstadoDisponibilidade({ ler = lerDados, gravar = gravarDado
             }
             return { ...resultadoInicializacao };
         },
-        confirmarContas(candidatas) {
+        async confirmarContas(candidatas) {
             if (colecoesBloqueadas.has("contas")) return { sucesso: false, motivo: "bloqueada" };
             if (!contasInicializadas) return { sucesso: false, motivo: "nao-inicializada" };
             if (!validarColecao(candidatas, validarConta)) return { sucesso: false, motivo: "invalida" };
@@ -148,7 +148,7 @@ export function criarEstadoDisponibilidade({ ler = lerDados, gravar = gravarDado
             }
             return { ...resultadoInicializacaoInvestimentos };
         },
-        confirmarInvestimentos(candidatas) {
+        async confirmarInvestimentos(candidatas) {
             if (colecoesBloqueadas.has("investimentos")) return { sucesso: false, motivo: "bloqueada" };
             if (!investimentosInicializados || !contasInicializadas || !transacoesInicializadas) {
                 return { sucesso: false, motivo: "nao-inicializada" };
@@ -194,7 +194,7 @@ export function criarEstadoDisponibilidade({ ler = lerDados, gravar = gravarDado
             return { sucesso: true };
         },
         validarTransacaoParaGravacao,
-        confirmarTransacoes(candidatas) {
+        async confirmarTransacoes(candidatas) {
             if (colecoesBloqueadas.has("transacoes")) return { sucesso: false, motivo: "bloqueada" };
             if (!transacoesInicializadas || !compatibilidadePreparada) return { sucesso: false, motivo: "nao-inicializada" };
             if (!validarColecao(candidatas, validarTransacaoParaGravacao)) return { sucesso: false, motivo: "invalida" };

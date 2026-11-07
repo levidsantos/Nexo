@@ -1,6 +1,6 @@
 import { dataValida, obterDataLocal, converterParaCentavos, formatarCentavos } from "../dominio/valores-datas.js";
 import { valorMonetarioValido, ehMovimentacaoInvestimento } from "../dominio/validacoes.js";
-import { mostrarErro, limparErros, limparErroCampo, focarPrimeiroErro } from "../ui/formularios.js";
+import { mostrarErro, limparErros, limparErroCampo, focarPrimeiroErro, criarConfirmacaoFinanceira } from "../ui/formularios.js";
 
 // Estado de formulário local; coleções e confirmações são consultadas explicitamente.
 export function criarOperacoesInvestimentos({ elementos, consultas: disponibilidadeColecoes,
@@ -12,6 +12,7 @@ export function criarOperacoesInvestimentos({ elementos, consultas: disponibilid
     const obterElemento = (id) => elementos[id];
     let inicializado = false;
     const removerListeners = [];
+    const confirmacaoFinanceira = criarConfirmacaoFinanceira(mostrarToast);
     function escutar(alvo, tipo, callback) {
         alvo.addEventListener(tipo, callback);
         removerListeners.push(() => alvo.removeEventListener(tipo, callback));
@@ -45,6 +46,7 @@ export function criarOperacoesInvestimentos({ elementos, consultas: disponibilid
     }
 
     function abrirModalInvestimento(id = null) {
+        if (confirmacaoFinanceira.estaPendente()) return;
         if (!investimentosDisponiveis()) return;
         const investimento = id === null ? null : disponibilidadeColecoes.consultarInvestimentos().find((item) => item.id === id);
         if (id !== null && !investimento) {
@@ -72,6 +74,7 @@ export function criarOperacoesInvestimentos({ elementos, consultas: disponibilid
     }
 
     function fecharModalInvestimento() {
+        if (confirmacaoFinanceira.estaPendente()) return;
         fecharModal(modalInvestimento, () => {
             formInvestimento.reset();
             limparErros(formInvestimento);
@@ -98,6 +101,7 @@ export function criarOperacoesInvestimentos({ elementos, consultas: disponibilid
     }
 
     function solicitarExclusaoInvestimento(id) {
+        if (confirmacaoFinanceira.estaPendente()) return;
         if (!podeExcluirInvestimento(id)) return;
         investimentoEmExclusao = id;
         const investimento = disponibilidadeColecoes.consultarInvestimentos().find((item) => item.id === id);
@@ -106,6 +110,7 @@ export function criarOperacoesInvestimentos({ elementos, consultas: disponibilid
     }
 
     function fecharExclusaoInvestimento() {
+        if (confirmacaoFinanceira.estaPendente()) return;
         fecharModal(modalExclusaoInvestimento);
         investimentoEmExclusao = null;
     }
@@ -123,6 +128,7 @@ export function criarOperacoesInvestimentos({ elementos, consultas: disponibilid
     const campoDataValorManual = obterElemento("data-valor-manual");
 
     function abrirAtualizacaoValor(id) {
+        if (confirmacaoFinanceira.estaPendente()) return;
         if (!investimentosDisponiveis()) return;
         const investimento = disponibilidadeColecoes.consultarInvestimentos().find((item) => item.id === id);
         if (!investimento) { mostrarToast("Investimento indisponível para atualização.", "erro"); return; }
@@ -141,6 +147,7 @@ export function criarOperacoesInvestimentos({ elementos, consultas: disponibilid
     }
 
     function fecharAtualizacaoValor() {
+        if (confirmacaoFinanceira.estaPendente()) return;
         fecharModal(modalValorInvestimento, () => {
             formValorInvestimento.reset();
             limparErros(formValorInvestimento);
@@ -166,6 +173,7 @@ export function criarOperacoesInvestimentos({ elementos, consultas: disponibilid
     }
 
     function abrirModalMovimentacao(tipo, investimentoId = null, id = null) {
+        if (confirmacaoFinanceira.estaPendente()) return;
         if (!["aporte", "resgate"].includes(tipo) || !podeMovimentarInvestimentos()) return;
         const registro = id === null ? null : disponibilidadeColecoes.consultarTransacoes().find((item) => item.id === id && item.tipo === tipo);
         if (id !== null && !registro) {
@@ -202,6 +210,7 @@ export function criarOperacoesInvestimentos({ elementos, consultas: disponibilid
     }
 
     function fecharModalMovimentacao() {
+        if (confirmacaoFinanceira.estaPendente()) return;
         fecharModal(modalMovimentacao, () => {
             formMovimentacao.reset();
             limparErros(formMovimentacao);
@@ -214,8 +223,9 @@ export function criarOperacoesInvestimentos({ elementos, consultas: disponibilid
     function inicializar() {
         if (inicializado) return;
         inicializado = true;
-        escutar(formInvestimento, "submit", (evento) => {
+        escutar(formInvestimento, "submit", async (evento) => {
             evento.preventDefault();
+            if (confirmacaoFinanceira.estaPendente()) return;
             limparErros(formInvestimento);
             if (!investimentosDisponiveis()) return;
             const campos = camposInvestimento;
@@ -257,7 +267,7 @@ export function criarOperacoesInvestimentos({ elementos, consultas: disponibilid
                 observacoes: campos.observacoes.value.trim()
             };
             const proximos = editando ? disponibilidadeColecoes.consultarInvestimentos().map((item) => item.id === anterior.id ? registro : item) : [...disponibilidadeColecoes.consultarInvestimentos(), registro];
-            if (!confirmarInvestimentos(proximos)) return;
+            if (!await confirmacaoFinanceira.confirmar(confirmarInvestimentos, proximos, obterElemento("salvar-investimento"))) return;
             aposSalvarInvestimento(registro, editando);
             fecharModalInvestimento();
             mostrarToast(editando ? "Investimento atualizado." : "Investimento cadastrado.", "sucesso");
@@ -272,10 +282,10 @@ export function criarOperacoesInvestimentos({ elementos, consultas: disponibilid
         escutar(modalExclusaoInvestimento, "click", (evento) => {
             if (evento.target === modalExclusaoInvestimento) fecharExclusaoInvestimento();
         });
-        escutar(obterElemento("confirmar-exclusao-investimento"), "click", () => {
+        escutar(obterElemento("confirmar-exclusao-investimento"), "click", async () => {
             if (investimentoEmExclusao === null || !podeExcluirInvestimento(investimentoEmExclusao)) return;
             const proximos = disponibilidadeColecoes.consultarInvestimentos().filter((item) => item.id !== investimentoEmExclusao);
-            if (!confirmarInvestimentos(proximos)) return;
+            if (!await confirmacaoFinanceira.confirmar(confirmarInvestimentos, proximos, obterElemento("confirmar-exclusao-investimento"))) return;
             aposExcluirInvestimento();
             fecharExclusaoInvestimento();
             mostrarToast("Investimento excluído.", "sucesso");
@@ -285,8 +295,9 @@ export function criarOperacoesInvestimentos({ elementos, consultas: disponibilid
             atualizarAvisoRetroativo(camposInvestimento.referenciaValor, anterior?.dataReferenciaValor,
                 "aviso-retroativo-investimento", "confirmar-retroativo-investimento");
         });
-        escutar(formValorInvestimento, "submit", (evento) => {
+        escutar(formValorInvestimento, "submit", async (evento) => {
             evento.preventDefault();
+            if (confirmacaoFinanceira.estaPendente()) return;
             limparErros(formValorInvestimento);
             const anterior = disponibilidadeColecoes.consultarInvestimentos().find((item) => item.id === investimentoEmAtualizacao);
             if (!investimentosDisponiveis() || !anterior) return;
@@ -307,7 +318,7 @@ export function criarOperacoesInvestimentos({ elementos, consultas: disponibilid
             const atualizado = { ...anterior, valorInformado: Number(campoValorManual.value),
                 dataReferenciaValor: data, atualizadoEm: new Date().toISOString() };
             const candidatos = disponibilidadeColecoes.consultarInvestimentos().map((item) => item.id === anterior.id ? atualizado : item);
-            if (!confirmarInvestimentos(candidatos)) return;
+            if (!await confirmacaoFinanceira.confirmar(confirmarInvestimentos, candidatos, formValorInvestimento.querySelector('button[type="submit"]'))) return;
             aposAtualizarValor(atualizado);
             fecharAtualizacaoValor();
             mostrarToast("Valor informado atualizado. As estimativas foram recalculadas.", "sucesso");
@@ -320,8 +331,9 @@ export function criarOperacoesInvestimentos({ elementos, consultas: disponibilid
         [campoValorManual, campoDataValorManual].forEach((campo) => escutar(campo, "input", () => limparErroCampo(campo)));
         escutar(obterElemento("cancelar-valor-investimento"), "click", fecharAtualizacaoValor);
         escutar(obterElemento("fechar-valor-investimento"), "click", fecharAtualizacaoValor);
-        escutar(formMovimentacao, "submit", (evento) => {
+        escutar(formMovimentacao, "submit", async (evento) => {
             evento.preventDefault();
+            if (confirmacaoFinanceira.estaPendente()) return;
             limparErros(formMovimentacao);
             if (!podeMovimentarInvestimentos()) return;
             const campos = camposMovimentacao;
@@ -368,7 +380,7 @@ export function criarOperacoesInvestimentos({ elementos, consultas: disponibilid
             const candidatos = anterior ? disponibilidadeColecoes.consultarTransacoes().map((item) => item.id === anterior.id ? registro : item)
                 : [...disponibilidadeColecoes.consultarTransacoes(), registro];
             // A persistência valida também a sequência futura completa, antes de qualquer confirmação.
-            if (!confirmarTransacoes(candidatos)) return;
+            if (!await confirmacaoFinanceira.confirmar(confirmarTransacoes, candidatos, obterElemento("salvar-movimentacao"))) return;
             aposSalvarMovimentacao();
             fecharModalMovimentacao();
             mostrarToast(anterior ? "Movimentação atualizada." : "Movimentação registrada.", "sucesso");

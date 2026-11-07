@@ -29,3 +29,26 @@ export function limparErroCampo(campo) {
 export function focarPrimeiroErro(formulario) {
     formulario.querySelector(".invalido").focus();
 }
+
+// Uma confirmação pendente por controlador. Não registra eventos nem acessa o DOM no import.
+export function criarConfirmacaoFinanceira(mostrarToast) {
+    let pendente = false;
+    return {
+        estaPendente: () => pendente,
+        async confirmar(acao, registros, botao) {
+            if (pendente) return false;
+            pendente = true;
+            const desabilitado = botao.disabled;
+            botao.disabled = true;
+            try {
+                return await acao(registros);
+            } catch (erro) {
+                mostrarToast("Ocorreu um erro inesperado ao confirmar a operação. Confira os dados antes de tentar novamente. Os campos preenchidos foram mantidos.", "erro");
+                return false;
+            } finally {
+                pendente = false;
+                botao.disabled = desabilitado;
+            }
+        }
+    };
+}

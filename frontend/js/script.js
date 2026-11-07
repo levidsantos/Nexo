@@ -113,7 +113,7 @@ const modais = criarModais({
         if (areaNotificacoes.parentElement !== document.body) document.body.appendChild(areaNotificacoes);
     },
     aoEscape: (modal) => {
-        if (!modalExclusao.classList.contains("hidden")) fecharModal(modalExclusao);
+        if (!modalExclusao.classList.contains("hidden")) operacoesTransacoes.cancelarExclusao();
         if (modal === modalExclusaoConta) fecharModalExclusaoConta();
         if (modal === document.getElementById("modal-exclusao-investimento")) fecharExclusaoInvestimento();
     }
@@ -354,11 +354,11 @@ function carregarColecao(chave, validarRegistro) {
     }
 }
 
-function persistirColecao(chave, registros) {
+async function persistirColecao(chave, registros) {
     if (chave === "contas" || chave === "transacoes" || chave === "investimentos") {
-        const resultado = chave === "contas" ? disponibilidadeColecoes.confirmarContas(registros)
-            : chave === "transacoes" ? disponibilidadeColecoes.confirmarTransacoes(registros)
-                : disponibilidadeColecoes.confirmarInvestimentos(registros);
+        const resultado = chave === "contas" ? await disponibilidadeColecoes.confirmarContas(registros)
+            : chave === "transacoes" ? await disponibilidadeColecoes.confirmarTransacoes(registros)
+                : await disponibilidadeColecoes.confirmarInvestimentos(registros);
         if (resultado.sucesso) return true;
         if (resultado.motivo === "bloqueada") {
             mostrarToast(`Não é possível salvar ${chave}: os dados estão indisponíveis e a coleção está bloqueada. `

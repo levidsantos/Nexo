@@ -33,7 +33,7 @@ function preparar(carteira = [investimento()], registros = [], inicializar = tru
     return { estado, valores, storage, leituras, gravacoes, carregar };
 }
 
-test('investimentos inicializam uma vez, sem escrita, na ordem das três coleções', () => {
+test('investimentos inicializam uma vez, sem escrita, na ordem das três coleções', async () => {
     const app = preparar(undefined, undefined, false);
     assert.equal(app.estado.investimentosEstaoDisponiveis(), false);
     assert.deepEqual(app.leituras, []);
@@ -46,7 +46,7 @@ test('investimentos inicializam uma vez, sem escrita, na ordem das três coleç�
     assert.equal(app.gravacoes.length, 0);
 });
 
-test('investimentos ausentes e vazios são válidos e não criam dados automaticamente', () => {
+test('investimentos ausentes e vazios são válidos e não criam dados automaticamente', async () => {
     for (const ausente of [false, true]) {
         const app = preparar([], [], false);
         if (ausente) app.valores.delete('investimentos');
@@ -58,7 +58,7 @@ test('investimentos ausentes e vazios são válidos e não criam dados automatic
     }
 });
 
-test('dados inválidos e referências futuras são preservados e bloqueados sem recuperação', () => {
+test('dados inválidos e referências futuras são preservados e bloqueados sem recuperação', async () => {
     for (const conteudo of ['{invalido', 'null', '{}', JSON.stringify([investimento(), investimento()]),
         JSON.stringify([investimento({ capitalInicial: 0.006 })]),
         JSON.stringify([investimento({ dataReferenciaValor: '2026-11-06' })])]) {
@@ -66,7 +66,7 @@ test('dados inválidos e referências futuras são preservados e bloqueados sem 
         app.valores.set('investimentos', conteudo); app.carregar();
         assert.equal(app.estado.investimentosEstaoDisponiveis(), false);
         assert.equal(app.estado.transacoesEstaoDisponiveis(), true);
-        assert.equal(app.estado.confirmarInvestimentos([]).motivo, 'bloqueada');
+        assert.equal((await app.estado.confirmarInvestimentos([])).motivo, 'bloqueada');
         app.valores.set('investimentos', '[]');
         assert.equal(app.estado.inicializarInvestimentos().sucesso, false);
         app.valores.set('investimentos', conteudo);
@@ -75,7 +75,7 @@ test('dados inválidos e referências futuras são preservados e bloqueados sem 
     }
 });
 
-test('falha de leitura bloqueia apenas investimentos sem escrever', () => {
+test('falha de leitura bloqueia apenas investimentos sem escrever', async () => {
     const app = preparar([], [transacao()], false), ler = app.storage.getItem;
     app.storage.getItem = (chave) => {
         if (chave === 'investimentos') throw new Error('Acesso negado');
@@ -87,7 +87,7 @@ test('falha de leitura bloqueia apenas investimentos sem escrever', () => {
     assert.equal(app.gravacoes.length, 0);
 });
 
-test('consultas congeladas isolam dados originais, candidatos e versões anteriores', () => {
+test('consultas congeladas isolam dados originais, candidatos e versões anteriores', async () => {
     const origem = investimento({ extra: { notas: ['original'] } });
     const dados = { contas: [conta()], transacoes: [], investimentos: [origem] };
     const estado = criarEstadoDisponibilidade({ ler: (chave) => ({ sucesso: true, dados: dados[chave] }),
@@ -101,19 +101,19 @@ test('consultas congeladas isolam dados originais, candidatos e versões anterio
     assert.throws(() => antiga[0].extra.notas.push('externo'), TypeError);
     assert.strictEqual(antiga, estado.consultarInvestimentos());
     const candidatas = [{ ...antiga[0], nome: 'Novo', extra: { notas: ['nova'] } }];
-    assert.equal(estado.confirmarInvestimentos(candidatas).sucesso, true);
+    assert.equal((await estado.confirmarInvestimentos(candidatas)).sucesso, true);
     candidatas[0].extra.notas.push('externo');
     assert.deepEqual(estado.consultarInvestimentos()[0].extra.notas, ['nova']);
     assert.equal(antiga[0].nome, 'Investimento de teste');
     assert.notStrictEqual(antiga, estado.consultarInvestimentos());
 });
 
-test('cadastro, edição, atualização manual e exclusão confirmam uma gravação por operação', () => {
+test('cadastro, edição, atualização manual e exclusão confirmam uma gravação por operação', async () => {
     const app = preparar([]);
     for (const carteira of [[investimento({ capitalInicial: 0, valorInformado: 0 })],
         [investimento({ nome: 'Renomeado' })], [investimento({ valorInformado: 80.25 })], []]) {
         const numero = app.gravacoes.length;
-        assert.equal(app.estado.confirmarInvestimentos(carteira).sucesso, true);
+        assert.equal((await app.estado.confirmarInvestimentos(carteira)).sucesso, true);
         assert.equal(app.gravacoes.length, numero + 1);
         assert.deepEqual(app.estado.consultarInvestimentos(), carteira);
         assert.deepEqual(JSON.parse(app.valores.get('investimentos')), carteira);
@@ -121,125 +121,125 @@ test('cadastro, edição, atualização manual e exclusão confirmam uma gravaç
     assert.deepEqual(app.gravacoes.map(([chave]) => chave), Array(4).fill('investimentos'));
 });
 
-test('validação e limites inválidos preservam memória e armazenamento', () => {
+test('validação e limites inválidos preservam memória e armazenamento', async () => {
     const app = preparar(), anterior = app.estado.consultarInvestimentos(), dados = app.valores.get('investimentos');
     for (const carteira of [null, {}, [investimento({ capitalInicial: -1 })],
         [investimento({ valorInformado: 0.006 })], [investimento({ valorInformado: 100000000000000 })],
         [investimento(), investimento()]]) {
-        assert.equal(app.estado.confirmarInvestimentos(carteira).motivo, 'invalida');
+        assert.equal((await app.estado.confirmarInvestimentos(carteira)).motivo, 'invalida');
         assert.strictEqual(app.estado.consultarInvestimentos(), anterior);
         assert.equal(app.valores.get('investimentos'), dados);
     }
     assert.equal(app.gravacoes.length, 0);
 });
 
-test('falha de persistência ou preparação mantém versão anterior e permite nova tentativa', () => {
+test('falha de persistência ou preparação mantém versão anterior e permite nova tentativa', async () => {
     const app = preparar(), anterior = app.estado.consultarInvestimentos(), dados = app.valores.get('investimentos');
     const escrever = app.storage.setItem;
     app.storage.setItem = () => { throw new Error('Quota'); };
-    assert.equal(app.estado.confirmarInvestimentos([investimento({ nome: 'Alterado' })]).motivo, 'gravacao');
+    assert.equal((await app.estado.confirmarInvestimentos([investimento({ nome: 'Alterado' })])).motivo, 'gravacao');
     assert.strictEqual(app.estado.consultarInvestimentos(), anterior);
     assert.equal(app.valores.get('investimentos'), dados);
     app.storage.setItem = escrever;
-    assert.equal(app.estado.confirmarInvestimentos([investimento({ extra: () => {} })]).motivo, 'gravacao');
+    assert.equal((await app.estado.confirmarInvestimentos([investimento({ extra: () => {} })])).motivo, 'gravacao');
     assert.equal(app.gravacoes.length, 0);
-    assert.equal(app.estado.confirmarInvestimentos([investimento({ nome: 'Alterado' })]).sucesso, true);
+    assert.equal((await app.estado.confirmarInvestimentos([investimento({ nome: 'Alterado' })])).sucesso, true);
 });
 
-test('memória só muda depois da confirmação do repositório', () => {
+test('memória só muda depois da confirmação do repositório', async () => {
     const app = preparar(), anterior = app.estado.consultarInvestimentos(), escrever = app.storage.setItem;
     app.storage.setItem = (chave, valor) => {
         assert.strictEqual(app.estado.consultarInvestimentos(), anterior);
         assert.equal(chave, 'investimentos');
         escrever(chave, valor);
     };
-    assert.equal(app.estado.confirmarInvestimentos([investimento({ nome: 'Confirmado' })]).sucesso, true);
+    assert.equal((await app.estado.confirmarInvestimentos([investimento({ nome: 'Confirmado' })])).sucesso, true);
     assert.equal(app.estado.consultarInvestimentos()[0].nome, 'Confirmado');
     assert.equal(app.gravacoes.length, 1);
 });
 
-test('bloqueios e inicialização incompleta impedem confirmação sem trocar a coleção', () => {
+test('bloqueios e inicialização incompleta impedem confirmação sem trocar a coleção', async () => {
     const app = preparar(undefined, undefined, false);
-    assert.equal(app.estado.confirmarInvestimentos([]).motivo, 'nao-inicializada');
+    assert.equal((await app.estado.confirmarInvestimentos([])).motivo, 'nao-inicializada');
     app.estado.inicializarInvestimentos();
-    assert.equal(app.estado.confirmarInvestimentos([]).motivo, 'nao-inicializada');
+    assert.equal((await app.estado.confirmarInvestimentos([])).motivo, 'nao-inicializada');
     app.carregar(); app.estado.bloquearColecao('transacoes');
-    assert.equal(app.estado.confirmarInvestimentos([]).motivo, 'dependencias');
+    assert.equal((await app.estado.confirmarInvestimentos([])).motivo, 'dependencias');
     app.estado.bloquearColecao('investimentos');
-    assert.equal(app.estado.confirmarInvestimentos([]).motivo, 'bloqueada');
+    assert.equal((await app.estado.confirmarInvestimentos([])).motivo, 'bloqueada');
     assert.equal(app.gravacoes.length, 0);
 });
 
-test('instâncias não compartilham investimentos nem versões', () => {
+test('instâncias não compartilham investimentos nem versões', async () => {
     const primeira = preparar(), segunda = preparar();
-    primeira.estado.confirmarInvestimentos([investimento({ nome: 'Primeira' })]);
+    (await primeira.estado.confirmarInvestimentos([investimento({ nome: 'Primeira' })]));
     assert.equal(segunda.estado.consultarInvestimentos()[0].nome, 'Investimento de teste');
     assert.equal(segunda.gravacoes.length, 0);
 });
 
-test('renomear preserva IDs, transações e referências; aportes/resgates só gravam transações', () => {
+test('renomear preserva IDs, transações e referências; aportes/resgates só gravam transações', async () => {
     const app = preparar(), movimentos = [aporte({ valor: 20.25 }), resgate({ valor: 10.50, capitalRetirado: 5.25 })];
-    assert.equal(app.estado.confirmarTransacoes(movimentos).sucesso, true);
+    assert.equal((await app.estado.confirmarTransacoes(movimentos)).sucesso, true);
     const transacoes = app.estado.consultarTransacoes(), salvo = app.valores.get('transacoes');
     assert.deepEqual(app.gravacoes.map(([chave]) => chave), ['transacoes']);
-    assert.equal(app.estado.confirmarInvestimentos([{ ...app.estado.consultarInvestimentos()[0], nome: 'Novo' }]).sucesso, true);
+    assert.equal((await app.estado.confirmarInvestimentos([{ ...app.estado.consultarInvestimentos()[0], nome: 'Novo' }])).sucesso, true);
     assert.strictEqual(app.estado.consultarTransacoes(), transacoes);
     assert.equal(app.valores.get('transacoes'), salvo);
     assert.equal(app.estado.consultarInvestimentos()[0].id, INVESTIMENTO_ID);
     assert.equal(app.estado.consultarInvestimentos()[0].dataReferenciaCapital, '2026-10-31');
     assert.deepEqual(app.gravacoes.map(([chave]) => chave), ['transacoes', 'investimentos']);
-    assert.equal(app.estado.confirmarTransacoes([...transacoes, aporte({ id: 'mais', valor: 1 })]).sucesso, true);
+    assert.equal((await app.estado.confirmarTransacoes([...transacoes, aporte({ id: 'mais', valor: 1 })])).sucesso, true);
     assert.deepEqual(app.gravacoes.map(([chave]) => chave), ['transacoes', 'investimentos', 'transacoes']);
 });
 
-test('excluir ou trocar o ID com movimentos vinculados falha sem alterar memória', () => {
+test('excluir ou trocar o ID com movimentos vinculados falha sem alterar memória', async () => {
     for (const movimento of [aporte(), resgate(), aporte({ data: '2026-10-01' }), resgate({ data: '2026-11-06' })]) {
         const app = preparar(undefined, [movimento]), anterior = app.estado.consultarInvestimentos();
-        assert.equal(app.estado.confirmarInvestimentos([]).motivo, 'integridade');
-        assert.equal(app.estado.confirmarInvestimentos([investimento({ id: '22222222-2222-4222-8222-222222222222' })]).motivo, 'integridade');
+        assert.equal((await app.estado.confirmarInvestimentos([])).motivo, 'integridade');
+        assert.equal((await app.estado.confirmarInvestimentos([investimento({ id: '22222222-2222-4222-8222-222222222222' })])).motivo, 'integridade');
         assert.strictEqual(app.estado.consultarInvestimentos(), anterior);
         assert.equal(app.gravacoes.length, 0);
     }
 });
 
-test('edição de capital valida sequência histórica e fechamentos futuros', () => {
+test('edição de capital valida sequência histórica e fechamentos futuros', async () => {
     for (const data of ['2026-11-01', '2026-11-06']) {
         const app = preparar(undefined, [resgate({ data, capitalRetirado: 80 })]);
-        assert.equal(app.estado.confirmarInvestimentos([investimento({ capitalInicial: 50 })]).motivo, 'integridade');
+        assert.equal((await app.estado.confirmarInvestimentos([investimento({ capitalInicial: 50 })])).motivo, 'integridade');
         assert.equal(app.estado.consultarInvestimentos()[0].capitalInicial, 100);
         assert.equal(app.gravacoes.length, 0);
     }
     const app = preparar([investimento({ capitalInicial: 0 })],
         [aporte({ valor: 50 }), resgate({ data: '2026-11-02', capitalRetirado: 30 })]);
-    assert.equal(app.estado.confirmarInvestimentos([investimento({ capitalInicial: 0, dataReferenciaCapital: '2026-11-01' })]).motivo, 'integridade');
+    assert.equal((await app.estado.confirmarInvestimentos([investimento({ capitalInicial: 0, dataReferenciaCapital: '2026-11-01' })])).motivo, 'integridade');
 });
 
-test('novas movimentações consultam a versão atual dos investimentos, sem referência obsoleta', () => {
+test('novas movimentações consultam a versão atual dos investimentos, sem referência obsoleta', async () => {
     const app = preparar(), antiga = app.estado.consultarInvestimentos();
-    assert.equal(app.estado.confirmarInvestimentos([investimento({ capitalInicial: 0 })]).sucesso, true);
-    assert.equal(app.estado.confirmarTransacoes([resgate()]).motivo, 'integridade');
+    assert.equal((await app.estado.confirmarInvestimentos([investimento({ capitalInicial: 0 })])).sucesso, true);
+    assert.equal((await app.estado.confirmarTransacoes([resgate()])).motivo, 'integridade');
     assert.equal(antiga[0].capitalInicial, 100);
-    assert.equal(app.estado.confirmarInvestimentos([investimento({ capitalInicial: 10 })]).sucesso, true);
-    assert.equal(app.estado.confirmarTransacoes([resgate({ data: '2026-11-06' })]).sucesso, true);
+    assert.equal((await app.estado.confirmarInvestimentos([investimento({ capitalInicial: 10 })])).sucesso, true);
+    assert.equal((await app.estado.confirmarTransacoes([resgate({ data: '2026-11-06' })])).sucesso, true);
     assert.equal(calculos.calcularCapitaisAplicados(app.estado.consultarInvestimentos(), app.estado.consultarTransacoes(), HOJE)
         .capitaisPorInvestimentoCentavos.get(INVESTIMENTO_ID), 1000);
     assert.deepEqual(app.gravacoes.map(([chave]) => chave), ['investimentos', 'investimentos', 'transacoes']);
 });
 
-test('atualização manual e retroativa preserva bases independentes e reaplica movimentos', () => {
+test('atualização manual e retroativa preserva bases independentes e reaplica movimentos', async () => {
     const app = preparar([investimento({ dataReferenciaValor: '2026-11-02' })],
         [aporte({ valor: 20 }), resgate({ data: '2026-11-03', capitalRetirado: 10, valorRetiradoInvestimento: 5 })]);
     const atualizado = { ...app.estado.consultarInvestimentos()[0], valorInformado: 80,
         dataReferenciaValor: '2026-10-31', atualizadoEm: '2026-11-05T12:00:00.000Z' };
-    assert.equal(app.estado.confirmarInvestimentos([atualizado]).sucesso, true);
+    assert.equal((await app.estado.confirmarInvestimentos([atualizado])).sucesso, true);
     assert.equal(calculos.calcularValoresInvestimentos(app.estado.consultarInvestimentos(), app.estado.consultarTransacoes(), HOJE).totalValorCentavos, 9500);
     assert.equal(calculos.calcularCapitaisAplicados(app.estado.consultarInvestimentos(), app.estado.consultarTransacoes(), HOJE)
         .capitaisPorInvestimentoCentavos.get(INVESTIMENTO_ID), 11000);
 });
 
-test('estimativa negativa continua indisponível, sem nova regra de rejeição ou ajuste silencioso', () => {
+test('estimativa negativa continua indisponível, sem nova regra de rejeição ou ajuste silencioso', async () => {
     const app = preparar(undefined, [resgate({ valorRetiradoInvestimento: 20 })]);
-    assert.equal(app.estado.confirmarInvestimentos([investimento({ valorInformado: 10 })]).sucesso, true);
+    assert.equal((await app.estado.confirmarInvestimentos([investimento({ valorInformado: 10 })])).sucesso, true);
     const valores = calculos.calcularValoresInvestimentos(app.estado.consultarInvestimentos(), app.estado.consultarTransacoes(), HOJE);
     assert.equal(valores.disponivel, false);
     assert.equal(valores.totalValorCentavos, null);
@@ -247,7 +247,7 @@ test('estimativa negativa continua indisponível, sem nova regra de rejeição o
 });
 
 for (let mascara = 0; mascara < 8; mascara++) {
-    test(`inicialização com coleções inválidas, combinação ${mascara}, preserva bloqueios específicos`, () => {
+    test(`inicialização com coleções inválidas, combinação ${mascara}, preserva bloqueios específicos`, async () => {
         for (const movimentos of [false, true]) {
             const app = preparar(undefined, movimentos ? [aporte()] : [transacao()], false);
             const chaves = ['contas', 'transacoes', 'investimentos'];
@@ -265,7 +265,7 @@ for (let mascara = 0; mascara < 8; mascara++) {
 
 const fonte = readFileSync(resolve(__dirname, '../../frontend/js/script.js'), 'utf8');
 function declaracao(nome) {
-    const encontrados = [...fonte.matchAll(new RegExp(`^function ${nome}\\([^]*?^\\}`, 'gm'))];
+    const encontrados = [...fonte.matchAll(new RegExp(`^(?:async )?function ${nome}\\([^]*?^\\}`, 'gm'))];
     assert.equal(encontrados.length, 1, nome);
     return encontrados[0][0];
 }
@@ -281,7 +281,7 @@ function adaptadores(app, adicionais = {}) {
     return { ui, contexto, mensagens };
 }
 
-test('adaptadores reais preservam mensagens e proteção de exclusão histórica/futura', () => {
+test('adaptadores reais preservam mensagens e proteção de exclusão histórica/futura', async () => {
     for (const movimento of [null, aporte(), resgate({ data: '2026-11-06' })]) {
         const app = preparar(undefined, movimento ? [movimento] : []), { ui, mensagens } = adaptadores(app);
         assert.equal(ui.podeExcluirInvestimento(INVESTIMENTO_ID), !movimento);
@@ -292,12 +292,12 @@ test('adaptadores reais preservam mensagens e proteção de exclusão histórica
     }
     const app = preparar(), { ui, mensagens } = adaptadores(app), antes = app.estado.consultarInvestimentos();
     app.storage.setItem = () => { throw new Error('Quota'); };
-    assert.equal(ui.persistirColecao('investimentos', [investimento({ nome: 'Outro' })]), false);
+    assert.equal((await ui.persistirColecao('investimentos', [investimento({ nome: 'Outro' })])), false);
     assert.strictEqual(app.estado.consultarInvestimentos(), antes);
     assert.match(mensagens.at(-1)[0], /campos preenchidos foram mantidos/);
 });
 
-test('handlers reais exigem confirmação retroativa na edição e atualização manual', () => {
+test('handlers reais exigem confirmação retroativa na edição e atualização manual', async () => {
     const { prepararOperacoes } = require('./support/operacoes-investimentos.cjs');
     for (const manual of [false, true]) {
         const app = preparar([investimento({ dataReferenciaValor: '2026-11-02' })]);
@@ -307,17 +307,17 @@ test('handlers reais exigem confirmação retroativa na edição e atualização
             : { 'valor-investimento': '80', 'referencia-valor-investimento': '2026-10-31' });
         const form = manual ? 'form-valor-investimento' : 'form-investimento';
         const erro = manual ? 'data-valor-manual' : 'referencia-valor-investimento';
-        a.enviar(form);
+        await a.enviar(form);
         assert.match(a.erros.get('erro-' + erro).textContent, /Confirme abaixo/);
         assert.equal(app.gravacoes.length, 0);
         a.elementos[manual ? 'confirmar-retroativo-manual' : 'confirmar-retroativo-investimento'].checked = true;
         a.efeitos.length = 0;
         app.storage.setItem = () => { throw new Error('Quota'); };
-        a.enviar(form);
+        await a.enviar(form);
         assert.equal(a.efeitos.some(([tipo]) => ['salvar', 'manual', 'fechar'].includes(tipo)), false);
         assert.equal(app.estado.consultarInvestimentos()[0].dataReferenciaValor, '2026-11-02');
         app.storage.setItem = (chave, valor) => { app.gravacoes.push([chave, valor]); app.valores.set(chave, valor); };
-        a.enviar(form);
+        await a.enviar(form);
         assert.deepEqual(a.efeitos.filter(([tipo]) => ['salvar','manual','fechar'].includes(tipo)).map(([tipo]) => tipo), [manual ? 'manual' : 'salvar', 'fechar']);
         assert.equal(app.gravacoes.length, 1);
         assert.equal(app.estado.consultarInvestimentos()[0].id, INVESTIMENTO_ID);

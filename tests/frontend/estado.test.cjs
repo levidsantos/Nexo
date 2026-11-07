@@ -13,7 +13,7 @@ const { conta, transacao, investimento, aporte } = require('./support/fixtures.c
 
 beforeEach((t) => t.mock.timers.enable({ apis: ['Date'], now: new Date(2026, 10, 5, 12) }));
 
-test('disponibilidade começa sem bloqueios e não expõe o Set ou desbloqueio', () => {
+test('disponibilidade começa sem bloqueios e não expõe o Set ou desbloqueio', async () => {
     const estado = criarEstadoDisponibilidade();
     assert.deepEqual(Object.keys(estado).sort(), ['bloquearColecao', 'colecaoEstaBloqueada', 'confirmarContas', 'consultarContas', 'contasEstaoDisponiveis', 'inicializarContas', 'inicializarTransacoes', 'consultarTransacoes', 'transacoesEstaoDisponiveis', 'verificarTransacoesCarregadas', 'prepararCompatibilidadeTransacoes', 'validarTransacaoParaGravacao', 'confirmarTransacoes', 'consultarInvestimentos', 'investimentosEstaoDisponiveis', 'inicializarInvestimentos', 'confirmarInvestimentos'].sort());
     for (const chave of ['contas', 'transacoes', 'investimentos']) {
@@ -21,7 +21,7 @@ test('disponibilidade começa sem bloqueios e não expõe o Set ou desbloqueio',
     }
 });
 
-test('bloqueio é consultável, independente entre coleções e idempotente', () => {
+test('bloqueio é consultável, independente entre coleções e idempotente', async () => {
     for (const chave of ['contas', 'transacoes', 'investimentos']) {
         const estado = criarEstadoDisponibilidade();
         estado.bloquearColecao(chave);
@@ -32,7 +32,7 @@ test('bloqueio é consultável, independente entre coleções e idempotente', ()
     }
 });
 
-test('instâncias não compartilham bloqueios', () => {
+test('instâncias não compartilham bloqueios', async () => {
     const primeira = criarEstadoDisponibilidade();
     const segunda = criarEstadoDisponibilidade();
     primeira.bloquearColecao('contas');
@@ -42,7 +42,7 @@ test('instâncias não compartilham bloqueios', () => {
     assert.equal(criarEstadoDisponibilidade().colecaoEstaBloqueada('contas'), false);
 });
 
-test('importação funciona sem DOM ou storage e não inicializa dados', () => {
+test('importação funciona sem DOM ou storage e não inicializa dados', async () => {
     const url = pathToFileURL(resolve(__dirname, '../../frontend/js/dados/estado.js')).href;
     execFileSync(process.execPath, ['--input-type=module', '-e', `
         for (const nome of ['localStorage', 'document', 'window']) {
@@ -63,7 +63,7 @@ const nomes = [
     'persistirColecao', 'obterRestricaoMovimentacaoInvestimentos'
 ];
 const declaracoes = nomes.map((nome) => {
-    const correspondencias = [...fonte.matchAll(new RegExp(`^function ${nome}\\([^]*?^\\}`, 'gm'))];
+    const correspondencias = [...fonte.matchAll(new RegExp(`^(?:async )?function ${nome}\\([^]*?^\\}`, 'gm'))];
     assert.equal(correspondencias.length, 1, nome);
     return correspondencias[0][0];
 }).join('\n\n');
@@ -97,7 +97,7 @@ function aplicacao(bloqueios = [], registros = [transacao()], carteira = [invest
 for (let mascara = 0; mascara < 8; mascara++) {
     const chaves = ['contas', 'transacoes', 'investimentos'];
     const bloqueios = chaves.filter((_, indice) => mascara & (1 << indice));
-    test(`condições existentes com bloqueios: ${bloqueios.join(', ') || 'nenhum'}`, () => {
+    test(`condições existentes com bloqueios: ${bloqueios.join(', ') || 'nenhum'}`, async () => {
         const app = aplicacao(bloqueios);
         const contasBloqueadas = bloqueios.includes('contas');
         const transacoesBloqueadas = bloqueios.includes('transacoes');
@@ -108,28 +108,28 @@ for (let mascara = 0; mascara < 8; mascara++) {
         assert.equal(app.obterDistribuicaoDespesas().disponivel, dadosBancariosDisponiveis);
         assert.equal(app.obterCapitaisAplicados().disponivel, bloqueios.length === 0);
         assert.equal(app.obterRestricaoMovimentacaoInvestimentos() === null, bloqueios.length === 0);
-        assert.equal(app.persistirColecao('transacoes', [transacao()]), dadosBancariosDisponiveis);
+        assert.equal((await app.persistirColecao('transacoes', [transacao()])), dadosBancariosDisponiveis);
         assert.equal(app.gravacoes.length, dadosBancariosDisponiveis ? 1 : 0);
     });
 }
 
-test('investimentos indisponíveis sem movimentações não bloqueiam receitas/despesas carregadas', () => {
+test('investimentos indisponíveis sem movimentações não bloqueiam receitas/despesas carregadas', async () => {
     const app = aplicacao(['investimentos'], [transacao()], []);
     app.verificarVinculosCarregados();
     assert.equal(app.disponibilidadeColecoes.colecaoEstaBloqueada('transacoes'), false);
     assert.equal(app.disponibilidadeColecoes.consultarTransacoes().length, 1);
-    assert.equal(app.persistirColecao('transacoes', [transacao()]), true);
+    assert.equal((await app.persistirColecao('transacoes', [transacao()])), true);
 });
 
-test('movimentação com investimento indisponível impede gravação sem criar bloqueio global', () => {
+test('movimentação com investimento indisponível impede gravação sem criar bloqueio global', async () => {
     const app = aplicacao(['investimentos']);
-    assert.equal(app.persistirColecao('transacoes', [aporte()]), false);
+    assert.equal((await app.persistirColecao('transacoes', [aporte()])), false);
     assert.equal(app.gravacoes.length, 0);
     assert.equal(app.disponibilidadeColecoes.colecaoEstaBloqueada('contas'), false);
     assert.equal(app.disponibilidadeColecoes.colecaoEstaBloqueada('transacoes'), false);
 });
 
-test('contas bloqueadas ou vínculos inválidos bloqueiam transações e mantêm fallback vazio', () => {
+test('contas bloqueadas ou vínculos inválidos bloqueiam transações e mantêm fallback vazio', async () => {
     for (const app of [aplicacao(['contas']), aplicacao([], [transacao({ contaId: 'inexistente' })])]) {
         app.verificarVinculosCarregados();
         assert.equal(app.disponibilidadeColecoes.colecaoEstaBloqueada('transacoes'), true);
@@ -139,7 +139,7 @@ test('contas bloqueadas ou vínculos inválidos bloqueiam transações e mantêm
     }
 });
 
-test('investimento ausente invalida vínculos de aportes; falha anterior de transações é preservada', () => {
+test('investimento ausente invalida vínculos de aportes; falha anterior de transações é preservada', async () => {
     const app = aplicacao(['investimentos'], [aporte()], []);
     app.verificarVinculosCarregados();
     assert.equal(app.disponibilidadeColecoes.colecaoEstaBloqueada('transacoes'), true);

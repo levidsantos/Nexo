@@ -1,6 +1,6 @@
 import { dataValida } from "../dominio/valores-datas.js";
 import { valorMonetarioValido, classificacaoDespesaValida, ehMovimentacaoInvestimento } from "../dominio/validacoes.js";
-import { mostrarErro, limparErros, limparErroCampo, focarPrimeiroErro } from "../ui/formularios.js";
+import { mostrarErro, limparErros, limparErroCampo, focarPrimeiroErro, criarConfirmacaoFinanceira } from "../ui/formularios.js";
 
 // Formulário e confirmação usam os controladores compartilhados; o coordenador atualiza as páginas.
 export function criarOperacoesTransacoes({ elementos, consultas: disponibilidadeColecoes,
@@ -19,6 +19,7 @@ export function criarOperacoesTransacoes({ elementos, consultas: disponibilidade
     let transacaoEmEdicao = null;
     let inicializado = false;
     const removerListeners = [];
+    const confirmacaoFinanceira = criarConfirmacaoFinanceira(mostrarToast);
     const escutar = (alvo, tipo, callback) => {
         alvo.addEventListener(tipo, callback);
         removerListeners.push(() => alvo.removeEventListener(tipo, callback));
@@ -36,6 +37,7 @@ export function criarOperacoesTransacoes({ elementos, consultas: disponibilidade
     }
 
     function fecharModalTransacao() {
+        if (confirmacaoFinanceira.estaPendente()) return;
         fecharModal(modalOverlay, () => {
             formTransacao.reset();
             limparErros(formTransacao);
@@ -72,6 +74,7 @@ export function criarOperacoesTransacoes({ elementos, consultas: disponibilidade
     }
 
     function solicitarExclusaoTransacoesSelecionadas() {
+        if (confirmacaoFinanceira.estaPendente()) return;
         const quantidade = consultarSelecao().length;
 
         if (quantidade === 0) return;
@@ -83,6 +86,7 @@ export function criarOperacoesTransacoes({ elementos, consultas: disponibilidade
     }
 
     function abrirReceita() {
+        if (confirmacaoFinanceira.estaPendente()) return;
         if (!prepararContasTransacao()) return;
         formTransacao.reset();
         limparErros(formTransacao);
@@ -98,6 +102,7 @@ export function criarOperacoesTransacoes({ elementos, consultas: disponibilidade
     }
 
     function abrirDespesa() {
+        if (confirmacaoFinanceira.estaPendente()) return;
         if (!prepararContasTransacao()) return;
         formTransacao.reset();
         limparErros(formTransacao);
@@ -113,6 +118,7 @@ export function criarOperacoesTransacoes({ elementos, consultas: disponibilidade
     }
 
     function editarTransacao(id) {
+        if (confirmacaoFinanceira.estaPendente()) return;
         const transacao = disponibilidadeColecoes.consultarTransacoes().find((transacao) => {
             return transacao.id === id;
         });
@@ -145,13 +151,13 @@ export function criarOperacoesTransacoes({ elementos, consultas: disponibilidade
         abrirModal(modalOverlay, campoNome);
     }
 
-    function confirmarExclusao() {
+    async function confirmarExclusao() {
         const quantidade = consultarSelecao().length;
         const transacoesRestantes = disponibilidadeColecoes.consultarTransacoes().filter((transacao) => {
             return !consultarSelecao().includes(transacao.id);
         });
 
-        if (!confirmarTransacoes(transacoesRestantes)) return;
+        if (!await confirmacaoFinanceira.confirmar(confirmarTransacoes, transacoesRestantes, botaoConfirmarExclusao)) return;
 
         aposPersistir();
 
@@ -160,8 +166,9 @@ export function criarOperacoesTransacoes({ elementos, consultas: disponibilidade
         mostrarToast(quantidade === 1 ? "Transação excluída." : `${quantidade} transações excluídas.`, "sucesso");
     }
 
-    function enviarTransacao(enviar) {
+    async function enviarTransacao(enviar) {
         enviar.preventDefault();
+        if (confirmacaoFinanceira.estaPendente()) return;
         if (!["receita", "despesa"].includes(tipoTransacao)
             || disponibilidadeColecoes.consultarTransacoes().some((item) => item.id === transacaoEmEdicao && ehMovimentacaoInvestimento(item))) {
             mostrarToast("Este formulário permite somente receitas e despesas nesta etapa.", "informacao");
@@ -245,7 +252,7 @@ export function criarOperacoesTransacoes({ elementos, consultas: disponibilidade
             proximasTransacoes = [...disponibilidadeColecoes.consultarTransacoes(), transacao];
         }
 
-        if (!confirmarTransacoes(proximasTransacoes)) return;
+        if (!await confirmacaoFinanceira.confirmar(confirmarTransacoes, proximasTransacoes, botaoSalvarTransacao)) return;
         aposPersistir();
 
         const estavaEditando = transacaoEmEdicao !== null;
@@ -253,7 +260,10 @@ export function criarOperacoesTransacoes({ elementos, consultas: disponibilidade
         mostrarToast(estavaEditando ? "Transação atualizada." : "Transação criada.", "sucesso");
     }
 
-    function cancelarExclusao() { fecharModal(modalExclusao); }
+    function cancelarExclusao() {
+        if (confirmacaoFinanceira.estaPendente()) return;
+        fecharModal(modalExclusao);
+    }
 
     function inicializar() {
         if (inicializado) return;
@@ -282,7 +292,7 @@ export function criarOperacoesTransacoes({ elementos, consultas: disponibilidade
         escutar(botaoConfirmarExclusao, "click", confirmarExclusao);
         // fechar o modal de exclusao ao clicar fora dele ou botao esc
         escutar(modalExclusao, "click", (event) => {
-            if (event.target === modalExclusao) {
+            if (event.target === modalExclusao && !confirmacaoFinanceira.estaPendente()) {
                 fecharModal(modalExclusao);
             }
         });

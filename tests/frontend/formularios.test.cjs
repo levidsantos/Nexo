@@ -44,7 +44,7 @@ function criarFormulario(ids) {
 }
 
 test('API preserva nomes e quantidade de parâmetros dos quatro helpers', () => {
-    assert.deepEqual(Object.keys(helpers).sort(), ['mostrarErro', 'limparErros', 'limparErroCampo', 'focarPrimeiroErro'].sort());
+    assert.deepEqual(Object.keys(helpers).sort(), ['mostrarErro', 'limparErros', 'limparErroCampo', 'focarPrimeiroErro', 'criarConfirmacaoFinanceira'].sort());
     for (const [nome, quantidade] of [['mostrarErro', 2], ['limparErros', 1], ['limparErroCampo', 1], ['focarPrimeiroErro', 1]]) {
         assert.equal(helpers[nome].name, nome);
         assert.equal(helpers[nome].length, quantidade);
@@ -172,6 +172,27 @@ test('importação não acessa DOM, armazenamento, listeners ou temporizadores',
             Object.defineProperty(globalThis, nome, { get() { throw new Error('Acesso durante import: ' + nome); } });
         }
         const modulo = await import(${JSON.stringify(url)});
-        if (Object.keys(modulo).length !== 4) throw new Error('API inesperada');
+        if (Object.keys(modulo).length !== 5) throw new Error('API inesperada');
     `], { stdio: 'pipe' });
 });
+
+for (const resultado of [true, false, 'rejeicao']) {
+    test(`confirmação financeira controlada: ${resultado}, sem duplo envio e com liberação`, async () => {
+        let resolver, rejeitar, chamadas = 0;
+        const espera = new Promise((resolve, reject) => { resolver = resolve; rejeitar = reject; });
+        const mensagens = [], botao = { disabled: false };
+        const confirmacao = helpers.criarConfirmacaoFinanceira((...args) => mensagens.push(args));
+        const acao = () => { chamadas++; return espera; };
+        const primeira = confirmacao.confirmar(acao, [], botao);
+        assert.equal(confirmacao.estaPendente(), true);
+        assert.equal(botao.disabled, true);
+        assert.equal(await confirmacao.confirmar(acao, [], botao), false);
+        assert.equal(chamadas, 1);
+        if (resultado === 'rejeicao') rejeitar(new Error('Falha assíncrona')); else resolver(resultado);
+        assert.equal(await primeira, resultado === true);
+        assert.equal(confirmacao.estaPendente(), false);
+        assert.equal(botao.disabled, false);
+        assert.equal(mensagens.length, resultado === 'rejeicao' ? 1 : 0);
+        assert.equal(await confirmacao.confirmar(async () => true, [], botao), true);
+    });
+}

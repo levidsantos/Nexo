@@ -39,7 +39,7 @@ function preparar(registros = [], carteira = [], inicializar = true) {
     return { estado, storage, valores, leituras, gravacoes, carteira, carregar };
 }
 
-test('transações inicializam na ordem existente, sem escrita e com versões estáveis', () => {
+test('transações inicializam na ordem existente, sem escrita e com versões estáveis', async () => {
     const app = preparar([transacao()], [], false);
     assert.equal(app.leituras.length, 0);
     assert.equal(app.estado.transacoesEstaoDisponiveis(), false);
@@ -52,7 +52,7 @@ test('transações inicializam na ordem existente, sem escrita e com versões es
     assert.equal(Object.hasOwn(app.estado, 'despesasLegadasSemClassificacao'), false);
 });
 
-test('transações ausentes e vazias permanecem disponíveis sem criar chave', () => {
+test('transações ausentes e vazias permanecem disponíveis sem criar chave', async () => {
     for (const ausente of [false, true]) {
         const app = preparar([], [], false);
         if (ausente) app.valores.delete('transacoes');
@@ -64,14 +64,14 @@ test('transações ausentes e vazias permanecem disponíveis sem criar chave', (
     }
 });
 
-test('leitura inválida ou negada bloqueia transações sem alterar o armazenamento', () => {
+test('leitura inválida ou negada bloqueia transações sem alterar o armazenamento', async () => {
     for (const conteudo of ['{invalido', 'null', '{}', JSON.stringify([transacao(), transacao()]),
         JSON.stringify([transacao({ valor: 0.006 })])]) {
         const app = preparar([], [], false);
         app.valores.set('transacoes', conteudo);
         app.carregar();
         assert.equal(app.estado.transacoesEstaoDisponiveis(), false);
-        assert.equal(app.estado.confirmarTransacoes([]).motivo, 'bloqueada');
+        assert.equal((await app.estado.confirmarTransacoes([])).motivo, 'bloqueada');
         assert.equal(app.valores.get('transacoes'), conteudo);
         assert.equal(app.gravacoes.length, 0);
     }
@@ -81,7 +81,7 @@ test('leitura inválida ou negada bloqueia transações sem alterar o armazename
     assert.equal(app.estado.transacoesEstaoDisponiveis(), false);
 });
 
-test('integridade inicial inválida usa fallback vazio sem gravar nem reconhecer legados', () => {
+test('integridade inicial inválida usa fallback vazio sem gravar nem reconhecer legados', async () => {
     const antigo = transacao({ tipo: 'despesa', classificacao: '', contaId: 'inexistente' });
     const app = preparar([antigo]);
     assert.deepEqual(app.estado.consultarTransacoes(), []);
@@ -91,21 +91,21 @@ test('integridade inicial inválida usa fallback vazio sem gravar nem reconhecer
     assert.equal(app.gravacoes.length, 0);
 });
 
-test('consultas e candidatos antigos não permitem mutação externa do estado', () => {
+test('consultas e candidatos antigos não permitem mutação externa do estado', async () => {
     const app = preparar([transacao({ extra: { notas: ['original'] } })]);
     const antiga = app.estado.consultarTransacoes();
     assert.throws(() => antiga.push(transacao()), TypeError);
     assert.throws(() => { antiga[0].valor = 999; }, TypeError);
     assert.throws(() => antiga[0].extra.notas.push('fora'), TypeError);
     const candidatas = [{ ...antiga[0], extra: { notas: ['nova'] }, valor: 12.34 }];
-    assert.equal(app.estado.confirmarTransacoes(candidatas).sucesso, true);
+    assert.equal((await app.estado.confirmarTransacoes(candidatas)).sucesso, true);
     candidatas[0].extra.notas.push('fora');
     assert.equal(antiga[0].valor, 10);
     assert.equal(app.estado.consultarTransacoes()[0].valor, 12.34);
     assert.deepEqual(app.estado.consultarTransacoes()[0].extra.notas, ['nova']);
 });
 
-test('confirmação de receita e despesa grava uma vez antes de atualizar memória', () => {
+test('confirmação de receita e despesa grava uma vez antes de atualizar memória', async () => {
     const app = preparar();
     const anterior = app.estado.consultarTransacoes();
     const candidatas = [transacao({ valor: 12.34 }),
@@ -115,116 +115,116 @@ test('confirmação de receita e despesa grava uma vez antes de atualizar memór
         assert.strictEqual(app.estado.consultarTransacoes(), anterior);
         escrever(chave, valor);
     };
-    assert.equal(app.estado.confirmarTransacoes(candidatas).sucesso, true);
+    assert.equal((await app.estado.confirmarTransacoes(candidatas)).sucesso, true);
     assert.deepEqual(app.estado.consultarTransacoes(), candidatas);
     assert.deepEqual(app.gravacoes.map(([chave]) => chave), ['transacoes']);
     assert.deepEqual(calculos.calcularTotaisResumo(app.estado.consultarTransacoes()),
         { receitasCentavos: 1234, despesasCentavos: 1 });
 });
 
-test('validação rejeita candidatos e preserva a coleção sem gravar', () => {
+test('validação rejeita candidatos e preserva a coleção sem gravar', async () => {
     const app = preparar([transacao()]);
     const anterior = app.estado.consultarTransacoes();
     for (const candidata of [null, {}, [{}], [transacao(), transacao()], [transacao({ valor: 0.006 })],
         [transacao({ tipo: 'despesa', classificacao: '' })]]) {
-        assert.equal(app.estado.confirmarTransacoes(candidata).motivo, 'invalida');
+        assert.equal((await app.estado.confirmarTransacoes(candidata)).motivo, 'invalida');
         assert.strictEqual(app.estado.consultarTransacoes(), anterior);
     }
     assert.equal(app.gravacoes.length, 0);
 });
 
-test('gravação ou serialização com falha preserva dados, memória e metadados legados', () => {
+test('gravação ou serialização com falha preserva dados, memória e metadados legados', async () => {
     const antigo = transacao({ tipo: 'despesa', classificacao: '' });
     const app = preparar([antigo]);
     const anterior = app.estado.consultarTransacoes();
     const conteudo = app.valores.get('transacoes');
     app.storage.setItem = () => { throw new Error('Quota excedida'); };
     const corrigida = [{ ...antigo, classificacao: 'Essencial' }];
-    assert.equal(app.estado.confirmarTransacoes(corrigida).motivo, 'gravacao');
+    assert.equal((await app.estado.confirmarTransacoes(corrigida)).motivo, 'gravacao');
     assert.strictEqual(app.estado.consultarTransacoes(), anterior);
     assert.equal(app.estado.validarTransacaoParaGravacao(antigo), true);
     assert.equal(app.valores.get('transacoes'), conteudo);
     const outra = preparar([antigo]);
     const extra = {}; extra.circular = extra;
-    assert.equal(outra.estado.confirmarTransacoes([antigo, transacao({ id: 'nova', extra })]).motivo, 'gravacao');
+    assert.equal((await outra.estado.confirmarTransacoes([antigo, transacao({ id: 'nova', extra })])).motivo, 'gravacao');
     assert.equal(outra.gravacoes.length, 0);
     assert.equal(outra.estado.validarTransacaoParaGravacao(antigo), true);
 });
 
-test('bloqueios e instâncias são independentes, sem desbloqueio ou releitura automáticos', () => {
+test('bloqueios e instâncias são independentes, sem desbloqueio ou releitura automáticos', async () => {
     const primeira = preparar(), segunda = preparar();
     primeira.estado.bloquearColecao('transacoes');
-    assert.equal(primeira.estado.confirmarTransacoes([transacao()]).motivo, 'bloqueada');
-    assert.equal(segunda.estado.confirmarTransacoes([transacao()]).sucesso, true);
+    assert.equal((await primeira.estado.confirmarTransacoes([transacao()])).motivo, 'bloqueada');
+    assert.equal((await segunda.estado.confirmarTransacoes([transacao()])).sucesso, true);
     primeira.estado.inicializarTransacoes();
     assert.equal(primeira.estado.transacoesEstaoDisponiveis(), false);
     assert.equal(primeira.leituras.filter((chave) => chave === 'transacoes').length, 1);
     assert.equal(primeira.gravacoes.length, 0);
 });
 
-test('confirmação exige inicialização e preparação da compatibilidade sem antecipar fases', () => {
+test('confirmação exige inicialização e preparação da compatibilidade sem antecipar fases', async () => {
     const app = preparar([], [], false);
-    assert.equal(app.estado.confirmarTransacoes([]).motivo, 'nao-inicializada');
+    assert.equal((await app.estado.confirmarTransacoes([])).motivo, 'nao-inicializada');
     assert.equal(app.estado.verificarTransacoesCarregadas().disponivel, false);
     assert.equal(app.estado.colecaoEstaBloqueada('transacoes'), false);
     assert.equal(app.estado.prepararCompatibilidadeTransacoes().sucesso, false);
     app.estado.inicializarTransacoes(); app.estado.inicializarContas(); app.estado.inicializarInvestimentos();
     assert.equal(app.estado.prepararCompatibilidadeTransacoes().sucesso, false);
-    assert.equal(app.estado.confirmarTransacoes([]).motivo, 'nao-inicializada');
+    assert.equal((await app.estado.confirmarTransacoes([])).motivo, 'nao-inicializada');
     app.estado.verificarTransacoesCarregadas();
     app.estado.prepararCompatibilidadeTransacoes();
-    assert.equal(app.estado.confirmarTransacoes([]).sucesso, true);
+    assert.equal((await app.estado.confirmarTransacoes([])).sucesso, true);
 });
 
-test('somente despesas legadas integralmente inalteradas conservam a exceção', () => {
+test('somente despesas legadas integralmente inalteradas conservam a exceção', async () => {
     for (const classificacao of [undefined, '', 'Desconhecida']) {
         const antigo = transacao({ tipo: 'despesa', classificacao, extra: { nota: 'preservar' } });
         const app = preparar([antigo]);
-        assert.equal(app.estado.confirmarTransacoes([antigo, transacao({ id: 'receita' })]).sucesso, true);
-        assert.equal(app.estado.confirmarTransacoes([{ ...antigo, nome: 'Alterado' }]).motivo, 'invalida');
-        assert.equal(app.estado.confirmarTransacoes([{ ...antigo, valor: 11 }]).motivo, 'invalida');
-        assert.equal(app.estado.confirmarTransacoes([{ ...antigo, id: 'outro' }]).motivo, 'invalida');
+        assert.equal((await app.estado.confirmarTransacoes([antigo, transacao({ id: 'receita' })])).sucesso, true);
+        assert.equal((await app.estado.confirmarTransacoes([{ ...antigo, nome: 'Alterado' }])).motivo, 'invalida');
+        assert.equal((await app.estado.confirmarTransacoes([{ ...antigo, valor: 11 }])).motivo, 'invalida');
+        assert.equal((await app.estado.confirmarTransacoes([{ ...antigo, id: 'outro' }])).motivo, 'invalida');
         const reordenado = { nome: antigo.nome, ...antigo };
         assert.notEqual(JSON.stringify(reordenado), JSON.stringify(antigo));
         assert.equal(app.estado.validarTransacaoParaGravacao(reordenado), false);
     }
 });
 
-test('corrigir legado ou excluí-lo remove exceção somente após sucesso, sem recriá-la', () => {
+test('corrigir legado ou excluí-lo remove exceção somente após sucesso, sem recriá-la', async () => {
     const antigo = transacao({ tipo: 'despesa', classificacao: '' });
     for (const candidatas of [[{ ...antigo, classificacao: 'Essencial' }], []]) {
         const app = preparar([antigo]);
-        assert.equal(app.estado.confirmarTransacoes(candidatas).sucesso, true);
+        assert.equal((await app.estado.confirmarTransacoes(candidatas)).sucesso, true);
         assert.equal(app.estado.validarTransacaoParaGravacao(antigo), false);
         app.estado.prepararCompatibilidadeTransacoes();
         assert.equal(app.estado.validarTransacaoParaGravacao(antigo), false);
-        assert.equal(app.estado.confirmarTransacoes([antigo]).motivo, 'invalida');
+        assert.equal((await app.estado.confirmarTransacoes([antigo])).motivo, 'invalida');
     }
 });
 
-test('investimentos bloqueados não impedem receitas/despesas independentes', () => {
+test('investimentos bloqueados não impedem receitas/despesas independentes', async () => {
     const app = preparar(); app.estado.bloquearColecao('investimentos');
-    assert.equal(app.estado.confirmarTransacoes([transacao()]).sucesso, true);
-    assert.equal(app.estado.confirmarTransacoes([aporte()]).motivo, 'dependencias');
+    assert.equal((await app.estado.confirmarTransacoes([transacao()])).sucesso, true);
+    assert.equal((await app.estado.confirmarTransacoes([aporte()])).motivo, 'dependencias');
     assert.equal(app.estado.colecaoEstaBloqueada('transacoes'), false);
     assert.equal(app.gravacoes.length, 1);
 });
 
-test('contas bloqueadas, vínculos inexistentes e investimentos inválidos recusam confirmação', () => {
+test('contas bloqueadas, vínculos inexistentes e investimentos inválidos recusam confirmação', async () => {
     const app = preparar();
-    assert.equal(app.estado.confirmarTransacoes([transacao({ contaId: 'ausente' })]).motivo, 'integridade');
-    assert.equal(app.estado.confirmarTransacoes([aporte()]).motivo, 'integridade');
+    assert.equal((await app.estado.confirmarTransacoes([transacao({ contaId: 'ausente' })])).motivo, 'integridade');
+    assert.equal((await app.estado.confirmarTransacoes([aporte()])).motivo, 'integridade');
     app.estado.bloquearColecao('contas');
-    assert.equal(app.estado.confirmarTransacoes([transacao()]).motivo, 'dependencias');
+    assert.equal((await app.estado.confirmarTransacoes([transacao()])).motivo, 'dependencias');
     assert.equal(app.gravacoes.length, 0);
 });
 
-test('aporte/resgate preservam três valores distintos, IDs e uma única escrita em transações', () => {
+test('aporte/resgate preservam três valores distintos, IDs e uma única escrita em transações', async () => {
     const carteira = [investimento()];
     const app = preparar([], carteira);
     const movimentos = [aporte({ valor: 20.15 }), resgate({ valor: 30.10, capitalRetirado: 5.05,
         valorRetiradoInvestimento: 40.20 })];
-    assert.equal(app.estado.confirmarTransacoes(movimentos).sucesso, true);
+    assert.equal((await app.estado.confirmarTransacoes(movimentos)).sucesso, true);
     assert.deepEqual(app.estado.consultarTransacoes(), movimentos);
     assert.deepEqual(app.gravacoes.map(([chave]) => chave), ['transacoes']);
     assert.equal(calculos.calcularSaldos(app.estado.consultarContas(), app.estado.consultarTransacoes(), HOJE, carteira)
@@ -235,38 +235,38 @@ test('aporte/resgate preservam três valores distintos, IDs e uma única escrita
         .totalValorCentavos, 9995);
 });
 
-test('edição de vínculo, valor e data recalcula usando as coleções completas', () => {
+test('edição de vínculo, valor e data recalcula usando as coleções completas', async () => {
     const app = preparar([transacao()]);
-    app.estado.confirmarContas([conta(), conta({ id: 'conta-b', saldoInicial: 0 })]);
+    (await app.estado.confirmarContas([conta(), conta({ id: 'conta-b', saldoInicial: 0 })]));
     const editada = [{ ...app.estado.consultarTransacoes()[0], contaId: 'conta-b', valor: 0.25, data: '2026-11-04' }];
-    assert.equal(app.estado.confirmarTransacoes(editada).sucesso, true);
+    assert.equal((await app.estado.confirmarTransacoes(editada)).sucesso, true);
     const saldos = calculos.calcularSaldos(app.estado.consultarContas(), app.estado.consultarTransacoes(), HOJE);
     assert.equal(saldos.saldosPorContaCentavos.get('conta-b'), 25);
     assert.equal(saldos.saldosPorContaCentavos.get('conta-a'), 10000);
     assert.equal(app.estado.consultarTransacoes()[0].id, transacao().id);
 });
 
-test('sequência histórica valida fechamento diário e rejeita mudanças que invalidem resgate futuro', () => {
+test('sequência histórica valida fechamento diário e rejeita mudanças que invalidem resgate futuro', async () => {
     const carteira = [investimento({ capitalInicial: 0 })];
     const a = aporte({ valor: 20, data: '2026-11-02' });
     const r = resgate({ capitalRetirado: 20, data: '2026-12-01' });
     const app = preparar([r, a], carteira);
     const anterior = app.estado.consultarTransacoes();
     for (const candidatas of [[r], [r, { ...a, valor: 10 }], [r, { ...a, data: '2026-12-02' }]]) {
-        assert.equal(app.estado.confirmarTransacoes(candidatas).motivo, 'integridade');
+        assert.equal((await app.estado.confirmarTransacoes(candidatas)).motivo, 'integridade');
         assert.strictEqual(app.estado.consultarTransacoes(), anterior);
     }
     assert.equal(app.gravacoes.length, 0);
-    assert.equal(app.estado.confirmarTransacoes([{ ...r, data: a.data }, a]).sucesso, true);
+    assert.equal((await app.estado.confirmarTransacoes([{ ...r, data: a.data }, a])).sucesso, true);
 });
 
-test('exclusão múltipla confirma somente a coleção restante e encerra exceções removidas', () => {
+test('exclusão múltipla confirma somente a coleção restante e encerra exceções removidas', async () => {
     const antigo = transacao({ tipo: 'despesa', classificacao: '' });
     const outra = transacao({ id: 'outra' });
     const mantida = transacao({ id: 'mantida' });
     const app = preparar([antigo, outra, mantida]);
     const ids = new Set([antigo.id, outra.id]);
-    assert.equal(app.estado.confirmarTransacoes(app.estado.consultarTransacoes().filter((r) => !ids.has(r.id))).sucesso, true);
+    assert.equal((await app.estado.confirmarTransacoes(app.estado.consultarTransacoes().filter((r) => !ids.has(r.id)))).sucesso, true);
     assert.deepEqual(app.estado.consultarTransacoes(), [mantida]);
     assert.equal(app.estado.validarTransacaoParaGravacao(antigo), false);
     assert.equal(app.gravacoes.length, 1);
@@ -275,12 +275,12 @@ test('exclusão múltipla confirma somente a coleção restante e encerra exceç
 const fonte = readFileSync(resolve(__dirname, '../../frontend/js/script.js'), 'utf8');
 const nomes = ['carregarColecao', 'persistirColecao', 'verificarVinculosCarregados'];
 const declaracoes = nomes.map((nome) => {
-    const encontrados = [...fonte.matchAll(new RegExp(`^function ${nome}\\([^]*?^\\}`, 'gm'))];
+    const encontrados = [...fonte.matchAll(new RegExp(`^(?:async )?function ${nome}\\([^]*?^\\}`, 'gm'))];
     assert.equal(encontrados.length, 1, nome);
     return encontrados[0][0];
 }).join('\n\n');
 
-test('adaptadores mantêm mensagens, ordem de leitura e falha sem confirmação indevida', () => {
+test('adaptadores mantêm mensagens, ordem de leitura e falha sem confirmação indevida', async () => {
     const app = preparar([], [], false), mensagens = [];
     const contexto = createContext({ ...validacoes, ...calculos, ...utilitarios,
         disponibilidadeColecoes: app.estado,
@@ -293,7 +293,7 @@ test('adaptadores mantêm mensagens, ordem de leitura e falha sem confirmação 
     ui.verificarVinculosCarregados(); app.estado.prepararCompatibilidadeTransacoes();
     assert.deepEqual(app.leituras, ['transacoes', 'contas', 'investimentos']);
     app.storage.setItem = () => { throw new Error('Quota'); };
-    assert.equal(ui.persistirColecao('transacoes', [transacao()]), false);
+    assert.equal((await ui.persistirColecao('transacoes', [transacao()])), false);
     assert.deepEqual(app.estado.consultarTransacoes(), []);
     assert.match(mensagens.at(-1)[0], /campos preenchidos foram mantidos/);
     assert.equal(mensagens.at(-1)[1], 'erro');

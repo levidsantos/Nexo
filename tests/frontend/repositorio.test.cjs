@@ -22,7 +22,7 @@ function armazenamentoSimulado(iniciais = {}) {
 }
 
 for (const chave of ['contas', 'transacoes', 'investimentos']) {
-    test(`repositório lê e grava a chave original ${chave} sem transformar os registros`, () => {
+    test(`repositório lê e grava a chave original ${chave} sem transformar os registros`, async () => {
         const storage = armazenamentoSimulado({ outra: 'preservada' });
         const registros = [{ id: 'original', valor: 12.34, observacoes: 'ação', extra: null }];
         const antes = structuredClone(registros);
@@ -35,7 +35,7 @@ for (const chave of ['contas', 'transacoes', 'investimentos']) {
     });
 }
 
-test('repositório distingue chave ausente, array vazio e null armazenado', () => {
+test('repositório distingue chave ausente, array vazio e null armazenado', async () => {
     const storage = armazenamentoSimulado({ vazia: '[]', nula: 'null' });
     assert.deepEqual(lerDados('ausente', storage), { sucesso: true, ausente: true, dados: null });
     assert.deepEqual(lerDados('vazia', storage), { sucesso: true, ausente: false, dados: [] });
@@ -43,7 +43,7 @@ test('repositório distingue chave ausente, array vazio e null armazenado', () =
     assert.equal(storage.gravacoes.length, 0);
 });
 
-test('JSON inválido retorna erro sem modificar nem substituir o conteúdo', () => {
+test('JSON inválido retorna erro sem modificar nem substituir o conteúdo', async () => {
     for (const conteudo of ['{invalido', '', 'undefined']) {
         const storage = armazenamentoSimulado({ contas: conteudo });
         const resultado = lerDados('contas', storage);
@@ -55,7 +55,7 @@ test('JSON inválido retorna erro sem modificar nem substituir o conteúdo', () 
     }
 });
 
-test('repositório desserializa sem assumir a validação estrutural da aplicação', () => {
+test('repositório desserializa sem assumir a validação estrutural da aplicação', async () => {
     for (const conteudo of ['{}', '42', '"texto"']) {
         const storage = armazenamentoSimulado({ contas: conteudo });
         assert.deepEqual(lerDados('contas', storage), {
@@ -64,7 +64,7 @@ test('repositório desserializa sem assumir a validação estrutural da aplicaç
     }
 });
 
-test('falha de getItem preserva o erro e não tenta gravar', () => {
+test('falha de getItem preserva o erro e não tenta gravar', async () => {
     const erro = new Error('Leitura bloqueada');
     const storage = armazenamentoSimulado({ contas: '[]' });
     storage.getItem = () => { throw erro; };
@@ -73,7 +73,7 @@ test('falha de getItem preserva o erro e não tenta gravar', () => {
     assert.equal(storage.valores.get('contas'), '[]');
 });
 
-test('falha de setItem não confirma sucesso nem altera o conteúdo anterior', () => {
+test('falha de setItem não confirma sucesso nem altera o conteúdo anterior', async () => {
     const storage = armazenamentoSimulado({ contas: '[{"id":"antigo"}]' });
     const erro = new Error('Quota excedida');
     storage.setItem = () => { throw erro; };
@@ -81,7 +81,7 @@ test('falha de setItem não confirma sucesso nem altera o conteúdo anterior', (
     assert.equal(storage.valores.get('contas'), '[{"id":"antigo"}]');
 });
 
-test('falhas de serialização não chegam ao setItem e preservam os dados', () => {
+test('falhas de serialização não chegam ao setItem e preservam os dados', async () => {
     const circular = {};
     circular.proprio = circular;
     for (const registros of [[circular], [{ valor: 1n }]]) {
@@ -94,7 +94,7 @@ test('falhas de serialização não chegam ao setItem e preservam os dados', () 
     }
 });
 
-test('acesso padrão é tardio e captura inclusive falha no getter de localStorage', (t) => {
+test('acesso padrão é tardio e captura inclusive falha no getter de localStorage', async (t) => {
     const descritor = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
     t.after(() => {
         if (descritor) Object.defineProperty(globalThis, 'localStorage', descritor);
@@ -114,7 +114,7 @@ test('acesso padrão é tardio e captura inclusive falha no getter de localStora
 // reais confirma a integração sem iniciar a interface ou acessar dados reais.
 const fonte = readFileSync(resolve(__dirname, '../../frontend/js/script.js'), 'utf8');
 const adaptadores = ['carregarColecao', 'persistirColecao'].map((nome) => {
-    const trechos = [...fonte.matchAll(new RegExp(`^function ${nome}\\([^]*?^\\}`, 'gm'))];
+    const trechos = [...fonte.matchAll(new RegExp(`^(?:async )?function ${nome}\\([^]*?^\\}`, 'gm'))];
     assert.equal(trechos.length, 1, `Declaração única de ${nome}`);
     return trechos[0][0];
 }).join('\n\n');
@@ -138,7 +138,7 @@ function aplicacaoSimulada(storage, registros = []) {
     return { ...funcoes, mensagens, disponibilidadeColecoes };
 }
 
-test('adaptador mantém ausente/vazio disponíveis e bloqueia dados incompatíveis sem alterá-los', () => {
+test('adaptador mantém ausente/vazio disponíveis e bloqueia dados incompatíveis sem alterá-los', async () => {
     for (const conteudo of [undefined, '[]', 'null', '{}', '[{"id":"invalido"}]', '{invalido']) {
         const storage = armazenamentoSimulado(conteudo === undefined ? {} : { contas: conteudo });
         const app = aplicacaoSimulada(storage);
@@ -151,42 +151,42 @@ test('adaptador mantém ausente/vazio disponíveis e bloqueia dados incompatíve
     }
 });
 
-test('adaptador preserva leitura válida e bloqueia gravações inválidas ou coleções bloqueadas', () => {
+test('adaptador preserva leitura válida e bloqueia gravações inválidas ou coleções bloqueadas', async () => {
     const storage = armazenamentoSimulado({ contas: JSON.stringify([conta()]) });
     const app = aplicacaoSimulada(storage);
     assert.deepEqual(structuredClone(app.carregarColecao('contas', validacoes.validarConta)), [conta()]);
-    assert.equal(app.persistirColecao('contas', [{}]), false);
-    assert.equal(app.persistirColecao('chave-desconhecida', []), false);
+    assert.equal((await app.persistirColecao('contas', [{}])), false);
+    assert.equal((await app.persistirColecao('chave-desconhecida', [])), false);
     app.disponibilidadeColecoes.bloquearColecao('contas');
-    assert.equal(app.persistirColecao('contas', [conta()]), false);
+    assert.equal((await app.persistirColecao('contas', [conta()])), false);
     assert.equal(storage.gravacoes.length, 0);
 });
 
-test('adaptador mantém dados indisponíveis após falha de leitura e recusa sobrescrita', () => {
+test('adaptador mantém dados indisponíveis após falha de leitura e recusa sobrescrita', async () => {
     const storage = armazenamentoSimulado({ contas: '[]' });
     storage.getItem = () => { throw new Error('Acesso negado'); };
     const app = aplicacaoSimulada(storage);
     assert.equal(app.carregarColecao('contas', validacoes.validarConta).length, 0);
     assert.equal(app.disponibilidadeColecoes.colecaoEstaBloqueada('contas'), true);
-    assert.equal(app.persistirColecao('contas', [conta()]), false);
+    assert.equal((await app.persistirColecao('contas', [conta()])), false);
     assert.equal(storage.gravacoes.length, 0);
 });
 
-test('adaptador valida vínculos e novas despesas antes de tentar a gravação', () => {
+test('adaptador valida vínculos e novas despesas antes de tentar a gravação', async () => {
     const storage = armazenamentoSimulado({ contas: JSON.stringify([conta()]), transacoes: '[]' });
     const app = aplicacaoSimulada(storage);
     app.carregarColecao('contas', validacoes.validarConta);
     app.carregarColecao('investimentos', validacoes.validarInvestimento);
     app.disponibilidadeColecoes.verificarTransacoesCarregadas();
     app.disponibilidadeColecoes.prepararCompatibilidadeTransacoes();
-    assert.equal(app.persistirColecao('transacoes', [transacao({ contaId: 'inexistente' })]), false);
-    assert.equal(app.persistirColecao('transacoes', [transacao({ tipo: 'despesa', classificacao: '' })]), false);
+    assert.equal((await app.persistirColecao('transacoes', [transacao({ contaId: 'inexistente' })])), false);
+    assert.equal((await app.persistirColecao('transacoes', [transacao({ tipo: 'despesa', classificacao: '' })])), false);
     app.disponibilidadeColecoes.bloquearColecao('transacoes');
-    assert.equal(app.persistirColecao('investimentos', []), false);
+    assert.equal((await app.persistirColecao('investimentos', [])), false);
     assert.equal(storage.gravacoes.length, 0);
 });
 
-test('falha de escrita mantém retrato dos legados; limpeza ocorre somente após sucesso', () => {
+test('falha de escrita mantém retrato dos legados; limpeza ocorre somente após sucesso', async () => {
     const legado = transacao({ tipo: 'despesa', classificacao: '' });
     const anterior = JSON.stringify([legado]);
     const storage = armazenamentoSimulado({ contas: JSON.stringify([conta()]), transacoes: anterior });
@@ -197,14 +197,14 @@ test('falha de escrita mantém retrato dos legados; limpeza ocorre somente após
     app.disponibilidadeColecoes.prepararCompatibilidadeTransacoes();
     const escrever = storage.setItem;
     storage.setItem = () => { throw new Error('Quota excedida'); };
-    assert.equal(app.persistirColecao('transacoes', []), false);
+    assert.equal((await app.persistirColecao('transacoes', [])), false);
     assert.equal(app.disponibilidadeColecoes.validarTransacaoParaGravacao(legado), true);
     assert.equal(storage.valores.get('transacoes'), anterior);
     assert.equal(app.mensagens.at(-1)[1], 'erro');
     storage.setItem = escrever;
-    assert.equal(app.persistirColecao('transacoes', [legado]), true);
+    assert.equal((await app.persistirColecao('transacoes', [legado])), true);
     assert.equal(app.disponibilidadeColecoes.validarTransacaoParaGravacao(legado), true);
-    assert.equal(app.persistirColecao('transacoes', []), true);
+    assert.equal((await app.persistirColecao('transacoes', [])), true);
     assert.equal(app.disponibilidadeColecoes.validarTransacaoParaGravacao(legado), false);
     assert.equal(storage.valores.get('transacoes'), '[]');
 });
