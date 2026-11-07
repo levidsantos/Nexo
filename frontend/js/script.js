@@ -1,3 +1,4 @@
+import { criarOperacoesTransacoes } from "./funcionalidades/operacoes-transacoes.js";
 import { criarListagensTransacoes } from "./funcionalidades/transacoes.js";
 import { criarContas } from "./funcionalidades/contas.js";
 import { criarResumo } from "./funcionalidades/resumo.js";
@@ -9,7 +10,7 @@ import { criarEstadoDisponibilidade } from "./dados/estado.js";
 import {
     textoPreenchido, ehMovimentacaoInvestimento, validarVinculosTransacoes,
     validarTransacao, validarConta, validarColecao,
-    valorMonetarioValido, validarInvestimento, classificacaoDespesaValida,
+    valorMonetarioValido, validarInvestimento,
     CLASSIFICACOES_DESPESAS
 } from "./dominio/validacoes.js";
 import {
@@ -35,7 +36,6 @@ const selectClassificacao = document.getElementById("classificacao");
 const selectPagamento = document.getElementById("pagamento");
 const campoConta = document.getElementById("conta");
 const campoData = document.getElementById("data");
-let tipoTransacao = "";
 // Inicializar antes da leitura: erros de carregamento também geram notificações.
 const areaNotificacoes = document.getElementById("notificacoes");
 const listaNotificacoes = document.getElementById("lista-notificacoes");
@@ -75,7 +75,6 @@ const modalExclusao = document.getElementById("modal-exclusao");
 const mensagemExclusao = document.getElementById("mensagem-exclusao");
 const botaoCancelarExclusao = document.getElementById("cancelar-exclusao");
 const botaoConfirmarExclusao = document.getElementById("confirmar-exclusao");
-let transacaoEmEdicao = null;
 const botaoSalvarTransacao = formTransacao.querySelector('button[type="submit"]');
 const linksNavegacao = document.querySelectorAll("[data-pagina]");
 const paginas = document.querySelectorAll(".pagina")
@@ -184,40 +183,36 @@ const listagensTransacoes = criarListagensTransacoes({
     aoExcluir: solicitarExclusaoTransacoesSelecionadas
 });
 
-// botoes para abrir e fechar o modal
-addReceita.addEventListener("click", () => {
-    if (!prepararContasTransacao()) return;
-    formTransacao.reset();
-    limparErros(formTransacao);
-    transacaoEmEdicao = null;
-    modalTitle.textContent = "Adicionar Receita";
-    botaoSalvarTransacao.textContent = "Salvar";
-    campoClassificacao.classList.add("hidden");
-    selectClassificacao.required = false;
-    campoPagamento.classList.add("hidden");
-    tipoTransacao = "receita";
-    
-    abrirModal(modalOverlay, campoNome);
+const operacoesTransacoes = criarOperacoesTransacoes({
+    elementos: {
+        addReceita, addDespesa, botoesFechar, modalOverlay,
+        modalTitle, campoClassificacao, campoPagamento, formTransacao,
+        campoNome, campoValor, campoCategoria, selectClassificacao,
+        selectPagamento, campoConta, campoData, botaoSalvarTransacao,
+        modalExclusao, mensagemExclusao, botaoCancelarExclusao, botaoConfirmarExclusao
+    },
+    consultas: {
+        consultarTransacoes: () => disponibilidadeColecoes.consultarTransacoes(),
+        consultarContas: () => disponibilidadeColecoes.consultarContas(),
+        colecaoEstaBloqueada: (chave) => disponibilidadeColecoes.colecaoEstaBloqueada(chave)
+    },
+    confirmarTransacoes: (candidatas) => persistirColecao("transacoes", candidatas),
+    validarContaTransacao,
+    consultarSelecao: () => listagensTransacoes.consultarSelecao(),
+    modais: { abrirModal, fecharModal }, mostrarToast,
+    aposPersistir: () => {
+        listagensTransacoes.definirSelecao([]);
+        renderizarTransacoes(listaTransacoes, 5);
+        atualizarCategorias();
+        atualizarTabelaCompleta();
+        atualizarResumo();
+        atualizarBarraAcoes();
+    },
+    // Na exclusão, a atualização de Investimentos continua após solicitar o fechamento.
+    aposFecharExclusao: () => renderizarInvestimentos()
 });
 
-addDespesa.addEventListener("click", () => {
-    if (!prepararContasTransacao()) return;
-    formTransacao.reset();
-    limparErros(formTransacao);
-    transacaoEmEdicao = null;
-    modalTitle.textContent = "Adicionar Despesa";
-    botaoSalvarTransacao.textContent = "Salvar";
-    campoClassificacao.classList.remove("hidden");
-    selectClassificacao.required = true;
-    campoPagamento.classList.remove("hidden");
-    tipoTransacao = "despesa";
-
-    abrirModal(modalOverlay, campoNome);
-});
-
-botoesFechar.forEach((fechar) => {
-    fechar.addEventListener("click", fecharModalTransacao);
-});
+operacoesTransacoes.inicializar();
 
 // funcoes reutilizaveis
 function mostrarToast(mensagem, tipo = "informacao") {
@@ -937,25 +932,6 @@ function atualizarBarraAcoes() {
     listagensTransacoes.atualizarBarraAcoes();
 }
 
-function preencherFormulario(transacao) {
-    formTransacao.elements.namedItem("nome").value = transacao.nome;
-    formTransacao.elements.namedItem("valor").value = transacao.valor;
-    formTransacao.elements.namedItem("categoria").value = transacao.categoria;
-    formTransacao.elements.namedItem("conta").value = transacao.contaId;
-    formTransacao.elements.namedItem("data").value = transacao.data;
-
-    formTransacao.elements.namedItem("pagamento").value = transacao.pagamento ?? "";
-    formTransacao.elements.namedItem("classificacao").value = transacao.classificacao ?? "";
-}
-
-function fecharModalTransacao() {
-    fecharModal(modalOverlay, () => {
-        formTransacao.reset();
-        limparErros(formTransacao);
-        transacaoEmEdicao = null;
-    });
-}
-
 function navegarPara(paginaDestino) {
     const paginaSelecionada = document.getElementById(
         `pagina-${paginaDestino}`
@@ -1044,31 +1020,7 @@ function abrirModalConta(contaId = null) {
 }
 
 function atualizarOpcoesContas() {
-    const contaAtual = campoConta.value;
-    campoConta.innerHTML = '<option value="">Selecione uma conta...</option>';
-    if (disponibilidadeColecoes.colecaoEstaBloqueada("contas")) return;
-    disponibilidadeColecoes.consultarContas().forEach((conta) => {
-        const option = document.createElement("option");
-        option.value = conta.id;
-        option.textContent = conta.nome;
-        campoConta.appendChild(option);
-    });
-    campoConta.value = disponibilidadeColecoes.consultarContas().some((conta) => conta.id === contaAtual) ? contaAtual : "";
-}
-
-function prepararContasTransacao() {
-    if (disponibilidadeColecoes.colecaoEstaBloqueada("transacoes") || disponibilidadeColecoes.colecaoEstaBloqueada("contas")) {
-        mostrarToast("Não é possível abrir o formulário: os dados de contas ou transações estão indisponíveis. "
-            + "Os dados armazenados foram preservados.", "erro");
-        return false;
-    }
-    if (disponibilidadeColecoes.consultarContas().length === 0) {
-        mostrarToast("É necessário cadastrar uma conta antes de criar transações. "
-            + "Cadastre a primeira conta na página Contas.", "informacao");
-        return false;
-    }
-    atualizarOpcoesContas();
-    return true;
+    operacoesTransacoes.atualizarOpcoesContas();
 }
 
 function podeExcluirConta(contaId) {
@@ -1109,58 +1061,10 @@ linksNavegacao.forEach((link) => {
 
 funcionalidadeContas.inicializar();
 
-// limpar os erros quando o usuario digitar algo nos campos do formulario
-const camposFormulario = [
-    campoNome,
-    campoValor,
-    campoCategoria,
-    campoData,
-    campoConta
-];
-
-camposFormulario.forEach((campo) => {
-    campo.addEventListener("input", () => {
-        limparErroCampo(campo);
-    });
-});
-selectClassificacao.addEventListener("change", () => {
-    if (classificacaoDespesaValida(selectClassificacao.value)) limparErroCampo(selectClassificacao);
-});
 function solicitarExclusaoTransacoesSelecionadas() {
-    const quantidade = listagensTransacoes.consultarSelecao().length;
-
-    if (quantidade === 0) return;
-
-    mensagemExclusao.textContent =
-        `Deseja realmente excluir ${quantidade} ${quantidade === 1 ? "transação" : "transações"}? Esta ação não poderá ser desfeita.`;
-
-    abrirModal(modalExclusao, botaoCancelarExclusao);
+    operacoesTransacoes.solicitarExclusao();
 }
 
-botaoCancelarExclusao.addEventListener("click", () => {
-    fecharModal(modalExclusao);
-});
-
-botaoConfirmarExclusao.addEventListener("click", () => {
-    const quantidade = listagensTransacoes.consultarSelecao().length;
-const transacoesRestantes = disponibilidadeColecoes.consultarTransacoes().filter((transacao) => {
-    return !listagensTransacoes.consultarSelecao().includes(transacao.id);
-});
-
-    if (!persistirColecao("transacoes", transacoesRestantes)) return;
-
-    listagensTransacoes.definirSelecao([]);
-
-    renderizarTransacoes(listaTransacoes, 5);
-    atualizarCategorias();
-    atualizarTabelaCompleta();
-    atualizarResumo();
-    atualizarBarraAcoes();
-
-    fecharModal(modalExclusao);
-    renderizarInvestimentos();
-    mostrarToast(quantidade === 1 ? "Transação excluída." : `${quantidade} transações excluídas.`, "sucesso");
-});
 function solicitarEdicaoTransacaoSelecionada() {
     if (listagensTransacoes.consultarSelecao().length !== 1) return;
 
@@ -1175,138 +1079,8 @@ function solicitarEdicaoTransacaoSelecionada() {
         abrirModalMovimentacao(transacao.tipo, transacao.investimentoId, transacao.id);
         return;
     }
-    if (!prepararContasTransacao()) return;
-
-    limparErros(formTransacao);
-    transacaoEmEdicao = transacao.id;
-    tipoTransacao = transacao.tipo;
-
-    preencherFormulario(transacao);
-
-    modalTitle.textContent =
-        transacao.tipo === "receita" ? "Editar Receita" : "Editar Despesa";
-
-    botaoSalvarTransacao.textContent = "Salvar Alterações";
-
-    if (transacao.tipo === "receita") {
-        selectClassificacao.required = false;
-        campoClassificacao.classList.add("hidden");
-        campoPagamento.classList.add("hidden");
-    } else {
-        selectClassificacao.required = true;
-        campoClassificacao.classList.remove("hidden");
-        campoPagamento.classList.remove("hidden");
-    }
-
-    abrirModal(modalOverlay, campoNome);
+    operacoesTransacoes.editarTransacao(id);
 }
-
-// fechar o modal de exclusao ao clicar fora dele ou botao esc
-modalExclusao.addEventListener("click", (event) => {
-    if (event.target === modalExclusao) {
-        fecharModal(modalExclusao);
-    }
-});
-
-
-// evento de envio do formulario
-formTransacao.addEventListener("submit", (enviar) => { 
-    enviar.preventDefault();
-    if (!["receita", "despesa"].includes(tipoTransacao)
-        || disponibilidadeColecoes.consultarTransacoes().some((item) => item.id === transacaoEmEdicao && ehMovimentacaoInvestimento(item))) {
-        mostrarToast("Este formulário permite somente receitas e despesas nesta etapa.", "informacao");
-        return;
-    }
-    limparErros(formTransacao);
-    const nome = campoNome.value.trim();
-    const valor = Number(campoValor.value);
-    const categoria = campoCategoria.value.trim();
-    const classificacao = selectClassificacao.value;
-    const pagamento = selectPagamento.value;
-    const contaId = campoConta.value;
-    const data = campoData.value;
-    
-    let formularioValido = true;
-
-    if (nome === "") {
-        mostrarErro(campoNome, "Informe o nome da transação.");
-        formularioValido = false;
-    }
-    if (!valorMonetarioValido(campoValor.value) || valor <= 0 || !campoValor.validity.valid) {
-        mostrarErro(campoValor, "Informe um valor maior que zero, com até duas casas decimais, dentro do limite permitido.");
-        formularioValido = false;
-    }
-    if (categoria.trim() === "") {
-        mostrarErro(campoCategoria, "Informe uma categoria.");
-        formularioValido = false;
-    }
-
-    if (tipoTransacao === "despesa" && !classificacaoDespesaValida(classificacao)) {
-        mostrarErro(selectClassificacao, "Selecione uma classificação válida para a despesa.");
-        formularioValido = false;
-    }
-
-    if (!dataValida(data) || !campoData.validity.valid) {
-        mostrarErro(campoData, "Selecione uma data válida.");
-        formularioValido = false;
-    }
-
-    if (!validarContaTransacao(contaId)) {
-        mostrarErro(campoConta, "Selecione uma conta cadastrada e disponível.");
-        formularioValido = false;
-    }
-    if (!formularioValido) {
-        focarPrimeiroErro(formTransacao);
-        return;
-    }
-
-    let proximasTransacoes;
-    if (transacaoEmEdicao !== null) {
-        const transacaoExistente = disponibilidadeColecoes.consultarTransacoes().find((transacao) => {
-            return transacao.id === transacaoEmEdicao;
-        });
-
-        if (!transacaoExistente) return;
-        const transacaoAtualizada = {
-            ...transacaoExistente,
-            nome,
-            valor,
-            categoria,
-            classificacao: tipoTransacao === "despesa" ? classificacao : null,
-            pagamento: tipoTransacao === "despesa" ? pagamento : null,
-            contaId,
-            data
-        };
-        proximasTransacoes = disponibilidadeColecoes.consultarTransacoes().map((transacao) => {
-            return transacao.id === transacaoEmEdicao ? transacaoAtualizada : transacao;
-        });
-    } else {
-    const transacao = {
-        id: crypto.randomUUID(),
-        tipo: tipoTransacao,
-        nome,
-        valor,
-        categoria,
-        classificacao: tipoTransacao === "despesa" ? classificacao : null,
-        pagamento: tipoTransacao === "despesa" ? pagamento : null,
-        contaId,
-        data,
-    };
-    proximasTransacoes = [...disponibilidadeColecoes.consultarTransacoes(), transacao];
-    }
-    
-    if (!persistirColecao("transacoes", proximasTransacoes)) return;
-    listagensTransacoes.definirSelecao([]);
-    renderizarTransacoes(listaTransacoes, 5);
-    atualizarCategorias();
-    atualizarTabelaCompleta();
-    atualizarResumo();
-    atualizarBarraAcoes();
-
-    const estavaEditando = transacaoEmEdicao !== null;
-    fecharModalTransacao();
-    mostrarToast(estavaEditando ? "Transação atualizada." : "Transação criada.", "sucesso");
-});
 
 let investimentoEmEdicao = null;
 let investimentoEmExclusao = null;

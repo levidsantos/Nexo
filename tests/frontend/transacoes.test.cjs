@@ -4,8 +4,7 @@ const assert = require('node:assert/strict');
 const { execFileSync } = require('node:child_process');
 const { pathToFileURL } = require('node:url');
 const { resolve } = require('node:path');
-const { readFileSync } = require('node:fs');
-const { Script, createContext } = require('node:vm');
+const { criarOperacoesTransacoes } = require('../../frontend/js/funcionalidades/operacoes-transacoes.js');
 const { criarListagensTransacoes } = require('../../frontend/js/funcionalidades/transacoes.js');
 const { transacao, conta, aporte, resgate, investimento } = require('./support/fixtures.cjs');
 
@@ -310,15 +309,14 @@ test('Listagens: encerramento cancela frame de transferência de foco e callback
 });
 
 test('Listagens: exclusão financeira real preserva seleção na falha e limpa após sucesso', () => {
-    const fonte=readFileSync(resolve(__dirname,'../../frontend/js/script.js'),'utf8');
-    const trecho=fonte.slice(fonte.indexOf('botaoConfirmarExclusao.addEventListener("click"'),fonte.indexOf('function solicitarEdicaoTransacaoSelecionada'));
-    const a=ambiente({registros:muitos(2)}); a.renderizar(); a.selecionar(0); let confirmar;
+    const a=ambiente({registros:muitos(2)}); a.renderizar(); a.selecionar(0);
     let sucesso=false; const efeitos=[];
-    new Script(trecho).runInContext(createContext({botaoConfirmarExclusao:{addEventListener:(_,cb)=>{confirmar=cb;}},listagensTransacoes:a.api,
-        disponibilidadeColecoes:{consultarTransacoes:()=>muitos(2)},persistirColecao:()=>sucesso,listaTransacoes:{},modalExclusao:{},
-        renderizarTransacoes:()=>efeitos.push('recentes'),atualizarCategorias:()=>efeitos.push('categorias'),atualizarTabelaCompleta:()=>efeitos.push('tabela'),
-        atualizarResumo:()=>efeitos.push('resumo'),atualizarBarraAcoes:()=>efeitos.push('acoes'),fecharModal:()=>efeitos.push('fechar'),renderizarInvestimentos:()=>efeitos.push('investimentos'),mostrarToast:()=>efeitos.push('toast')}));
-    confirmar(); assert.deepEqual(a.api.consultarSelecao(),['t-1']); assert.deepEqual(efeitos,[]);
-    sucesso=true; confirmar(); assert.deepEqual(a.api.consultarSelecao(),[]);
+    const operacoes=criarOperacoesTransacoes({elementos:{campoConta:{ownerDocument:{}},modalExclusao:{}},
+        consultas:{consultarTransacoes:()=>muitos(2)},confirmarTransacoes:()=>sucesso,consultarSelecao:()=>a.api.consultarSelecao(),
+        modais:{fecharModal:()=>efeitos.push('fechar')},mostrarToast:()=>efeitos.push('toast'),
+        aposPersistir:()=>{a.api.definirSelecao([]);efeitos.push('recentes','categorias','tabela','resumo','acoes');},
+        aposFecharExclusao:()=>efeitos.push('investimentos')});
+    operacoes.confirmarExclusao(); assert.deepEqual(a.api.consultarSelecao(),['t-1']); assert.deepEqual(efeitos,[]);
+    sucesso=true; operacoes.confirmarExclusao(); assert.deepEqual(a.api.consultarSelecao(),[]);
     assert.deepEqual(efeitos,['recentes','categorias','tabela','resumo','acoes','fechar','investimentos','toast']);
 });
