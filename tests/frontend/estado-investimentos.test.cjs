@@ -273,8 +273,11 @@ function adaptadores(app, adicionais = {}) {
     const mensagens = [];
     const contexto = createContext({ ...validacoes, ...calculos, ...utilitarios,
         disponibilidadeColecoes: app.estado, mostrarToast: (...args) => mensagens.push(args), ...adicionais });
-    const nomes = ['carregarColecao', 'persistirColecao', 'verificarVinculosCarregados', 'investimentosDisponiveis', 'podeExcluirInvestimento'];
+    const nomes = ['carregarColecao', 'persistirColecao', 'verificarVinculosCarregados'];
     const ui = new Script(nomes.map(declaracao).join('\n') + `\n({${nomes.join(',')}})`).runInContext(contexto);
+    const { prepararOperacoes } = require('./support/operacoes-investimentos.cjs');
+    const operacoes = prepararOperacoes({ estado: app.estado, mostrarToast: (...args) => mensagens.push(args) });
+    ui.podeExcluirInvestimento = operacoes.api.podeExcluirInvestimento;
     return { ui, contexto, mensagens };
 }
 
@@ -295,41 +298,31 @@ test('adaptadores reais preservam mensagens e proteção de exclusão histórica
 });
 
 test('handlers reais exigem confirmação retroativa na edição e atualização manual', () => {
+    const { prepararOperacoes } = require('./support/operacoes-investimentos.cjs');
     for (const manual of [false, true]) {
         const app = preparar([investimento({ dataReferenciaValor: '2026-11-02' })]);
-        const campo = (value) => ({ value, validity: { valid: true } });
-        const campos = { nome: campo('Editado'), tipo: campo('Tipo livre'), instituicao: campo(''), capital: campo('100'),
-            valor: campo('80'), referencia: campo('2026-10-31'), referenciaValor: campo('2026-10-31'), observacoes: campo('') };
-        const confirmacao = { checked: false }, erros = [], efeitos = [];
-        const form = manual ? 'formValorInvestimento' : 'formInvestimento';
-        const trecho = fonte.match(new RegExp(`^${form}\\.addEventListener\\("submit",[^]*?^\\}\\);`, 'm'))[0];
-        let enviar;
-        const extras = {
-            [form]: { addEventListener: (_, callback) => { enviar = callback; } },
-            camposInvestimento: campos, campoValorManual: campos.valor, campoDataValorManual: campos.referenciaValor,
-            investimentoEmEdicao: INVESTIMENTO_ID, investimentoEmAtualizacao: INVESTIMENTO_ID,
-            document: { getElementById: () => confirmacao },
-            limparErros() {}, mostrarErro: (_, mensagem) => erros.push(mensagem), focarPrimeiroErro() {},
-            renderizarInvestimentos: () => efeitos.push('render'), renderizarTransacoes() {}, atualizarTabelaCompleta() {},
-            listaTransacoes: {}, prepararRetornoFocoInvestimento() {},
-            fecharModalInvestimento: () => efeitos.push('fechar'), fecharAtualizacaoValor: () => efeitos.push('fechar')
-        };
-        const { contexto } = adaptadores(app, extras);
-        new Script(trecho).runInContext(contexto);
-        enviar({ preventDefault() {} });
-        assert.match(erros.at(-1), /Confirme abaixo/);
+        const a = prepararOperacoes({ estado: app.estado }); a.api.inicializar();
+        if (manual) a.api.abrirAtualizacaoValor(INVESTIMENTO_ID); else a.api.abrirModalInvestimento(INVESTIMENTO_ID);
+        a.preencher(manual ? { 'valor-manual-investimento': '80', 'data-valor-manual': '2026-10-31' }
+            : { 'valor-investimento': '80', 'referencia-valor-investimento': '2026-10-31' });
+        const form = manual ? 'form-valor-investimento' : 'form-investimento';
+        const erro = manual ? 'data-valor-manual' : 'referencia-valor-investimento';
+        a.enviar(form);
+        assert.match(a.erros.get('erro-' + erro).textContent, /Confirme abaixo/);
         assert.equal(app.gravacoes.length, 0);
-        confirmacao.checked = true;
+        a.elementos[manual ? 'confirmar-retroativo-manual' : 'confirmar-retroativo-investimento'].checked = true;
+        a.efeitos.length = 0;
         app.storage.setItem = () => { throw new Error('Quota'); };
-        enviar({ preventDefault() {} });
-        assert.equal(efeitos.length, 0);
+        a.enviar(form);
+        assert.equal(a.efeitos.some(([tipo]) => ['salvar', 'manual', 'fechar'].includes(tipo)), false);
         assert.equal(app.estado.consultarInvestimentos()[0].dataReferenciaValor, '2026-11-02');
         app.storage.setItem = (chave, valor) => { app.gravacoes.push([chave, valor]); app.valores.set(chave, valor); };
-        enviar({ preventDefault() {} });
-        assert.deepEqual(efeitos, ['render', 'fechar']);
+        a.enviar(form);
+        assert.deepEqual(a.efeitos.filter(([tipo]) => ['salvar','manual','fechar'].includes(tipo)).map(([tipo]) => tipo), [manual ? 'manual' : 'salvar', 'fechar']);
         assert.equal(app.gravacoes.length, 1);
         assert.equal(app.estado.consultarInvestimentos()[0].id, INVESTIMENTO_ID);
         assert.equal(app.estado.consultarInvestimentos()[0].dataReferenciaValor, '2026-10-31');
         assert.equal(app.estado.consultarInvestimentos()[0].valorInformado, 80);
+        a.api.encerrar();
     }
 });

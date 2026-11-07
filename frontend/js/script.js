@@ -1,3 +1,4 @@
+import { criarOperacoesInvestimentos } from "./funcionalidades/operacoes-investimentos.js";
 import { criarApresentacaoInvestimentos } from "./funcionalidades/investimentos.js";
 import { criarOperacoesTransacoes } from "./funcionalidades/operacoes-transacoes.js";
 import { criarListagensTransacoes } from "./funcionalidades/transacoes.js";
@@ -1083,94 +1084,6 @@ function solicitarEdicaoTransacaoSelecionada() {
     operacoesTransacoes.editarTransacao(id);
 }
 
-let investimentoEmEdicao = null;
-let investimentoEmExclusao = null;
-const formInvestimento = document.getElementById("form-investimento");
-const modalInvestimento = document.getElementById("modal-investimento");
-const modalExclusaoInvestimento = document.getElementById("modal-exclusao-investimento");
-const camposInvestimento = {
-    nome: document.getElementById("nome-investimento"),
-    tipo: document.getElementById("tipo-investimento"),
-    instituicao: document.getElementById("instituicao-investimento"),
-    capital: document.getElementById("capital-investimento"),
-    valor: document.getElementById("valor-investimento"),
-    referencia: document.getElementById("referencia-investimento"),
-    referenciaValor: document.getElementById("referencia-valor-investimento"),
-    observacoes: document.getElementById("observacoes-investimento")
-};
-
-function investimentosDisponiveis() {
-    if (!disponibilidadeColecoes.colecaoEstaBloqueada("investimentos")) return true;
-    mostrarToast("Investimentos indisponíveis. As gravações estão bloqueadas e os dados armazenados foram preservados.", "erro");
-    return false;
-}
-
-function abrirModalInvestimento(id = null) {
-    if (!investimentosDisponiveis()) return;
-    const investimento = id === null ? null : disponibilidadeColecoes.consultarInvestimentos().find((item) => item.id === id);
-    if (id !== null && !investimento) {
-        mostrarToast("O investimento não está disponível para edição.", "erro");
-        return;
-    }
-    formInvestimento.reset();
-    limparErros(formInvestimento);
-    investimentoEmEdicao = id;
-    document.getElementById("titulo-modal-investimento").textContent = investimento ? "Editar investimento" : "Adicionar investimento";
-    document.getElementById("salvar-investimento").textContent = investimento ? "Salvar alterações" : "Salvar investimento";
-    camposInvestimento.nome.value = investimento?.nome ?? "";
-    camposInvestimento.tipo.value = investimento?.tipo ?? "";
-    camposInvestimento.instituicao.value = investimento?.instituicao ?? "";
-    camposInvestimento.capital.value = investimento?.capitalInicial ?? "";
-    camposInvestimento.valor.value = investimento?.valorInformado ?? "";
-    camposInvestimento.referencia.max = obterDataLocal();
-    camposInvestimento.referencia.value = investimento?.dataReferenciaCapital ?? obterDataLocal();
-    camposInvestimento.referenciaValor.max = obterDataLocal();
-    camposInvestimento.referenciaValor.value = investimento?.dataReferenciaValor ?? obterDataLocal();
-    atualizarAvisoRetroativo(camposInvestimento.referenciaValor, investimento?.dataReferenciaValor,
-        "aviso-retroativo-investimento", "confirmar-retroativo-investimento");
-    camposInvestimento.observacoes.value = investimento?.observacoes ?? "";
-    abrirModal(modalInvestimento, camposInvestimento.nome);
-}
-
-function fecharModalInvestimento() {
-    fecharModal(modalInvestimento, () => {
-        formInvestimento.reset();
-        limparErros(formInvestimento);
-        investimentoEmEdicao = null;
-    });
-}
-
-// Ponto único de proteção da exclusão, incluindo movimentos históricos e futuros.
-function podeExcluirInvestimento(id) {
-    if (!investimentosDisponiveis()) return false;
-    if (disponibilidadeColecoes.colecaoEstaBloqueada("transacoes")) {
-        mostrarToast("Não é possível excluir o investimento: as transações estão indisponíveis e os vínculos não puderam ser verificados.", "erro");
-        return false;
-    }
-    if (disponibilidadeColecoes.consultarTransacoes().some((item) => ehMovimentacaoInvestimento(item) && item.investimentoId === id)) {
-        mostrarToast("Este investimento possui aportes ou resgates vinculados e não pode ser excluído, inclusive quando os registros são históricos ou futuros.", "erro");
-        return false;
-    }
-    if (!disponibilidadeColecoes.consultarInvestimentos().some((item) => item.id === id)) {
-        mostrarToast("O investimento não está disponível para exclusão.", "erro");
-        return false;
-    }
-    return true;
-}
-
-function solicitarExclusaoInvestimento(id) {
-    if (!podeExcluirInvestimento(id)) return;
-    investimentoEmExclusao = id;
-    const investimento = disponibilidadeColecoes.consultarInvestimentos().find((item) => item.id === id);
-    document.getElementById("mensagem-exclusao-investimento").textContent = `Deseja excluir o investimento "${investimento.nome}"? Esta ação não poderá ser desfeita.`;
-    abrirModal(modalExclusaoInvestimento, document.getElementById("cancelar-exclusao-investimento"));
-}
-
-function fecharExclusaoInvestimento() {
-    fecharModal(modalExclusaoInvestimento);
-    investimentoEmExclusao = null;
-}
-
 const apresentacaoInvestimentos = criarApresentacaoInvestimentos({
     document, window,
     listaInvestimentos: document.getElementById("lista-investimentos"),
@@ -1209,158 +1122,99 @@ function renderizarInvestimentos() {
     });
 }
 
-formInvestimento.addEventListener("submit", (evento) => {
-    evento.preventDefault();
-    limparErros(formInvestimento);
-    if (!investimentosDisponiveis()) return;
-    const campos = camposInvestimento;
-    let valido = true;
-    const erro = (campo, mensagem) => { mostrarErro(campo, mensagem); valido = false; };
-    if (!campos.nome.value.trim()) erro(campos.nome, "Informe o nome do investimento.");
-    if (!campos.tipo.value.trim()) erro(campos.tipo, "Informe o tipo do investimento ou escolha uma sugestão.");
-    [campos.capital, campos.valor].forEach((campo) => {
-        if (campo.value === "" || !valorMonetarioValido(campo.value) || !campo.validity.valid) {
-            erro(campo, "Informe um valor zero ou positivo, com até duas casas decimais, dentro do limite permitido.");
-        }
-    });
-    const referencia = campos.referencia.value;
-    if (!dataValida(referencia) || referencia > obterDataLocal() || !campos.referencia.validity.valid) {
-        erro(campos.referencia, "Informe uma data válida, igual ou anterior a hoje.");
+const elementosOperacoesInvestimentos = Object.fromEntries([
+    "aviso-retroativo-investimento",
+    "aviso-retroativo-manual",
+    "form-investimento",
+    "modal-investimento",
+    "modal-exclusao-investimento",
+    "nome-investimento",
+    "tipo-investimento",
+    "instituicao-investimento",
+    "capital-investimento",
+    "valor-investimento",
+    "referencia-investimento",
+    "referencia-valor-investimento",
+    "observacoes-investimento",
+    "titulo-modal-investimento",
+    "salvar-investimento",
+    "mensagem-exclusao-investimento",
+    "cancelar-exclusao-investimento",
+    "modal-valor-investimento",
+    "form-valor-investimento",
+    "valor-manual-investimento",
+    "data-valor-manual",
+    "titulo-valor-investimento",
+    "avaliacao-anterior-investimento",
+    "modal-movimentacao",
+    "form-movimentacao",
+    "titulo-modal-movimentacao",
+    "salvar-movimentacao",
+    "rotulo-investimento-movimentacao",
+    "rotulo-conta-movimentacao",
+    "rotulo-valor-movimentacao",
+    "campos-resgate",
+    "confirmar-retroativo-investimento",
+    "novo-investimento",
+    "fechar-investimento",
+    "cancelar-investimento",
+    "confirmar-exclusao-investimento",
+    "confirmar-retroativo-manual",
+    "cancelar-valor-investimento",
+    "fechar-valor-investimento",
+    "fechar-movimentacao",
+    "cancelar-movimentacao",
+    "investimento-movimentacao",
+    "conta-movimentacao",
+    "valor-movimentacao",
+    "capital-movimentacao",
+    "baixa-movimentacao",
+    "data-movimentacao",
+    "observacoes-movimentacao"
+].map((id) => [id, document.getElementById(id)]));
+elementosOperacoesInvestimentos.botoesMovimentacao = document.querySelectorAll("[data-movimentacao]");
+const operacoesInvestimentos = criarOperacoesInvestimentos({
+    elementos: elementosOperacoesInvestimentos,
+    consultas: {
+        colecaoEstaBloqueada: (chave) => disponibilidadeColecoes.colecaoEstaBloqueada(chave),
+        consultarInvestimentos: () => disponibilidadeColecoes.consultarInvestimentos(),
+        consultarTransacoes: () => disponibilidadeColecoes.consultarTransacoes(),
+        consultarContas: () => disponibilidadeColecoes.consultarContas()
+    },
+    confirmarInvestimentos: (candidatos) => persistirColecao("investimentos", candidatos),
+    confirmarTransacoes: (candidatos) => persistirColecao("transacoes", candidatos),
+    validarContaTransacao, prepararMovimentacaoInvestimento, obterRestricaoMovimentacaoInvestimentos, formatarDataInvestimento,
+    modais: { abrirModal, fecharModal }, mostrarToast,
+    aposSalvarInvestimento: (registro, editando) => {
+        renderizarInvestimentos();
+        renderizarTransacoes(listaTransacoes, 5);
+        atualizarTabelaCompleta();
+        if (editando) prepararRetornoFocoInvestimento(registro.id, "editar");
+    },
+    aposExcluirInvestimento: () => renderizarInvestimentos(),
+    aposAtualizarValor: (registro) => {
+        renderizarInvestimentos();
+        prepararRetornoFocoInvestimento(registro.id, "atualizar");
+    },
+    aposSalvarMovimentacao: () => {
+        limparSelecao();
+        atualizarCategorias();
+        renderizarTransacoes(listaTransacoes, 5);
+        atualizarTabelaCompleta();
+        atualizarResumo();
+        renderizarInvestimentos();
     }
-    if (campos.observacoes.value.length > 500) erro(campos.observacoes, "Use no máximo 500 caracteres.");
-    const referenciaValor = campos.referenciaValor.value;
-    if (!dataValida(referenciaValor) || referenciaValor > obterDataLocal() || !campos.referenciaValor.validity.valid) {
-        erro(campos.referenciaValor, "Informe uma data válida, igual ou anterior a hoje.");
-    }
-    const investimentoAnterior = disponibilidadeColecoes.consultarInvestimentos().find((item) => item.id === investimentoEmEdicao);
-    if (investimentoAnterior && referenciaValor < investimentoAnterior.dataReferenciaValor
-        && !document.getElementById("confirmar-retroativo-investimento").checked) {
-        erro(campos.referenciaValor, "Confirme abaixo a substituição retroativa e o recálculo das movimentações.");
-    }
-    if (!valido) { focarPrimeiroErro(formInvestimento); return; }
-    const editando = investimentoEmEdicao !== null;
-    const anterior = editando ? disponibilidadeColecoes.consultarInvestimentos().find((item) => item.id === investimentoEmEdicao) : null;
-    if (editando && !anterior) { mostrarToast("O investimento em edição não está disponível.", "erro"); return; }
-    const valorInformado = Number(campos.valor.value);
-    const atualizouValor = !anterior || anterior.valorInformado !== valorInformado || anterior.dataReferenciaValor !== referenciaValor;
-    const registro = {
-        id: anterior ? anterior.id : crypto.randomUUID(),
-        nome: campos.nome.value.trim(), tipo: campos.tipo.value.trim(), instituicao: campos.instituicao.value.trim(),
-        capitalInicial: Number(campos.capital.value), dataReferenciaCapital: referencia,
-        valorInformado, dataReferenciaValor: referenciaValor,
-        atualizadoEm: atualizouValor ? new Date().toISOString() : anterior.atualizadoEm,
-        observacoes: campos.observacoes.value.trim()
-    };
-    const proximos = editando ? disponibilidadeColecoes.consultarInvestimentos().map((item) => item.id === anterior.id ? registro : item) : [...disponibilidadeColecoes.consultarInvestimentos(), registro];
-    if (!persistirColecao("investimentos", proximos)) return;
-    renderizarInvestimentos();
-    // Resolve os nomes atuais pelos IDs, preservando os registros e o estado da listagem.
-    renderizarTransacoes(listaTransacoes, 5);
-    atualizarTabelaCompleta();
-    if (editando) prepararRetornoFocoInvestimento(registro.id, "editar");
-    fecharModalInvestimento();
-    mostrarToast(editando ? "Investimento atualizado." : "Investimento cadastrado.", "sucesso");
 });
-document.getElementById("novo-investimento").addEventListener("click", () => abrirModalInvestimento());
-document.getElementById("fechar-investimento").addEventListener("click", fecharModalInvestimento);
-document.getElementById("cancelar-investimento").addEventListener("click", fecharModalInvestimento);
-Object.values(camposInvestimento).filter((campo) => campo.id !== "instituicao-investimento").forEach((campo) => {
-    campo.addEventListener("input", () => limparErroCampo(campo));
-});
-document.getElementById("cancelar-exclusao-investimento").addEventListener("click", fecharExclusaoInvestimento);
-modalExclusaoInvestimento.addEventListener("click", (evento) => {
-    if (evento.target === modalExclusaoInvestimento) fecharExclusaoInvestimento();
-});
-document.getElementById("confirmar-exclusao-investimento").addEventListener("click", () => {
-    if (investimentoEmExclusao === null || !podeExcluirInvestimento(investimentoEmExclusao)) return;
-    const proximos = disponibilidadeColecoes.consultarInvestimentos().filter((item) => item.id !== investimentoEmExclusao);
-    if (!persistirColecao("investimentos", proximos)) return;
-    renderizarInvestimentos();
-    fecharExclusaoInvestimento();
-    mostrarToast("Investimento excluído.", "sucesso");
-});
+operacoesInvestimentos.inicializar();
 renderizarInvestimentos();
 
-function atualizarAvisoRetroativo(campo, referenciaAnterior, avisoId, confirmacaoId) {
-    const aviso = document.getElementById(avisoId);
-    aviso.classList.toggle("hidden", !referenciaAnterior || !campo.value || campo.value >= referenciaAnterior);
-    document.getElementById(confirmacaoId).checked = false;
+function abrirModalInvestimento(id = null) { return operacoesInvestimentos.abrirModalInvestimento(id); }
+function solicitarExclusaoInvestimento(id) { return operacoesInvestimentos.solicitarExclusaoInvestimento(id); }
+function fecharExclusaoInvestimento() { operacoesInvestimentos.fecharExclusaoInvestimento(); }
+function abrirAtualizacaoValor(id) { operacoesInvestimentos.abrirAtualizacaoValor(id); }
+function abrirModalMovimentacao(tipo, investimentoId = null, id = null) {
+    operacoesInvestimentos.abrirModalMovimentacao(tipo, investimentoId, id);
 }
-
-camposInvestimento.referenciaValor.addEventListener("input", () => {
-    const anterior = disponibilidadeColecoes.consultarInvestimentos().find((item) => item.id === investimentoEmEdicao);
-    atualizarAvisoRetroativo(camposInvestimento.referenciaValor, anterior?.dataReferenciaValor,
-        "aviso-retroativo-investimento", "confirmar-retroativo-investimento");
-});
-
-let investimentoEmAtualizacao = null;
-const modalValorInvestimento = document.getElementById("modal-valor-investimento");
-const formValorInvestimento = document.getElementById("form-valor-investimento");
-const campoValorManual = document.getElementById("valor-manual-investimento");
-const campoDataValorManual = document.getElementById("data-valor-manual");
-
-function abrirAtualizacaoValor(id) {
-    if (!investimentosDisponiveis()) return;
-    const investimento = disponibilidadeColecoes.consultarInvestimentos().find((item) => item.id === id);
-    if (!investimento) { mostrarToast("Investimento indisponível para atualização.", "erro"); return; }
-    investimentoEmAtualizacao = id;
-    formValorInvestimento.reset();
-    limparErros(formValorInvestimento);
-    document.getElementById("titulo-valor-investimento").textContent = `Atualizar valor · ${investimento.nome}`;
-    document.getElementById("avaliacao-anterior-investimento").textContent =
-        `Avaliação anterior: ${formatarCentavos(converterParaCentavos(investimento.valorInformado))}, referente ao final de ${formatarDataInvestimento(investimento.dataReferenciaValor)}. Registro atualizado em ${formatarDataInvestimento(obterDataLocal(new Date(investimento.atualizadoEm)))}.`;
-    campoValorManual.value = investimento.valorInformado;
-    campoDataValorManual.max = obterDataLocal();
-    campoDataValorManual.value = investimento.dataReferenciaValor;
-    atualizarAvisoRetroativo(campoDataValorManual, investimento.dataReferenciaValor,
-        "aviso-retroativo-manual", "confirmar-retroativo-manual");
-    abrirModal(modalValorInvestimento, campoValorManual);
-}
-
-function fecharAtualizacaoValor() {
-    fecharModal(modalValorInvestimento, () => {
-        formValorInvestimento.reset();
-        limparErros(formValorInvestimento);
-        investimentoEmAtualizacao = null;
-    });
-}
-
-formValorInvestimento.addEventListener("submit", (evento) => {
-    evento.preventDefault();
-    limparErros(formValorInvestimento);
-    const anterior = disponibilidadeColecoes.consultarInvestimentos().find((item) => item.id === investimentoEmAtualizacao);
-    if (!investimentosDisponiveis() || !anterior) return;
-    let valido = true;
-    if (campoValorManual.value === "" || !valorMonetarioValido(campoValorManual.value) || !campoValorManual.validity.valid) {
-        mostrarErro(campoValorManual, "Informe um valor zero ou positivo, com até duas casas decimais, dentro do limite permitido.");
-        valido = false;
-    }
-    const data = campoDataValorManual.value;
-    if (!dataValida(data) || data > obterDataLocal() || !campoDataValorManual.validity.valid) {
-        mostrarErro(campoDataValorManual, "Informe uma data válida, igual ou anterior a hoje.");
-        valido = false;
-    } else if (data < anterior.dataReferenciaValor && !document.getElementById("confirmar-retroativo-manual").checked) {
-        mostrarErro(campoDataValorManual, "Confirme abaixo a substituição retroativa e o recálculo das movimentações.");
-        valido = false;
-    }
-    if (!valido) { focarPrimeiroErro(formValorInvestimento); return; }
-    const atualizado = { ...anterior, valorInformado: Number(campoValorManual.value),
-        dataReferenciaValor: data, atualizadoEm: new Date().toISOString() };
-    const candidatos = disponibilidadeColecoes.consultarInvestimentos().map((item) => item.id === anterior.id ? atualizado : item);
-    if (!persistirColecao("investimentos", candidatos)) return;
-    renderizarInvestimentos();
-    prepararRetornoFocoInvestimento(atualizado.id, "atualizar");
-    fecharAtualizacaoValor();
-    mostrarToast("Valor informado atualizado. As estimativas foram recalculadas.", "sucesso");
-});
-campoDataValorManual.addEventListener("input", () => {
-    const anterior = disponibilidadeColecoes.consultarInvestimentos().find((item) => item.id === investimentoEmAtualizacao);
-    atualizarAvisoRetroativo(campoDataValorManual, anterior?.dataReferenciaValor,
-        "aviso-retroativo-manual", "confirmar-retroativo-manual");
-});
-[campoValorManual, campoDataValorManual].forEach((campo) => campo.addEventListener("input", () => limparErroCampo(campo)));
-document.getElementById("cancelar-valor-investimento").addEventListener("click", fecharAtualizacaoValor);
-document.getElementById("fechar-valor-investimento").addEventListener("click", fecharAtualizacaoValor);
 
 function formatarDataInvestimento(data) {
     return data.split("-").reverse().join("/");
@@ -1382,14 +1236,6 @@ function renderizarHistoricoInvestimentos() {
     });
 }
 
-const modalMovimentacao = document.getElementById("modal-movimentacao");
-const formMovimentacao = document.getElementById("form-movimentacao");
-const camposMovimentacao = Object.fromEntries(
-    ["investimento", "conta", "valor", "capital", "baixa", "data", "observacoes"]
-        .map((nome) => [nome, document.getElementById(`${nome}-movimentacao`)]));
-let tipoMovimentacao = "aporte";
-let movimentacaoEmEdicao = null;
-
 function obterRestricaoMovimentacaoInvestimentos() {
     if (["transacoes", "contas", "investimentos"].some((chave) => disponibilidadeColecoes.colecaoEstaBloqueada(chave))) {
         return { mensagem: "Não é possível movimentar: contas, investimentos ou transações estão indisponíveis. Os dados armazenados foram preservados.", tipo: "erro" };
@@ -1399,128 +1245,6 @@ function obterRestricaoMovimentacaoInvestimentos() {
     }
     return null;
 }
-
-function podeMovimentarInvestimentos() {
-    const restricao = obterRestricaoMovimentacaoInvestimentos();
-    if (restricao) {
-        mostrarToast(restricao.mensagem, restricao.tipo);
-        return false;
-    }
-    return true;
-}
-
-function abrirModalMovimentacao(tipo, investimentoId = null, id = null) {
-    if (!["aporte", "resgate"].includes(tipo) || !podeMovimentarInvestimentos()) return;
-    const registro = id === null ? null : disponibilidadeColecoes.consultarTransacoes().find((item) => item.id === id && item.tipo === tipo);
-    if (id !== null && !registro) {
-        mostrarToast("A movimentação não está disponível para edição.", "erro");
-        return;
-    }
-    formMovimentacao.reset();
-    limparErros(formMovimentacao);
-    tipoMovimentacao = tipo;
-    movimentacaoEmEdicao = id;
-    const resgate = tipo === "resgate";
-    document.getElementById("titulo-modal-movimentacao").textContent = `${registro ? "Editar" : "Adicionar"} ${tipo}`;
-    document.getElementById("salvar-movimentacao").textContent = registro ? "Salvar alterações" : `Salvar ${tipo}`;
-    document.getElementById("rotulo-investimento-movimentacao").textContent = `Investimento de ${resgate ? "origem" : "destino"}`;
-    document.getElementById("rotulo-conta-movimentacao").textContent = `Conta de ${resgate ? "destino" : "origem"}`;
-    document.getElementById("rotulo-valor-movimentacao").textContent = resgate ? "Valor recebido" : "Valor do aporte";
-    document.getElementById("campos-resgate").classList.toggle("hidden", !resgate);
-    camposMovimentacao.capital.required = resgate;
-    camposMovimentacao.capital.disabled = !resgate;
-    camposMovimentacao.baixa.disabled = !resgate;
-    for (const [nome, colecao] of [["investimento", disponibilidadeColecoes.consultarInvestimentos()], ["conta", disponibilidadeColecoes.consultarContas()]]) {
-        const select = camposMovimentacao[nome];
-        select.replaceChildren(new Option("Selecione...", ""));
-        colecao.forEach((item) => select.add(new Option(item.nome, item.id)));
-    }
-    camposMovimentacao.investimento.value = registro?.investimentoId ?? investimentoId ?? "";
-    camposMovimentacao.conta.value = registro?.contaId ?? "";
-    camposMovimentacao.valor.value = registro?.valor ?? "";
-    camposMovimentacao.capital.value = registro?.capitalRetirado ?? "";
-    camposMovimentacao.baixa.value = registro?.valorRetiradoInvestimento ?? "";
-    camposMovimentacao.data.value = registro?.data ?? obterDataLocal();
-    camposMovimentacao.observacoes.value = registro?.observacoes ?? "";
-    abrirModal(modalMovimentacao, camposMovimentacao.investimento);
-}
-
-function fecharModalMovimentacao() {
-    fecharModal(modalMovimentacao, () => {
-        formMovimentacao.reset();
-        limparErros(formMovimentacao);
-        movimentacaoEmEdicao = null;
-    });
-}
-
-formMovimentacao.addEventListener("submit", (evento) => {
-    evento.preventDefault();
-    limparErros(formMovimentacao);
-    if (!podeMovimentarInvestimentos()) return;
-    const campos = camposMovimentacao;
-    let valido = true;
-    const erro = (campo, mensagem) => { mostrarErro(campo, mensagem); valido = false; };
-    const investimento = disponibilidadeColecoes.consultarInvestimentos().find((item) => item.id === campos.investimento.value);
-    if (!investimento) erro(campos.investimento, "Selecione um investimento cadastrado.");
-    if (!validarContaTransacao(campos.conta.value)) erro(campos.conta, "Selecione uma conta cadastrada.");
-    const monetarios = [campos.valor];
-    if (tipoMovimentacao === "resgate") {
-        monetarios.push(campos.capital);
-        if (campos.baixa.value !== "") monetarios.push(campos.baixa);
-    }
-    for (const campo of monetarios) {
-        if (campo.value === "" || !valorMonetarioValido(campo.value)
-            || Number(campo.value) <= 0 || !campo.validity.valid) {
-            erro(campo, "Informe um valor maior que zero, com até duas casas decimais, dentro do limite permitido.");
-        }
-    }
-    if (!dataValida(campos.data.value) || !campos.data.validity.valid) erro(campos.data, "Selecione uma data válida.");
-    if (campos.observacoes.value.length > 500) erro(campos.observacoes, "Use até 500 caracteres.");
-    if (!valido) { focarPrimeiroErro(formMovimentacao); return; }
-    const anterior = movimentacaoEmEdicao === null ? null
-        : disponibilidadeColecoes.consultarTransacoes().find((item) => item.id === movimentacaoEmEdicao && item.tipo === tipoMovimentacao);
-    if (movimentacaoEmEdicao !== null && !anterior) {
-        mostrarToast("A movimentação em edição não está disponível.", "erro");
-        return;
-    }
-    const registro = prepararMovimentacaoInvestimento({
-        ...anterior,
-        id: anterior?.id ?? crypto.randomUUID(),
-        tipo: tipoMovimentacao,
-        nome: `${tipoMovimentacao === "aporte" ? "Aporte" : "Resgate"} - ${investimento.nome}`,
-        investimentoId: investimento.id,
-        contaId: campos.conta.value,
-        valor: Number(campos.valor.value),
-        data: campos.data.value,
-        observacoes: campos.observacoes.value.trim(),
-        ...(tipoMovimentacao === "resgate" ? {
-            capitalRetirado: Number(campos.capital.value),
-            valorRetiradoInvestimento: campos.baixa.value === "" ? null : Number(campos.baixa.value)
-        } : {})
-    });
-    const candidatos = anterior ? disponibilidadeColecoes.consultarTransacoes().map((item) => item.id === anterior.id ? registro : item)
-        : [...disponibilidadeColecoes.consultarTransacoes(), registro];
-    // A persistência valida também a sequência futura completa, antes de qualquer confirmação.
-    if (!persistirColecao("transacoes", candidatos)) return;
-    limparSelecao();
-    atualizarCategorias();
-    renderizarTransacoes(listaTransacoes, 5);
-    atualizarTabelaCompleta();
-    atualizarResumo();
-    renderizarInvestimentos();
-    fecharModalMovimentacao();
-    mostrarToast(anterior ? "Movimentação atualizada." : "Movimentação registrada.", "sucesso");
-});
-document.querySelectorAll("[data-movimentacao]").forEach((botao) => {
-    botao.addEventListener("click", () => abrirModalMovimentacao(botao.dataset.movimentacao));
-});
-document.getElementById("fechar-movimentacao").addEventListener("click", fecharModalMovimentacao);
-document.getElementById("cancelar-movimentacao").addEventListener("click", fecharModalMovimentacao);
-// Como no cadastro de investimentos, fundo e Escape não descartam o formulário.
-Object.values(camposMovimentacao).forEach((campo) => {
-    campo.addEventListener("input", () => limparErroCampo(campo));
-    campo.addEventListener("change", () => limparErroCampo(campo));
-});
 
 // Um único listener atende as instâncias atuais, sem listeners retidos após destroy().
 document.addEventListener("pointerdown", (evento) => {
