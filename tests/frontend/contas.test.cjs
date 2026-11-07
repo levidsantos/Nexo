@@ -228,7 +228,7 @@ test('Contas: Cancelar, X e cancelamento da confirmação reutilizam fechamento 
 
 test('Contas: callback real do ponto de entrada preserva atualizações de salvar e excluir', () => {
     const fonte = readFileSync(resolve(__dirname, '../../frontend/js/script.js'), 'utf8');
-    const trecho = fonte.slice(fonte.indexOf('const funcionalidadeContas ='), fonte.indexOf('// botoes para abrir'));
+    const trecho = fonte.slice(fonte.indexOf('const funcionalidadeContas ='), fonte.indexOf('const listagensTransacoes ='));
     const efeitos = [], elementos = {};
     const nomes = [...trecho.match(/elementos: \{([^]*?)\}/)[1].matchAll(/\b\w+\b/g)].map(([nome]) => nome);
     nomes.forEach((nome) => { elementos[nome] = {}; });
