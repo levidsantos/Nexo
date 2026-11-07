@@ -84,7 +84,11 @@ test('Investimentos: cards preservam ordem, valores preparados, referências, no
     a.renderizar([primeiro, investimento({ id: 'segundo', nome: 'Segundo' })]);
     const card = a.refs.listaInvestimentos.children[0];
     assert.deepEqual(a.refs.listaInvestimentos.children.map(c => c.dataset.investimentoId), [primeiro.id, 'segundo']);
-    for (const trecho of ['Nome longo', 'Tipo livre · Banco', 'Capital aplicado atual', valores.formatarCentavos(10000), 'Valor estimado atual', valores.formatarCentavos(12000), 'Inicial: ', 'Manual: ', 'fim de 31/10/2026', 'Atualização manual: 01/11/2026', 'Nota']) assert.ok(card.textContent.includes(trecho), trecho);
+    // O instante UTC da fixture pode corresponder a outro dia no fuso local.
+    const dataAtualizacaoEsperada = new Intl.DateTimeFormat('pt-BR', {
+        day: '2-digit', month: '2-digit', year: 'numeric'
+    }).format(new Date(primeiro.atualizadoEm));
+    for (const trecho of ['Nome longo', 'Tipo livre · Banco', 'Capital aplicado atual', valores.formatarCentavos(10000), 'Valor estimado atual', valores.formatarCentavos(12000), 'Inicial: ', 'Manual: ', 'fim de 31/10/2026', `Atualização manual: ${dataAtualizacaoEsperada}`, 'Nota']) assert.ok(card.textContent.includes(trecho), trecho);
     assert.equal(a.menu().querySelector('summary').getAttribute('aria-controls'), `administracao-investimento-${primeiro.id}`);
     assert.equal(card.querySelector('[data-acao="editar"]').getAttribute('aria-label'), 'Editar investimento Nome longo');
     assert.equal(card.classList.contains('entrada-investimento'), false);
