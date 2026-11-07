@@ -1,0 +1,118 @@
+/* Resumo: os mesmos registros recentes, com prioridade para nome e valor no mobile. */
+#pagina-resumo .contexto-recente { display: none; }
+#pagina-resumo .selecao-recente { display: inline-flex; align-items: center; justify-content: center; margin: -14px -14px; width: 44px; height: 44px; cursor: pointer; }
+#pagina-resumo .recente-nome { overflow-wrap: anywhere; }
+@media (max-width: 850px) {
+    #pagina-resumo .tabela-resumo { overflow: visible; }
+    #pagina-resumo .transacoes .transacoes-header { margin-bottom: 8px; }
+    #pagina-resumo .tabela-resumo table { display: block; min-width: 0; width: 100%; }
+    #pagina-resumo .tabela-resumo thead { display: block; position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); }
+    #pagina-resumo .tabela-resumo thead :is(tr, th) { display: block; }
+    #pagina-resumo #lista-transacoes { display: block; }
+    #pagina-resumo #lista-transacoes tr { display: grid; grid-template-columns: 28px minmax(0, 1fr) minmax(0, .85fr); gap: 6px 12px; padding: 18px 0; border-bottom: 1px solid var(--nexo-borda); }
+    #pagina-resumo #lista-transacoes tr:last-child { border-bottom: 0; padding-bottom: 4px; }
+    #pagina-resumo #lista-transacoes td { display: block; min-width: 0; width: auto; padding: 0; border: 0; }
+    #pagina-resumo #lista-transacoes .recente-selecao { grid-column: 1; grid-row: 1 / 3; align-self: start; }
+    #pagina-resumo #lista-transacoes .selecao-recente { margin: -10px -8px; }
+    #pagina-resumo #lista-transacoes .recente-nome { grid-column: 2; grid-row: 1; font-size: 14px; font-weight: 550; line-height: 1.45; }
+    #pagina-resumo #lista-transacoes .recente-valor { grid-column: 3; grid-row: 1; text-align: right; white-space: normal; overflow-wrap: anywhere; font-size: 16px; font-weight: 600; line-height: 1.45; }
+    #pagina-resumo #lista-transacoes .recente-categoria { grid-column: 2; grid-row: 2; color: #62596d; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+    #pagina-resumo .categoria-recente-desktop { display: none; }
+    #pagina-resumo .contexto-recente { display: inline; }
+    #pagina-resumo #lista-transacoes .recente-data { grid-column: 3; grid-row: 2; text-align: right; color: #62596d; font-size: 12px; line-height: 1.5; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    #pagina-resumo #lista-transacoes :is(.recente-pagamento, .recente-classificacao, .recente-conta) { display: none; }
+    #pagina-resumo #lista-transacoes :is(.receita, .resgate) { color: #177252; }
+    #pagina-resumo #lista-transacoes .despesa { color: #a43d42; }
+    #pagina-resumo #lista-transacoes .aporte { color: var(--nexo-primaria); }
+    #pagina-resumo #lista-transacoes .mensagem-sem-resultados { grid-column: 1 / -1; padding: 12px 0; white-space: normal; overflow-wrap: anywhere; }
+    #pagina-resumo #lista-transacoes tr.selecionada { background: #f4effb; }
+    #pagina-resumo #lista-transacoes input:focus-visible { outline: 2px solid var(--nexo-primaria); outline-offset: 3px; }
+}
+@media (max-width: 520px) {
+    #pagina-resumo #lista-transacoes tr { grid-template-columns: 24px minmax(0, 1fr) auto; gap: 5px 8px; padding-block: 16px; }
+    #pagina-resumo #lista-transacoes .recente-nome { grid-column: 2 / -1; }
+    #pagina-resumo #lista-transacoes .recente-valor { grid-column: 2 / -1; grid-row: 2; text-align: left; }
+    #pagina-resumo #lista-transacoes .recente-categoria { grid-row: 3; }
+    #pagina-resumo #lista-transacoes .recente-data { grid-row: 3; }
+    #pagina-resumo #lista-transacoes .recente-selecao { grid-row: 1 / 4; }
+}
+
+/* Transações mobile: dados aplicáveis agrupados, sem linhas vazias por tipo. */
+#pagina-transacoes :is(.complementos-mobile, .tipo-data-mobile, .recebido-mobile) { display: none; }
+@media (max-width: 850px) {
+    #pagina-transacoes thead, #pagina-transacoes thead :is(tr, th) { display: block; }
+    #pagina-transacoes #lista-transacoes-completa tr { grid-template-columns: 28px minmax(0, 1fr) minmax(0, .85fr); gap: 6px 10px; padding: 16px; }
+    #pagina-transacoes #lista-transacoes-completa .transacao-selecionar { grid-column: 1; grid-row: 1 / 4; }
+    #pagina-transacoes .alvo-selecao { min-width: 44px; margin-left: -8px; }
+    #pagina-transacoes #lista-transacoes-completa .transacao-nome { grid-column: 2; grid-row: 1; }
+    #pagina-transacoes .transacao-nome .tipo-transacao { display: none; }
+    #pagina-transacoes #lista-transacoes-completa .transacao-valor { grid-column: 3; grid-row: 1; text-align: right; white-space: normal; overflow-wrap: anywhere; }
+    #pagina-transacoes #lista-transacoes-completa .transacao-data { grid-column: 2 / -1; grid-row: 2; text-align: left; white-space: normal; font-size: 12px; }
+    #pagina-transacoes .tipo-data-mobile { display: inline; }
+    #pagina-transacoes #lista-transacoes-completa .transacao-categoria { grid-column: 2 / -1; grid-row: 3; }
+    #pagina-transacoes .transacao-categoria > :not(.complementos-mobile),
+    #pagina-transacoes #lista-transacoes-completa :is(.transacao-pagamento, .transacao-classificacao, .transacao-conta) { display: none; }
+    #pagina-transacoes .complementos-mobile { display: flex; flex-wrap: wrap; gap: 3px 14px; color: #62596d; font-size: 12px; line-height: 1.5; }
+    #pagina-transacoes .complementos-mobile > span { min-width: 0; overflow-wrap: anywhere; }
+    #pagina-transacoes .rotulo-complemento { color: var(--nexo-texto-secundario); }
+    #pagina-transacoes .recebido-mobile { display: block; margin-top: 2px; color: #62596d; font-size: 11px; font-weight: 400; letter-spacing: normal; }
+    #pagina-transacoes #lista-transacoes-completa .mensagem-sem-resultados { white-space: normal; overflow-wrap: anywhere; }
+}
+@media (max-width: 520px) {
+    #pagina-transacoes #lista-transacoes-completa tr { grid-template-columns: 28px minmax(0, 1fr); gap: 5px 8px; }
+    #pagina-transacoes #lista-transacoes-completa .transacao-nome { grid-column: 2; }
+    #pagina-transacoes #lista-transacoes-completa .transacao-valor { grid-column: 2; grid-row: 2; text-align: left; }
+    #pagina-transacoes #lista-transacoes-completa .transacao-data { grid-column: 2; grid-row: 3; }
+    #pagina-transacoes #lista-transacoes-completa .transacao-categoria { grid-column: 2; grid-row: 4; }
+    #pagina-transacoes #lista-transacoes-completa .transacao-selecionar { grid-row: 1 / 5; }
+}
+
+/* Ações de seleção: mesma hierarquia no Resumo e na listagem completa. */
+:is(#pagina-resumo, #pagina-transacoes) .conteudo-acoes { flex-wrap: wrap; gap: 10px 12px; color: #62596d; font-size: 12px; }
+:is(#pagina-resumo, #pagina-transacoes) .conteudo-acoes > span { min-width: 0; overflow-wrap: anywhere; }
+:is(#pagina-resumo, #pagina-transacoes) .botoes-acoes { flex-wrap: wrap; gap: 8px; }
+:is(#pagina-resumo, #pagina-transacoes) .botoes-acoes button { box-sizing: border-box; min-height: 44px; height: auto; padding: 8px 12px; border: 1px solid #d9d3e1; border-radius: 8px; background: #fff; color: #38303f; box-shadow: none; font-size: 13px; line-height: 1.3; transition: background-color .16s ease, border-color .16s ease; }
+:is(#pagina-resumo, #pagina-transacoes) .botoes-acoes button:hover:not(:disabled) { background: #f7f5fa; border-color: #b8adc8; }
+:is(#pagina-resumo, #pagina-transacoes) .botoes-acoes :is(#limpar-selecao-completa, #cancelar-selecao-contextual) { padding-inline: 4px; border-color: transparent; background: transparent; color: #62596d; font-weight: 400; }
+:is(#pagina-resumo, #pagina-transacoes) .botoes-acoes :is(#limpar-selecao-completa, #cancelar-selecao-contextual):hover { background: #f7f5fa; color: var(--nexo-primaria); }
+:is(#pagina-resumo, #pagina-transacoes) .botoes-acoes button:focus-visible { outline: 2px solid var(--nexo-primaria); outline-offset: 3px; }
+:is(#pagina-resumo, #pagina-transacoes) .botoes-acoes button:disabled { opacity: .4; cursor: not-allowed; }
+@media (prefers-reduced-motion: reduce) {
+    :is(#pagina-resumo, #pagina-transacoes) .botoes-acoes button { transition: none; }
+}
+
+/* A barra contextual fica fora do fluxo, preservando a expansão da barra superior. */
+#pagina-transacoes #barra-contextual-transacoes { display: none; }
+@media (max-width: 850px) {
+    /* Reserva constante no mobile, inclusive ao cancelar: não depende da barra ou da seleção. */
+    /* Reutiliza a expansão de 250 ms da área de seleção do Resumo. */
+    #pagina-transacoes { padding-bottom: 110px; }
+    html:has(#pagina-transacoes.ativa.tem-selecao-mobile) { scroll-padding-bottom: calc(var(--reserva-navegacao-mobile, 72px) + 126px); }
+    #pagina-transacoes #barra-acoes-completa { transition: opacity .2s ease-out, transform .2s ease-out, visibility 0s linear .2s; }
+    #pagina-transacoes #area-acoes-completa.ativa #barra-acoes-completa { transition-delay: 0s; }
+    #pagina-transacoes #barra-acoes-completa.acoes-superiores-ocultas { opacity: 0; visibility: hidden; pointer-events: none; transition: none; }
+    #pagina-transacoes #barra-contextual-transacoes { display: block; position: fixed; z-index: 35; left: max(12px, env(safe-area-inset-left, 0px)); right: max(12px, env(safe-area-inset-right, 0px)); bottom: calc(var(--altura-nav-acoes, var(--reserva-navegacao-mobile, 72px)) + 8px); max-width: 560px; margin-inline: auto; padding: 8px 10px; box-sizing: border-box; background: var(--nexo-superficie); border: 1px solid #d9d3e1; border-radius: 12px; opacity: 0; visibility: hidden; pointer-events: none; transform: translateY(6px); transition: opacity .2s ease-out, transform .2s ease-out, visibility 0s linear .2s; }
+    #pagina-transacoes #barra-contextual-transacoes.visivel { opacity: 1; visibility: visible; pointer-events: auto; transform: translateY(0); transition: opacity .2s ease-out, transform .2s ease-out, visibility 0s; }
+    #pagina-transacoes #quantidade-contextual-transacoes { display: block; margin-bottom: 6px; font-size: 12px; line-height: 1.5; color: #62596d; }
+    #pagina-transacoes #barra-contextual-transacoes .botoes-acoes { flex-wrap: nowrap; gap: 6px; }
+    #pagina-transacoes #barra-contextual-transacoes #cancelar-selecao-contextual { margin-left: auto; }
+    #pagina-transacoes #barra-contextual-transacoes.troca-foco-contextual { transition: none; }
+    #pagina-transacoes #barra-acoes-completa.troca-foco-contextual { visibility: visible; opacity: 1; transition: none; }
+    body:has(.modal-overlay:not(.hidden)) #pagina-transacoes #barra-contextual-transacoes { opacity: 0; visibility: hidden; pointer-events: none; transition: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+    #pagina-transacoes #area-acoes-completa { transition: none; }
+    #pagina-transacoes :is(#barra-contextual-transacoes, #barra-acoes-completa) { transition: none !important; transform: none; }
+}
+
+/* Variantes de cor: a geometria continua sob responsabilidade de cada componente. */
+.btn-primario { --acao-fundo: var(--nexo-primaria); --acao-hover: var(--nexo-primaria-hover); }
+.btn-excluir { --acao-fundo: var(--cor-despesa); --acao-hover: #a91b1b; }
+:is(.topbar, #pagina-resumo, #pagina-transacoes, #pagina-contas, #pagina-investimentos, #modal-overlay, #modal-conta, #modal-investimento, #modal-valor-investimento, #modal-movimentacao, #modal-exclusao, #modal-exclusao-conta, #modal-exclusao-investimento) button:is(.btn-primario, .btn-excluir) { background: var(--acao-fundo); border-color: var(--acao-fundo); color: #fff; }
+:is(.topbar, #pagina-resumo, #pagina-transacoes, #pagina-contas, #pagina-investimentos, #modal-overlay, #modal-conta, #modal-investimento, #modal-valor-investimento, #modal-movimentacao, #modal-exclusao, #modal-exclusao-conta, #modal-exclusao-investimento) button:is(.btn-primario, .btn-excluir):hover:not(:disabled) { background: var(--acao-hover); border-color: var(--acao-borda-hover, var(--acao-hover)); color: #fff; }
+:is(.topbar, #pagina-resumo, #pagina-transacoes, #pagina-contas, #pagina-investimentos, #modal-overlay, #modal-conta, #modal-investimento, #modal-valor-investimento, #modal-movimentacao, #modal-exclusao, #modal-exclusao-conta, #modal-exclusao-investimento) button:is(.btn-primario, .btn-excluir):focus-visible { outline: 2px solid var(--nexo-primaria); outline-offset: 3px; }
+:is(.topbar, #pagina-resumo, #pagina-transacoes, #pagina-contas, #pagina-investimentos, #modal-overlay, #modal-conta, #modal-investimento, #modal-valor-investimento, #modal-movimentacao, #modal-exclusao, #modal-exclusao-conta, #modal-exclusao-investimento) button:is(.btn-primario, .btn-excluir):disabled { opacity: .4; cursor: not-allowed; }
+
+/* Nestes primários, a borda conserva o roxo normal durante o hover. */
+:is(#btn-nova-conta, #novo-investimento, #salvar-conta).btn-primario,
+:is(#modal-investimento, #modal-valor-investimento, #modal-movimentacao) button.btn-primario { --acao-borda-hover: var(--nexo-primaria); }

@@ -1,0 +1,69 @@
+/* Valores atuais: esta base não aplica uma nova paleta nem altera medidas. */
+:root {
+    /* Estados compartilhados dos campos dos modais. */
+    --campo-modal-borda: #998c8b;
+    --campo-modal-borda-hover: #776a89;
+    --campo-modal-borda-foco: #655d70;
+    --campo-sombra-foco: inset 0 0 0 1px var(--campo-modal-borda-foco), 0 0 0 3px rgba(104, 64, 181, 0.08);
+    --campo-modal-borda-erro: #b46a64;
+
+    /* Superfícies e textos */
+    --cor-fundo: #f3f6fb;
+    --cor-superficie: #ffffff;
+    --cor-texto: #20242a;
+    --cor-texto-inverso: #ffffff;
+    --cor-texto-auxiliar: #6b7280;
+    --cor-texto-secundario: #64748b;
+    --cor-texto-campo: #1c1427;
+    --cor-texto-controle: #26202a;
+    --cor-texto-titulo: #27202a;
+    --cor-texto-formulario: #374151;
+
+    /* Bordas e superfícies interativas */
+    --cor-superficie-interativa: #faf8fc;
+    --cor-borda: #edf0f5;
+    --cor-borda-campo: #d7d1db;
+    --cor-borda-botao: #f4f5f7;
+    --cor-borda-hover: #e1cccb;
+
+    /* Destaque e estados semânticos */
+    --cor-destaque: #a163f1;
+    --cor-receita: #28d166;
+    --cor-sucesso: #28d166;
+    --cor-despesa: #c91f1f;
+    --cor-erro: #c0392b;
+    --cor-texto-vazio: #a894b8;
+
+    /* Elevação e foco */
+    --sombra-interativa: 0 2px 8px rgba(30, 55, 90, 0.144);
+    --sombra-foco: 0 0 0 3px rgba(161, 99, 241, 0.12);
+
+    /* Raios e espaçamentos compartilhados */
+    --raio-controle: 8px;
+    --raio-painel: 12px;
+    --raio-item: 10px;
+    --espaco-2: 8px;
+    --espaco-3: 12px;
+    --espaco-4: 16px;
+    --espaco-6: 24px;
+}
+
+body {
+    margin: 0;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 
+    'Open Sans', 'Helvetica Neue', sans-serif;
+    background: var(--cor-fundo);
+    color: var(--cor-texto);
+}
+
+.container {
+    display: flex;
+    min-height: 100vh;  
+}
+
+.main-area {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+}
