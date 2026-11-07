@@ -1,4 +1,5 @@
 'use strict';
+const { criarContas } = require("../../frontend/js/funcionalidades/contas.js");
 const { test, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
@@ -183,6 +184,8 @@ function adaptadores(app, registros = []) {
     const contexto = createContext({
         ...utilitarios, ...validacoes, ...calculos,
         disponibilidadeColecoes: app.estado,
+        funcionalidadeContas: criarContas({ elementos: { listaContas: { ownerDocument: {} } },
+            estado: app.estado, modais: {}, mostrarToast: (...args) => mensagens.push(args) }),
         mostrarToast: (...argumentos) => mensagens.push(argumentos)
     });
     const funcoes = new Script(`${declaracoes}\n({ ${nomes.join(', ')} })`).runInContext(contexto);

@@ -379,7 +379,7 @@ test('toasts reais acompanham abertura, fechamento e troca; anúncio fica no di�
 
 test('adaptador real de Escape mantém os três fluxos específicos de confirmação', (t) => {
     const a = ambiente(t), chamadas = [], investimento = a.elemento('div');
-    const trecho = fonte.slice(fonte.indexOf('const modais = criarModais('), fonte.indexOf('// botoes para abrir'));
+    const trecho = fonte.slice(fonte.indexOf('const modais = criarModais('), fonte.indexOf('const funcionalidadeContas ='));
     let opcoes;
     const contexto = createContext({
         document: { getElementById: (id) => id === 'modal-exclusao-investimento' ? investimento : null },

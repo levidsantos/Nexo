@@ -1,3 +1,4 @@
+import { criarContas } from "./funcionalidades/contas.js";
 import { criarResumo } from "./funcionalidades/resumo.js";
 import { criarModais } from "./ui/modais.js";
 import { criarNotificacoes } from "./ui/notificacoes.js";
@@ -133,9 +134,6 @@ const campoInstituicaoConta = document.getElementById("instituicao-conta");
 const campoSaldoInicial = document.getElementById("saldo-inicial-conta");
 const campoDataReferencia = document.getElementById("data-referencia-conta");
 const campoIncluirNoSaldoDisponivel = document.getElementById("incluir-saldo-disponivel");
-let inclusaoSaldoAlterada = false;
-let contaEmEdicao = null;
-let contaEmExclusao = null;
 const tituloModalConta = document.getElementById("titulo-modal-conta");
 const botaoSalvarConta = document.getElementById("salvar-conta");
 const modalExclusaoConta = document.getElementById("modal-exclusao-conta");
@@ -162,6 +160,28 @@ const modais = criarModais({
         if (!modalExclusao.classList.contains("hidden")) fecharModal(modalExclusao);
         if (modal === modalExclusaoConta) fecharModalExclusaoConta();
         if (modal === document.getElementById("modal-exclusao-investimento")) fecharExclusaoInvestimento();
+    }
+});
+
+const funcionalidadeContas = criarContas({
+    elementos: {
+        botaoNovaConta, modalConta, botaoFecharConta, botaoCancelarConta,
+        formConta, campoNomeConta, campoTipoConta, campoInstituicaoConta,
+        campoSaldoInicial, campoDataReferencia, campoIncluirNoSaldoDisponivel, tituloModalConta,
+        botaoSalvarConta, modalExclusaoConta, mensagemExclusaoConta, botaoCancelarExclusaoConta,
+        botaoConfirmarExclusaoConta, listaContas
+    },
+    estado: disponibilidadeColecoes,
+    confirmarContas: (candidatas) => persistirColecao("contas", candidatas),
+    modais: { abrirModal, fecharModal }, mostrarToast,
+    aoConfirmarAlteracao: (operacao) => {
+        atualizarOpcoesContas();
+        atualizarVisualizacoesSaldos();
+        if (operacao === "salvar") {
+            // Nomes atuais por ID, sem modificar os vínculos ou a seleção.
+            renderizarTransacoes(listaTransacoes, 5);
+            atualizarTabelaCompleta();
+        }
     }
 });
 
@@ -1456,26 +1476,7 @@ function aplicarFiltros() {
 }
 
 function abrirModalConta(contaId = null) {
-    const conta = contaId === null ? null : disponibilidadeColecoes.consultarContas().find((registro) => registro.id === contaId);
-    if (contaId !== null && !conta) {
-        mostrarToast("Não foi possível editar: a conta não está disponível.", "erro");
-        return;
-    }
-    formConta.reset();
-    limparErros(formConta);
-    contaEmEdicao = conta ? conta.id : null;
-    tituloModalConta.textContent = conta ? "Editar Conta" : "Adicionar Conta";
-    botaoSalvarConta.textContent = conta ? "Salvar alterações" : "Salvar Conta";
-    campoNomeConta.value = conta ? conta.nome : "";
-    campoTipoConta.value = conta ? conta.tipo : "";
-    campoInstituicaoConta.value = conta ? conta.instituicao ?? "" : "";
-    campoSaldoInicial.value = conta ? conta.saldoInicial : "";
-    campoDataReferencia.max = obterDataLocal();
-    campoDataReferencia.value = conta ? conta.dataReferencia : obterDataLocal();
-    campoIncluirNoSaldoDisponivel.checked = conta ? conta.incluirNoSaldoDisponivel : true;
-    // Na edição, a opção salva prevalece sobre sugestões baseadas no tipo.
-    inclusaoSaldoAlterada = Boolean(conta);
-    abrirModal(modalConta, campoNomeConta);
+    funcionalidadeContas.abrirModalConta(contaId);
 }
 
 function atualizarOpcoesContas() {
@@ -1506,127 +1507,16 @@ function prepararContasTransacao() {
     return true;
 }
 
-function fecharModalConta() {
-    fecharModal(modalConta, () => {
-        formConta.reset();
-        limparErros(formConta);
-        contaEmEdicao = null;
-        inclusaoSaldoAlterada = false;
-    });
-}
-
 function podeExcluirConta(contaId) {
-    if (disponibilidadeColecoes.colecaoEstaBloqueada("contas") || disponibilidadeColecoes.colecaoEstaBloqueada("transacoes")) {
-        mostrarToast("Não é possível excluir a conta: os dados de contas ou transações estão indisponíveis. "
-            + "Não foi possível confirmar a ausência de vínculos.", "erro");
-        return false;
-    }
-    if (!disponibilidadeColecoes.consultarContas().some((conta) => conta.id === contaId)) {
-        mostrarToast("Não foi possível excluir: a conta não está disponível.", "erro");
-        return false;
-    }
-    if (disponibilidadeColecoes.consultarTransacoes().some((transacao) => transacao.contaId === contaId)) {
-        mostrarToast("Esta conta possui transações vinculadas e não pode ser excluída, "
-            + "mesmo que sejam históricas. Nenhuma transação foi alterada.", "erro");
-        return false;
-    }
-    return true;
-}
-
-function solicitarExclusaoConta(contaId) {
-    if (!podeExcluirConta(contaId)) return;
-    const conta = disponibilidadeColecoes.consultarContas().find((registro) => registro.id === contaId);
-    contaEmExclusao = conta.id;
-    mensagemExclusaoConta.textContent = `Deseja excluir a conta "${conta.nome}"? Esta ação não poderá ser desfeita.`;
-    abrirModal(modalExclusaoConta, botaoCancelarExclusaoConta);
+    return funcionalidadeContas.podeExcluirConta(contaId);
 }
 
 function fecharModalExclusaoConta() {
-    fecharModal(modalExclusaoConta);
-    contaEmExclusao = null;
+    funcionalidadeContas.fecharModalExclusaoConta();
 }
 
 function renderizarContas(saldos) {
-    listaContas.innerHTML = "";
-
-    if (disponibilidadeColecoes.colecaoEstaBloqueada("contas")) {
-        const mensagem = document.createElement("p");
-        mensagem.classList.add("mensagem-vazia");
-        mensagem.textContent = "Dados de contas indisponíveis. Gravações bloqueadas nesta sessão.";
-        listaContas.appendChild(mensagem);
-        return;
-    }
-
-    if (!saldos.disponivel) {
-        const mensagem = document.createElement("p");
-        mensagem.classList.add("mensagem-vazia");
-        mensagem.textContent = `Saldos indisponíveis. ${saldos.motivo}`;
-        listaContas.appendChild(mensagem);
-    }
-
-    if (disponibilidadeColecoes.consultarContas().length === 0) {
-        if (!saldos.disponivel) return;
-        listaContas.innerHTML = `
-            <p class="mensagem-vazia">
-                Nenhuma conta cadastrada.
-            </p>
-        `;
-        return;
-    }
-
-    disponibilidadeColecoes.consultarContas().forEach((conta) => {
-        const item = document.createElement("div");
-        item.classList.add("item-conta");
-
-        const nome = document.createElement("h3");
-        nome.textContent = conta.nome;
-
-        const detalhes = document.createElement("p");
-
-        const tipos = {
-            corrente: "Conta corrente",
-            poupanca: "Poupança",
-            reserva: "Reserva",
-            carteira: "Carteira física"
-        };
-
-        detalhes.textContent = [
-            conta.instituicao,
-            tipos[conta.tipo] || conta.tipo
-        ].filter(Boolean).join(" · ");
-
-        const saldo = document.createElement("strong");
-        saldo.textContent = saldos.disponivel
-            ? formatarCentavos(saldos.saldosPorContaCentavos.get(conta.id))
-            : "Saldo indisponível";
-
-        const acoes = document.createElement("div");
-        acoes.classList.add("acoes-conta");
-        const editar = document.createElement("button");
-        editar.type = "button";
-        editar.textContent = "Editar";
-        editar.setAttribute("aria-label", `Editar conta ${conta.nome}`);
-        editar.addEventListener("click", () => abrirModalConta(conta.id));
-        const excluir = document.createElement("button");
-        excluir.type = "button";
-        excluir.classList.add("btn-excluir");
-        excluir.textContent = "Excluir";
-        excluir.setAttribute("aria-label", `Excluir conta ${conta.nome}`);
-        excluir.addEventListener("click", () => solicitarExclusaoConta(conta.id));
-        acoes.append(editar, excluir);
-        const rotuloSaldo = document.createElement("span");
-        rotuloSaldo.className = "rotulo-saldo-conta";
-        rotuloSaldo.textContent = "Saldo atual";
-        saldo.className = "saldo-atual-conta";
-        if (saldos.disponivel && saldos.saldosPorContaCentavos.get(conta.id) < 0) saldo.classList.add("saldo-negativo");
-        const inclusao = document.createElement("p");
-        inclusao.className = "inclusao-conta";
-        inclusao.textContent = conta.incluirNoSaldoDisponivel
-            ? "Incluída no saldo disponível" : "Fora do saldo disponível";
-        if (conta.incluirNoSaldoDisponivel) inclusao.classList.add("incluida");
-        item.append(nome, detalhes, rotuloSaldo, saldo, inclusao, acoes);
-        listaContas.appendChild(item);
-    });
+    funcionalidadeContas.renderizarContas(saldos);
 }
 // Compartilha um único cálculo sobre as coleções completas entre as páginas.
 function atualizarVisualizacoesSaldos() {
@@ -1653,101 +1543,7 @@ linksNavegacao.forEach((link) => {
     });
 });
 
-// evento modal de conta
-botaoNovaConta.addEventListener("click", () => abrirModalConta());
-
-botaoFecharConta.addEventListener("click", fecharModalConta);
-
-botaoCancelarConta.addEventListener("click", fecharModalConta);
-campoTipoConta.addEventListener("change", () => {
-    // A sugestão por tipo não substitui uma escolha manual durante o cadastro.
-    if (!inclusaoSaldoAlterada) {
-        campoIncluirNoSaldoDisponivel.checked = campoTipoConta.value !== "reserva";
-    }
-});
-campoIncluirNoSaldoDisponivel.addEventListener("change", () => {
-    inclusaoSaldoAlterada = true;
-});
-
-formConta.addEventListener("submit", (evento) => {
-    evento.preventDefault();
-    limparErros(formConta);
-
-    const nome = campoNomeConta.value.trim();
-    const tipo = campoTipoConta.value;
-    const instituicao = campoInstituicaoConta.value.trim();
-    const valorInformado = campoSaldoInicial.value;
-    const saldoInicial = Number(valorInformado);
-    const dataReferencia = campoDataReferencia.value;
-    const incluirNoSaldoDisponivel = campoIncluirNoSaldoDisponivel.checked;
-
-    let formularioValido = true;
-    if (!nome) {
-        mostrarErro(campoNomeConta, "Informe o nome da conta.");
-        formularioValido = false;
-    }
-    if (!tipo) {
-        mostrarErro(campoTipoConta, "Selecione um tipo de conta.");
-        formularioValido = false;
-    }
-    if (valorInformado === "" || !valorMonetarioValido(valorInformado)
-        || !campoSaldoInicial.validity.valid) {
-        mostrarErro(campoSaldoInicial, "Informe um saldo zero ou positivo, com até duas casas decimais, dentro do limite permitido.");
-        formularioValido = false;
-    }
-    if (!dataValida(dataReferencia) || dataReferencia > obterDataLocal() || !campoDataReferencia.validity.valid) {
-        mostrarErro(campoDataReferencia, "Informe uma data válida, igual ou anterior a hoje.");
-        formularioValido = false;
-    }
-    if (!formularioValido) {
-        focarPrimeiroErro(formConta);
-        return;
-    }
-
-    const estavaEditando = contaEmEdicao !== null;
-    const contaExistente = estavaEditando ? disponibilidadeColecoes.consultarContas().find((conta) => conta.id === contaEmEdicao) : null;
-    if (estavaEditando && !contaExistente) {
-        mostrarToast("Não foi possível salvar: a conta em edição não está disponível.", "erro");
-        return;
-    }
-    const contaAtualizada = {
-        ...contaExistente,
-        id: estavaEditando ? contaExistente.id : crypto.randomUUID(),
-        nome: nome,
-        tipo: tipo,
-        instituicao: instituicao,
-        saldoInicial: saldoInicial,
-        dataReferencia,
-        incluirNoSaldoDisponivel
-    };
-
-    const proximasContas = estavaEditando
-        ? disponibilidadeColecoes.consultarContas().map((conta) => conta.id === contaEmEdicao ? contaAtualizada : conta)
-        : [...disponibilidadeColecoes.consultarContas(), contaAtualizada];
-    if (!persistirColecao("contas", proximasContas)) return;
-    atualizarOpcoesContas();
-    atualizarVisualizacoesSaldos();
-    // O nome exibido muda; os vínculos e a seleção continuam baseados nos IDs.
-    renderizarTransacoes(listaTransacoes, 5);
-    atualizarTabelaCompleta();
-
-    fecharModalConta();
-    mostrarToast(estavaEditando ? "Conta atualizada." : "Conta criada.", "sucesso");
-});
-
-botaoCancelarExclusaoConta.addEventListener("click", fecharModalExclusaoConta);
-modalExclusaoConta.addEventListener("click", (evento) => {
-    if (evento.target === modalExclusaoConta) fecharModalExclusaoConta();
-});
-botaoConfirmarExclusaoConta.addEventListener("click", () => {
-    if (contaEmExclusao === null || !podeExcluirConta(contaEmExclusao)) return;
-    const proximasContas = disponibilidadeColecoes.consultarContas().filter((conta) => conta.id !== contaEmExclusao);
-    if (!persistirColecao("contas", proximasContas)) return;
-    atualizarOpcoesContas();
-    atualizarVisualizacoesSaldos();
-    fecharModalExclusaoConta();
-    mostrarToast("Conta excluída.", "sucesso");
-});
+funcionalidadeContas.inicializar();
 
 // evento campo de pesquisa
 campoPesquisa.addEventListener("input", aplicarFiltros); 
@@ -1811,11 +1607,7 @@ const camposFormulario = [
     campoValor,
     campoCategoria,
     campoData,
-    campoConta,
-    campoNomeConta,
-    campoTipoConta,
-    campoSaldoInicial,
-    campoDataReferencia
+    campoConta
 ];
 
 camposFormulario.forEach((campo) => {
