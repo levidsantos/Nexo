@@ -1,6 +1,6 @@
 import { lerDados, gravarDados } from "./repositorio.js";
 import { validarConta, validarColecao, validarTransacao, validarInvestimento, classificacaoDespesaValida,
-    ehMovimentacaoInvestimento } from "../dominio/validacoes.js";
+    ehMovimentacaoInvestimento, validarVinculosContas } from "../dominio/validacoes.js";
 import { verificarIntegridadeTransacoes } from "../dominio/calculos.js";
 
 // Copia uma vez por versão, preservando também campos adicionais de registros
@@ -75,6 +75,19 @@ export function criarEstadoDisponibilidade({ ler = lerDados, gravar = gravarDado
             if (colecoesBloqueadas.has("contas")) return { sucesso: false, motivo: "bloqueada" };
             if (!contasInicializadas) return { sucesso: false, motivo: "nao-inicializada" };
             if (!validarColecao(candidatas, validarConta)) return { sucesso: false, motivo: "invalida" };
+            const idsCandidatos = new Set(candidatas.map((conta) => conta.id));
+            const removeIds = contas.some((conta) => !idsCandidatos.has(conta.id));
+            // Manter todos os IDs é seguro para os vínculos, mesmo com dependências indisponíveis.
+            // Remover um ID exige comprovar que nenhuma transação depende dele.
+            if (removeIds) {
+                if (!transacoesInicializadas || colecoesBloqueadas.has("transacoes")) {
+                    return { sucesso: false, motivo: "dependencias" };
+                }
+                if (!validarVinculosContas(transacoes, candidatas)) {
+                    return { sucesso: false, motivo: "integridade",
+                        detalhe: "Há transações vinculadas a contas ausentes na coleção proposta." };
+                }
+            }
             try {
                 // Preparar antes de gravar evita trabalho sujeito a falha entre
                 // a confirmação do armazenamento e a substituição em memória.

@@ -21,11 +21,15 @@ export function ehMovimentacaoInvestimento(registro) {
     return registro.tipo === "aporte" || registro.tipo === "resgate";
 }
 
-export function validarVinculosTransacoes(registros, contasCadastradas, investimentosCadastrados = []) {
+export function validarVinculosContas(registros, contasCadastradas) {
     const idsContas = new Set(contasCadastradas.map((conta) => conta.id));
+    return registros.every((transacao) => idsContas.has(transacao.contaId));
+}
+
+export function validarVinculosTransacoes(registros, contasCadastradas, investimentosCadastrados = []) {
     const idsInvestimentos = new Set(investimentosCadastrados.map((item) => item.id));
-    return registros.every((transacao) => idsContas.has(transacao.contaId)
-        && (!ehMovimentacaoInvestimento(transacao) || idsInvestimentos.has(transacao.investimentoId)));
+    return validarVinculosContas(registros, contasCadastradas)
+        && registros.every((transacao) => !ehMovimentacaoInvestimento(transacao) || idsInvestimentos.has(transacao.investimentoId));
 }
 
 export function validarTransacao(registro) {

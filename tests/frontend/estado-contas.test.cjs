@@ -10,7 +10,7 @@ const { lerDados, gravarDados } = require('../../frontend/js/dados/repositorio.j
 const validacoes = require('../../frontend/js/dominio/validacoes.js');
 const calculos = require('../../frontend/js/dominio/calculos.js');
 const utilitarios = require('../../frontend/js/dominio/valores-datas.js');
-const { conta, transacao } = require('./support/fixtures.cjs');
+const { conta, transacao, investimento, aporte, resgate } = require('./support/fixtures.cjs');
 
 beforeEach((t) => t.mock.timers.enable({ apis: ['Date'], now: new Date(2026, 10, 5, 12) }));
 
@@ -238,4 +238,79 @@ test('editar conta vinculada preserva IDs, transações e cálculo de saldo', ()
     assert.equal(JSON.stringify(registros), antes);
     assert.deepEqual(app.gravacoes.map(([chave]) => chave), ['contas']);
     assert.equal(ui.podeExcluirConta(conta().id), false);
+});
+
+function prepararVinculos(registros = [], contas = [conta()]) {
+    const app = preparar(JSON.stringify(contas));
+    app.valores.set('transacoes', JSON.stringify(registros));
+    app.valores.set('investimentos', JSON.stringify([investimento()]));
+    app.estado.inicializarContas();
+    app.estado.inicializarTransacoes();
+    app.estado.inicializarInvestimentos();
+    assert.equal(app.estado.verificarTransacoesCarregadas().disponivel, true);
+    app.estado.prepararCompatibilidadeTransacoes();
+    return app;
+}
+
+for (const criar of [transacao, (campos) => transacao({ tipo: 'despesa', ...campos }), aporte, resgate]) {
+    for (const data of ['2020-01-01', '2027-01-01']) {
+        const registro = criar({ data });
+        test(`confirmação protege conta com ${registro.tipo} em ${data}, inclusive substituição de ID`, () => {
+            const app = prepararVinculos([registro]);
+            const contasAntes = app.estado.consultarContas();
+            const transacoesAntes = app.estado.consultarTransacoes();
+            const armazenado = [...app.valores];
+            for (const candidatas of [[], [conta({ id: 'substituta' })]]) {
+                assert.equal(app.estado.confirmarContas(candidatas).motivo, 'integridade');
+                assert.strictEqual(app.estado.consultarContas(), contasAntes);
+                assert.strictEqual(app.estado.consultarTransacoes(), transacoesAntes);
+                assert.deepEqual([...app.valores], armazenado);
+                assert.equal(app.gravacoes.length, 0);
+            }
+        });
+    }
+}
+
+test('edições legítimas preservam vínculos e legado e gravam somente contas', () => {
+    const legado = transacao({ tipo: 'despesa', classificacao: '' });
+    const app = prepararVinculos([legado]);
+    const transacoesAntes = app.estado.consultarTransacoes();
+    assert.equal(app.estado.confirmarContas([conta({ nome: 'Renomeada', saldoInicial: 200, dataReferencia: '2026-10-30' })]).sucesso, true);
+    assert.strictEqual(app.estado.consultarTransacoes(), transacoesAntes);
+    assert.equal(app.estado.validarTransacaoParaGravacao(legado), true);
+    assert.deepEqual(app.gravacoes.map(([chave]) => chave), ['contas']);
+});
+
+test('exclusão sem vínculos funciona com investimentos bloqueados, sem validar capital novamente', () => {
+    const app = prepararVinculos([aporte()], [conta(), conta({ id: 'livre' })]);
+    app.estado.bloquearColecao('investimentos');
+    assert.equal(app.estado.confirmarContas([conta()]).sucesso, true);
+    assert.equal(app.gravacoes.length, 1);
+});
+
+for (const indisponibilidade of ['nao-inicializada', 'bloqueada', 'leitura-invalida']) {
+    test(`remoção é conservadora com transações ${indisponibilidade}, mas edição independente continua permitida`, () => {
+        const app = preparar(); app.estado.inicializarContas();
+        if (indisponibilidade === 'bloqueada') app.estado.bloquearColecao('transacoes');
+        if (indisponibilidade === 'leitura-invalida') {
+            app.valores.set('transacoes', '{'); app.estado.inicializarTransacoes();
+        }
+        const antes = app.estado.consultarContas();
+        assert.equal(app.estado.confirmarContas([]).motivo, 'dependencias');
+        assert.strictEqual(app.estado.consultarContas(), antes);
+        assert.equal(app.gravacoes.length, 0);
+        assert.equal(app.estado.confirmarContas([conta({ nome: 'Editada' })]).sucesso, true);
+    });
+}
+
+test('exclusão válida com falha de escrita preserva versões e registros legados', () => {
+    const legado = transacao({ tipo: 'despesa', classificacao: '' });
+    const app = prepararVinculos([legado], [conta(), conta({ id: 'livre' })]);
+    const antes = app.estado.consultarContas();
+    const armazenado = [...app.valores];
+    app.storage.setItem = () => { throw new Error('Quota'); };
+    assert.equal(app.estado.confirmarContas([conta()]).motivo, 'gravacao');
+    assert.strictEqual(app.estado.consultarContas(), antes);
+    assert.deepEqual([...app.valores], armazenado);
+    assert.equal(app.estado.validarTransacaoParaGravacao(legado), true);
 });
