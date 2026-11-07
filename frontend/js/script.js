@@ -1,3 +1,4 @@
+import { criarResumo } from "./funcionalidades/resumo.js";
 import { criarModais } from "./ui/modais.js";
 import { criarNotificacoes } from "./ui/notificacoes.js";
 import { mostrarErro, limparErros, limparErroCampo, focarPrimeiroErro } from "./ui/formularios.js";
@@ -63,6 +64,11 @@ const listaTransacoesCompleta = document.getElementById("lista-transacoes-comple
 const valorRecebido = document.getElementById("valor-recebido");
 const valorDespesas = document.getElementById("valor-despesas");
 const valorSaldo = document.getElementById("valor-saldo");
+const resumo = criarResumo({
+    valorRecebido, valorDespesas, valorSaldo,
+    listaContas: document.getElementById("contas-resumo"),
+    abrirCadastroConta: () => abrirModalConta()
+});
 let transacoesSelecionadas = [];
 const areaAcoes = document.getElementById("area-acoes");
 const quantidadeSelecionadas = document.getElementById("transacoes-selecionadas");
@@ -1127,15 +1133,10 @@ function atualizarResumo() {
     atualizarVisualizacoesSaldos();
     atualizarGraficosHistorico();
     atualizarDistribuicaoDespesas();
-    if (disponibilidadeColecoes.colecaoEstaBloqueada("transacoes")) {
-        [valorRecebido, valorDespesas].forEach((campo) => {
-            campo.textContent = "Indisponível";
-        });
-        return;
-    }
-    const { receitasCentavos, despesasCentavos } = calcularTotaisResumo(disponibilidadeColecoes.consultarTransacoes());
-    valorRecebido.textContent = formatarCentavos(receitasCentavos);
-    valorDespesas.textContent = formatarCentavos(despesasCentavos);
+    const totais = disponibilidadeColecoes.colecaoEstaBloqueada("transacoes")
+        ? { receitasCentavos: null, despesasCentavos: null }
+        : calcularTotaisResumo(disponibilidadeColecoes.consultarTransacoes());
+    resumo.renderizarIndicadores(totais);
 }
 
 function sincronizarCheckboxes() {
@@ -1632,44 +1633,13 @@ function atualizarVisualizacoesSaldos() {
     const saldos = obterSaldosContas();
     saldoTotalContas.textContent = saldos.disponivel
         ? formatarCentavos(saldos.saldoTotalCentavos) : "Indisponível";
-    valorSaldo.textContent = saldos.disponivel
-        ? formatarCentavos(saldos.saldoDisponivelCentavos) : "Indisponível";
+    resumo.renderizarSaldo(saldos);
     renderizarContas(saldos);
     renderizarContasResumo(saldos);
 }
 
 function renderizarContasResumo(saldos) {
-    const lista = document.getElementById("contas-resumo");
-    lista.replaceChildren();
-    if (!saldos.disponivel || disponibilidadeColecoes.consultarContas().length === 0) {
-        const mensagem = document.createElement("p");
-        mensagem.classList.add("mensagem-vazia");
-        mensagem.textContent = !saldos.disponivel
-            ? `Dados de saldo indisponíveis. ${saldos.motivo}`
-            : "Cadastre sua primeira conta para acompanhar seus saldos.";
-        lista.appendChild(mensagem);
-        if (saldos.disponivel) {
-            const cadastrar = document.createElement("button");
-            cadastrar.type = "button";
-            cadastrar.classList.add("btn-primario");
-            cadastrar.textContent = "Cadastrar primeira conta";
-            cadastrar.addEventListener("click", () => abrirModalConta());
-            lista.appendChild(cadastrar);
-        }
-        return;
-    }
-    const itens = document.createElement("ul");
-    itens.classList.add("lista-contas-resumo");
-    disponibilidadeColecoes.consultarContas().slice(0, 3).forEach((conta) => {
-        const item = document.createElement("li");
-        const nome = document.createElement("span");
-        nome.textContent = conta.nome;
-        const saldo = document.createElement("strong");
-        saldo.textContent = formatarCentavos(saldos.saldosPorContaCentavos.get(conta.id));
-        item.append(nome, saldo);
-        itens.appendChild(item);
-    });
-    lista.appendChild(itens);
+    resumo.renderizarContas({ contas: disponibilidadeColecoes.consultarContas(), saldos });
 }
 
 // eventos links de navegação
