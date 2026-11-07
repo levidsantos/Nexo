@@ -4,7 +4,8 @@ const assert = require('node:assert/strict');
 const { execFileSync } = require('node:child_process');
 const { resolve } = require('node:path');
 const { pathToFileURL } = require('node:url');
-const { criarApresentacaoInvestimentos } = require('../../frontend/js/funcionalidades/investimentos.js');
+const { formatarDataInvestimento } = require('../../frontend/js/dominio/valores-datas.js');
+const { criarApresentacaoInvestimentos } = require('../../frontend/js/funcionalidades/apresentacao-investimentos.js');
 const valores = require('../../frontend/js/dominio/valores-datas.js');
 const { investimento, aporte, resgate, congelar } = require('./support/fixtures.cjs');
 
@@ -51,7 +52,7 @@ function ambiente(t, reduzido = true) {
     const window = eventos({ innerHeight: 900 }), movimento = eventos({ matches: reduzido }), mobile = { matches: false };
     const refs = Object.fromEntries(['listaInvestimentos', 'historicoInvestimentos', 'totalCapital', 'totalValor', 'botaoNovoInvestimento', 'navegacaoPrincipal'].map(n => [n, elemento()]));
     const chamadas = [], retornos = []; let modal = null;
-    const opcoes = { document, window, ...refs, ...valores, formatarDataInvestimento: data => data.split('-').reverse().join('/'),
+    const opcoes = { document, window, ...refs, ...valores, formatarDataInvestimento,
         larguraMobileTransacoes: mobile, movimentoReduzidoMenus: movimento, obterModalAtivo: () => modal,
         definirFocoRetorno: alvo => retornos.push(alvo), acoes: Object.fromEntries(['aporte', 'resgate', 'atualizar', 'editar', 'excluir'].map(n => [n, id => chamadas.push([n, id])])) };
     const ui = criarApresentacaoInvestimentos(opcoes); t.after(() => ui.encerrar());
@@ -63,7 +64,7 @@ function ambiente(t, reduzido = true) {
 }
 
 test('Investimentos: importação sem DOM, storage, listeners ou temporizadores', () => {
-    const url = pathToFileURL(resolve(__dirname, '../../frontend/js/funcionalidades/investimentos.js')).href;
+    const url = pathToFileURL(resolve(__dirname, '../../frontend/js/funcionalidades/apresentacao-investimentos.js')).href;
     execFileSync(process.execPath, ['--input-type=module', '-e', `for (const n of ['document','window','localStorage']) Object.defineProperty(globalThis,n,{get(){throw Error(n)}}); globalThis.setTimeout=globalThis.addEventListener=()=>{throw Error('efeito')}; await import(${JSON.stringify(url)});`]);
 });
 test('Investimentos: fábrica inerte e inicialização idempotente', t => {

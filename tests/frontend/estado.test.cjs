@@ -5,7 +5,7 @@ const { resolve } = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { execFileSync } = require('node:child_process');
 const { Script, createContext } = require('node:vm');
-const { criarEstadoDisponibilidade } = require('../../frontend/js/dados/estado.js');
+const { criarEstadoFinanceiro } = require('../../frontend/js/dados/estado.js');
 const utilitarios = require('../../frontend/js/dominio/valores-datas.js');
 const validacoes = require('../../frontend/js/dominio/validacoes.js');
 const calculos = require('../../frontend/js/dominio/calculos.js');
@@ -14,7 +14,7 @@ const { conta, transacao, investimento, aporte } = require('./support/fixtures.c
 beforeEach((t) => t.mock.timers.enable({ apis: ['Date'], now: new Date(2026, 10, 5, 12) }));
 
 test('disponibilidade começa sem bloqueios e não expõe o Set ou desbloqueio', async () => {
-    const estado = criarEstadoDisponibilidade();
+    const estado = criarEstadoFinanceiro();
     assert.deepEqual(Object.keys(estado).sort(), ['bloquearColecao', 'colecaoEstaBloqueada', 'confirmarContas', 'consultarContas', 'contasEstaoDisponiveis', 'inicializarContas', 'inicializarTransacoes', 'consultarTransacoes', 'transacoesEstaoDisponiveis', 'verificarTransacoesCarregadas', 'prepararCompatibilidadeTransacoes', 'validarTransacaoParaGravacao', 'confirmarTransacoes', 'consultarInvestimentos', 'investimentosEstaoDisponiveis', 'inicializarInvestimentos', 'confirmarInvestimentos'].sort());
     for (const chave of ['contas', 'transacoes', 'investimentos']) {
         assert.equal(estado.colecaoEstaBloqueada(chave), false);
@@ -23,7 +23,7 @@ test('disponibilidade começa sem bloqueios e não expõe o Set ou desbloqueio',
 
 test('bloqueio é consultável, independente entre coleções e idempotente', async () => {
     for (const chave of ['contas', 'transacoes', 'investimentos']) {
-        const estado = criarEstadoDisponibilidade();
+        const estado = criarEstadoFinanceiro();
         estado.bloquearColecao(chave);
         estado.bloquearColecao(chave);
         for (const outra of ['contas', 'transacoes', 'investimentos']) {
@@ -33,13 +33,13 @@ test('bloqueio é consultável, independente entre coleções e idempotente', as
 });
 
 test('instâncias não compartilham bloqueios', async () => {
-    const primeira = criarEstadoDisponibilidade();
-    const segunda = criarEstadoDisponibilidade();
+    const primeira = criarEstadoFinanceiro();
+    const segunda = criarEstadoFinanceiro();
     primeira.bloquearColecao('contas');
     segunda.bloquearColecao('investimentos');
     assert.equal(primeira.colecaoEstaBloqueada('investimentos'), false);
     assert.equal(segunda.colecaoEstaBloqueada('contas'), false);
-    assert.equal(criarEstadoDisponibilidade().colecaoEstaBloqueada('contas'), false);
+    assert.equal(criarEstadoFinanceiro().colecaoEstaBloqueada('contas'), false);
 });
 
 test('importação funciona sem DOM ou storage e não inicializa dados', async () => {
@@ -49,8 +49,8 @@ test('importação funciona sem DOM ou storage e não inicializa dados', async (
             Object.defineProperty(globalThis, nome, { get() { throw new Error(nome); } });
         }
         const modulo = await import(${JSON.stringify(url)});
-        if (Object.keys(modulo).join() !== 'criarEstadoDisponibilidade') throw new Error('API inesperada');
-        if (modulo.criarEstadoDisponibilidade().colecaoEstaBloqueada('contas')) throw new Error('Bloqueio inesperado');
+        if (Object.keys(modulo).join() !== 'criarEstadoFinanceiro') throw new Error('API inesperada');
+        if (modulo.criarEstadoFinanceiro().colecaoEstaBloqueada('contas')) throw new Error('Bloqueio inesperado');
     `], { stdio: 'pipe' });
 });
 
@@ -70,7 +70,7 @@ const declaracoes = nomes.map((nome) => {
 
 function aplicacao(bloqueios = [], registros = [transacao()], carteira = [investimento()]) {
     const gravacoes = [];
-    const disponibilidadeColecoes = criarEstadoDisponibilidade({
+    const disponibilidadeColecoes = criarEstadoFinanceiro({
         ler: (chave) => ({ sucesso: true, ausente: false, dados: chave === "transacoes" ? registros : chave === "investimentos" ? carteira : [conta()] }),
         gravar: (...argumentos) => { gravacoes.push(argumentos); return { sucesso: true }; }
     });

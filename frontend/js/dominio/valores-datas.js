@@ -50,3 +50,7 @@ export function formatarCentavos(centavos) {
     const texto = partes.map((parte) => parte.type === "fraction" ? fracao : parte.value).join("");
     return inteiro < 0n && inteiro > -100n ? `-${texto}` : texto;
 }
+
+export function formatarDataInvestimento(data) {
+    return data.split("-").reverse().join("/");
+}

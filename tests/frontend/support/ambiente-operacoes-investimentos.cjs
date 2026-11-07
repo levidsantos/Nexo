@@ -1,13 +1,9 @@
 const { criarOperacoesInvestimentos } = require('../../../frontend/js/funcionalidades/operacoes-investimentos.js');
-const { criarEstadoDisponibilidade } = require('../../../frontend/js/dados/estado.js');
+const { criarEstadoFinanceiro } = require('../../../frontend/js/dados/estado.js');
 const { readFileSync } = require('node:fs');
 const { resolve } = require('node:path');
-const { Script } = require('node:vm');
+const { formatarDataInvestimento } = require('../../../frontend/js/dominio/valores-datas.js');
 const { conta, investimento, INVESTIMENTO_ID } = require('./fixtures.cjs');
-const fonte = readFileSync(resolve(__dirname, '../../../frontend/js/script.js'), 'utf8');
-// Exercita o preparador ainda mantido no coordenador, sem copiar sua regra.
-const prepararMovimentacaoInvestimento = new Script(fonte.match(/^function prepararMovimentacaoInvestimento\([^]*?^\}/m)[0] + '\nprepararMovimentacaoInvestimento').runInNewContext();
-
 function prepararOperacoes({ carteira = [investimento()], registros = [], contas = [conta()], estado: externo, mostrarToast, confirmar: confirmarExterno } = {}) {
     const efeitos = [], gravacoes = [], armazenado = new Map(), elementos = {}, erros = new Map();
     let falha = false, id = 1;
@@ -43,15 +39,15 @@ function prepararOperacoes({ carteira = [investimento()], registros = [], contas
         form.querySelector=sel=>sel==='button[type="submit"]'?elementos['botao-salvar-manual']:grupo.find(c=>c.classList.contains('invalido'));
     }
     elementos.botoesMovimentacao=['aporte','resgate'].map(tipo=>{const e=elemento();e.dataset.movimentacao=tipo;return e;});
-    const estado = externo ?? criarEstadoDisponibilidade({ler:chave=>({sucesso:true,dados:chave==='contas'?contas:chave==='transacoes'?registros:carteira}),
+    const estado = externo ?? criarEstadoFinanceiro({ler:chave=>({sucesso:true,dados:chave==='contas'?contas:chave==='transacoes'?registros:carteira}),
         gravar:(chave,dados)=>{efeitos.push(['gravar',chave]);if(falha)return{sucesso:false,erro:new Error('Quota')};gravacoes.push([chave,dados]);armazenado.set(chave,JSON.stringify(dados));return{sucesso:true};}});
     if(!externo){estado.inicializarTransacoes();estado.inicializarContas();estado.inicializarInvestimentos();estado.verificarTransacoesCarregadas();estado.prepararCompatibilidadeTransacoes();}
     const confirmar=async (chave,api,dados)=>{if(confirmarExterno)return confirmarExterno(chave,dados,estado);const r=await estado[api](dados);if(!r.sucesso)efeitos.push(['falha',chave,r.motivo]);return r.sucesso;};
     const opcoes={elementos,consultas:estado,
         confirmarInvestimentos:dados=>confirmar('investimentos','confirmarInvestimentos',dados), confirmarTransacoes:dados=>confirmar('transacoes','confirmarTransacoes',dados),
-        validarContaTransacao:id=>!estado.colecaoEstaBloqueada('contas')&&estado.consultarContas().some(c=>c.id===id), prepararMovimentacaoInvestimento,
+        validarContaTransacao:id=>!estado.colecaoEstaBloqueada('contas')&&estado.consultarContas().some(c=>c.id===id),
         obterRestricaoMovimentacaoInvestimentos:()=>['contas','transacoes','investimentos'].some(c=>estado.colecaoEstaBloqueada(c))?{mensagem:'Dados indisponíveis',tipo:'erro'}:!estado.consultarContas().length||!estado.consultarInvestimentos().length?{mensagem:'Cadastre conta e investimento',tipo:'informacao'}:null,
-        formatarDataInvestimento:data=>data.split('-').reverse().join('/'),
+        formatarDataInvestimento,
         modais:{abrirModal:(modal,foco)=>{efeitos.push(['abrir',modal.id]);foco.focus();},fecharModal:(modal,limpar)=>{efeitos.push(['fechar',modal.id]);limpar?.();}},
         mostrarToast:mostrarToast??((...args)=>efeitos.push(['toast',...args])),
         aposSalvarInvestimento:(r,editando)=>efeitos.push(['salvar',r.id,editando]), aposExcluirInvestimento:()=>efeitos.push(['excluir']),

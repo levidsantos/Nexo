@@ -1,24 +1,23 @@
 import { criarAnalises } from "./funcionalidades/analises.js";
 import { criarOperacoesInvestimentos } from "./funcionalidades/operacoes-investimentos.js";
-import { criarApresentacaoInvestimentos } from "./funcionalidades/investimentos.js";
+import { criarApresentacaoInvestimentos } from "./funcionalidades/apresentacao-investimentos.js";
 import { criarOperacoesTransacoes } from "./funcionalidades/operacoes-transacoes.js";
-import { criarListagensTransacoes } from "./funcionalidades/transacoes.js";
+import { criarListagensTransacoes } from "./funcionalidades/listagens-transacoes.js";
 import { criarContas } from "./funcionalidades/contas.js";
 import { criarResumo } from "./funcionalidades/resumo.js";
 import { criarModais } from "./ui/modais.js";
 import { criarNotificacoes } from "./ui/notificacoes.js";
-import { obterDataLocal, converterParaCentavos, formatarCentavos, formatadorMoeda } from "./dominio/valores-datas.js";
-import { criarEstadoDisponibilidade } from "./dados/estado.js";
+import { obterDataLocal, converterParaCentavos, formatarCentavos, formatadorMoeda, formatarDataInvestimento } from "./dominio/valores-datas.js";
+import { criarEstadoFinanceiro } from "./dados/estado.js";
 import {
     textoPreenchido, ehMovimentacaoInvestimento, validarVinculosTransacoes,
     validarTransacao, validarConta, validarColecao,
-    valorMonetarioValido, validarInvestimento,
-    CLASSIFICACOES_DESPESAS
+    validarInvestimento
 } from "./dominio/validacoes.js";
 import {
     saldosIndisponiveis, capitaisIndisponiveis, calcularCapitaisAplicados,
     verificarIntegridadeTransacoes, valoresInvestimentosIndisponiveis, calcularValoresInvestimentos,
-    calcularSaldos, historicoMensalIndisponivel,
+    calcularSaldos, calcularTotalCapitalAplicado, historicoMensalIndisponivel,
     prepararHistoricoMensal, distribuicaoDespesasIndisponivel, definirPeriodoDespesas,
     prepararDistribuicaoDespesas, calcularTotaisResumo
 } from "./dominio/calculos.js";
@@ -54,10 +53,10 @@ const notificacoes = criarNotificacoes({
         }
     }
 });
-const disponibilidadeColecoes = criarEstadoDisponibilidade();
-carregarColecao("transacoes", validarTransacao);
-carregarColecao("contas", validarConta);
-carregarColecao("investimentos", validarInvestimento);
+const disponibilidadeColecoes = criarEstadoFinanceiro();
+carregarColecao("transacoes");
+carregarColecao("contas");
+carregarColecao("investimentos");
 verificarVinculosCarregados();
 const listaTransacoes = document.getElementById("lista-transacoes");
 const listaTransacoesCompleta = document.getElementById("lista-transacoes-completa");
@@ -232,13 +231,6 @@ function verificarVinculosCarregados() {
     }
 }
 
-// Uso explícito pela futura interface. Nunca normaliza ou regrava registros carregados.
-function prepararMovimentacaoInvestimento(registro) {
-    return registro.tipo === "resgate"
-        ? { ...registro, valorRetiradoInvestimento: registro.valorRetiradoInvestimento ?? registro.valor }
-        : { ...registro };
-}
-
 function obterCapitaisAplicados(hoje = obterDataLocal()) {
     if (["investimentos", "transacoes", "contas"].some((chave) => disponibilidadeColecoes.colecaoEstaBloqueada(chave))) {
         return capitaisIndisponiveis("Dados necessários ao cálculo de capital indisponíveis nesta sessão.");
@@ -251,11 +243,7 @@ function obterCapitaisAplicados(hoje = obterDataLocal()) {
 function obterAcompanhamentoInvestimentos(hoje = obterDataLocal()) {
     const capitais = obterCapitaisAplicados(hoje);
     if (!capitais.disponivel) return { capitais, valores: valoresInvestimentosIndisponiveis(capitais.motivo), totalCapitalCentavos: null };
-    let totalCapitalCentavos = 0;
-    for (const capital of capitais.capitaisPorInvestimentoCentavos.values()) {
-        totalCapitalCentavos += capital;
-        if (!Number.isSafeInteger(totalCapitalCentavos)) { totalCapitalCentavos = null; break; }
-    }
+    const totalCapitalCentavos = calcularTotalCapitalAplicado(capitais.capitaisPorInvestimentoCentavos);
     return { capitais, totalCapitalCentavos, valores: calcularValoresInvestimentos(disponibilidadeColecoes.consultarInvestimentos(), disponibilidadeColecoes.consultarTransacoes(), hoje) };
 }
 
@@ -336,7 +324,7 @@ function concluirFormacoesAnalises() { analises.concluirFormacoesAnalises(); }
 function prepararFormacoesPagina(pagina) { analises.prepararFormacoesPagina(pagina); }
 function agendarFormacaoAnalises(chave) { analises.agendarFormacaoAnalises(chave); }
 
-function carregarColecao(chave, validarRegistro) {
+function carregarColecao(chave) {
     try {
         const inicializacao = chave === "contas" ? disponibilidadeColecoes.inicializarContas()
             : chave === "transacoes" ? disponibilidadeColecoes.inicializarTransacoes()
@@ -686,7 +674,7 @@ const operacoesInvestimentos = criarOperacoesInvestimentos({
     },
     confirmarInvestimentos: (candidatos) => persistirColecao("investimentos", candidatos),
     confirmarTransacoes: (candidatos) => persistirColecao("transacoes", candidatos),
-    validarContaTransacao, prepararMovimentacaoInvestimento, obterRestricaoMovimentacaoInvestimentos, formatarDataInvestimento,
+    validarContaTransacao, obterRestricaoMovimentacaoInvestimentos, formatarDataInvestimento,
     modais: { abrirModal, fecharModal }, mostrarToast,
     aposSalvarInvestimento: (registro, editando) => {
         renderizarInvestimentos();
@@ -717,10 +705,6 @@ function fecharExclusaoInvestimento() { operacoesInvestimentos.fecharExclusaoInv
 function abrirAtualizacaoValor(id) { operacoesInvestimentos.abrirAtualizacaoValor(id); }
 function abrirModalMovimentacao(tipo, investimentoId = null, id = null) {
     operacoesInvestimentos.abrirModalMovimentacao(tipo, investimentoId, id);
-}
-
-function formatarDataInvestimento(data) {
-    return data.split("-").reverse().join("/");
 }
 
 function renderizarHistoricoInvestimentos() {
@@ -782,16 +766,3 @@ document.addEventListener("visibilitychange", () => {
         atualizarDistribuicaoDespesas();
     }
 });
-
-/* RESETAR OS DADOS DE TESTE
-
-transacoes.length = 0;
-localStorage.setItem("transacoes", JSON.stringify(transacoes));
-renderizarTransacoes(listaTransacoes, 5);
-atualizarTabelaCompleta();
-
-*/
-
-/*OU
-localStorage.removeItem("transacoes");
-*/

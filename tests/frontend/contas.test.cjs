@@ -7,7 +7,7 @@ const { resolve } = require('node:path');
 const { readFileSync } = require('node:fs');
 const { Script, createContext } = require('node:vm');
 const { criarContas } = require('../../frontend/js/funcionalidades/contas.js');
-const { criarEstadoDisponibilidade } = require('../../frontend/js/dados/estado.js');
+const { criarEstadoFinanceiro } = require('../../frontend/js/dados/estado.js');
 const { criarResumo } = require('../../frontend/js/funcionalidades/resumo.js');
 const { calcularSaldos } = require('../../frontend/js/dominio/calculos.js');
 const { formatarCentavos } = require('../../frontend/js/dominio/valores-datas.js');
@@ -50,7 +50,7 @@ function ambiente(registros = [], movimentos = [], confirmar) {
     elementos.formConta.querySelectorAll = (seletor) => seletor === '.erro-campo' ? [...mensagens.values()]
         : campos.filter((campo) => campo.classList.contains('invalido'));
     elementos.formConta.querySelector = () => campos.find((campo) => campo.classList.contains('invalido'));
-    const estado = criarEstadoDisponibilidade({
+    const estado = criarEstadoFinanceiro({
         ler: (chave) => ({ sucesso: true, dados: chave === 'contas' ? registros : chave === 'transacoes' ? movimentos : [investimento()] }),
         gravar: (chave, dados) => { efeitos.push(['gravar', chave]); if (falhar) return { sucesso: false, erro: new Error('Quota') };
             gravacoes.push([chave, dados]); return { sucesso: true }; }

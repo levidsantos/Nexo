@@ -4,7 +4,7 @@ const { readFileSync } = require('node:fs');
 const { resolve } = require('node:path');
 const { Script, createContext } = require('node:vm');
 const { lerDados, gravarDados } = require('../../frontend/js/dados/repositorio.js');
-const { criarEstadoDisponibilidade } = require('../../frontend/js/dados/estado.js');
+const { criarEstadoFinanceiro } = require('../../frontend/js/dados/estado.js');
 const validacoes = require('../../frontend/js/dominio/validacoes.js');
 const calculos = require('../../frontend/js/dominio/calculos.js');
 const { conta, transacao } = require('./support/fixtures.cjs');
@@ -121,7 +121,7 @@ const adaptadores = ['carregarColecao', 'persistirColecao'].map((nome) => {
 
 function aplicacaoSimulada(storage, registros = []) {
     const mensagens = [];
-    const disponibilidadeColecoes = criarEstadoDisponibilidade({
+    const disponibilidadeColecoes = criarEstadoFinanceiro({
         ler: (chave) => lerDados(chave, storage),
         gravar: (chave, dados) => gravarDados(chave, dados, storage)
     });
@@ -142,7 +142,7 @@ test('adaptador mantém ausente/vazio disponíveis e bloqueia dados incompatíve
     for (const conteudo of [undefined, '[]', 'null', '{}', '[{"id":"invalido"}]', '{invalido']) {
         const storage = armazenamentoSimulado(conteudo === undefined ? {} : { contas: conteudo });
         const app = aplicacaoSimulada(storage);
-        assert.equal(app.carregarColecao('contas', validacoes.validarConta).length, 0);
+        assert.equal(app.carregarColecao('contas').length, 0);
         const invalido = conteudo !== undefined && conteudo !== '[]';
         assert.equal(app.disponibilidadeColecoes.colecaoEstaBloqueada('contas'), invalido);
         assert.equal(app.mensagens.length, invalido ? 1 : 0);
@@ -154,7 +154,7 @@ test('adaptador mantém ausente/vazio disponíveis e bloqueia dados incompatíve
 test('adaptador preserva leitura válida e bloqueia gravações inválidas ou coleções bloqueadas', async () => {
     const storage = armazenamentoSimulado({ contas: JSON.stringify([conta()]) });
     const app = aplicacaoSimulada(storage);
-    assert.deepEqual(structuredClone(app.carregarColecao('contas', validacoes.validarConta)), [conta()]);
+    assert.deepEqual(structuredClone(app.carregarColecao('contas')), [conta()]);
     assert.equal((await app.persistirColecao('contas', [{}])), false);
     assert.equal((await app.persistirColecao('chave-desconhecida', [])), false);
     app.disponibilidadeColecoes.bloquearColecao('contas');
@@ -166,7 +166,7 @@ test('adaptador mantém dados indisponíveis após falha de leitura e recusa sob
     const storage = armazenamentoSimulado({ contas: '[]' });
     storage.getItem = () => { throw new Error('Acesso negado'); };
     const app = aplicacaoSimulada(storage);
-    assert.equal(app.carregarColecao('contas', validacoes.validarConta).length, 0);
+    assert.equal(app.carregarColecao('contas').length, 0);
     assert.equal(app.disponibilidadeColecoes.colecaoEstaBloqueada('contas'), true);
     assert.equal((await app.persistirColecao('contas', [conta()])), false);
     assert.equal(storage.gravacoes.length, 0);
@@ -175,8 +175,8 @@ test('adaptador mantém dados indisponíveis após falha de leitura e recusa sob
 test('adaptador valida vínculos e novas despesas antes de tentar a gravação', async () => {
     const storage = armazenamentoSimulado({ contas: JSON.stringify([conta()]), transacoes: '[]' });
     const app = aplicacaoSimulada(storage);
-    app.carregarColecao('contas', validacoes.validarConta);
-    app.carregarColecao('investimentos', validacoes.validarInvestimento);
+    app.carregarColecao('contas');
+    app.carregarColecao('investimentos');
     app.disponibilidadeColecoes.verificarTransacoesCarregadas();
     app.disponibilidadeColecoes.prepararCompatibilidadeTransacoes();
     assert.equal((await app.persistirColecao('transacoes', [transacao({ contaId: 'inexistente' })])), false);
@@ -191,8 +191,8 @@ test('falha de escrita mantém retrato dos legados; limpeza ocorre somente após
     const anterior = JSON.stringify([legado]);
     const storage = armazenamentoSimulado({ contas: JSON.stringify([conta()]), transacoes: anterior });
     const app = aplicacaoSimulada(storage, [legado]);
-    app.carregarColecao('contas', validacoes.validarConta);
-    app.carregarColecao('investimentos', validacoes.validarInvestimento);
+    app.carregarColecao('contas');
+    app.carregarColecao('investimentos');
     app.disponibilidadeColecoes.verificarTransacoesCarregadas();
     app.disponibilidadeColecoes.prepararCompatibilidadeTransacoes();
     const escrever = storage.setItem;

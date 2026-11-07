@@ -119,3 +119,12 @@ test('cálculos de saldo e totais não alteram registros, nem acrescentam saldoA
     assert.equal(JSON.stringify({ contas, registros }), antes);
     assert.equal(Object.hasOwn(contas[0], 'saldoAtual'), false);
 });
+
+test('total de capital extraído preserva vazio, soma em centavos e limite seguro', () => {
+    const { calcularTotalCapitalAplicado } = require('../../frontend/js/dominio/calculos.js');
+    const capitais = new Map([['a', 101], ['b', 202]]);
+    assert.equal(calcularTotalCapitalAplicado(new Map()), 0);
+    assert.equal(calcularTotalCapitalAplicado(capitais), 303);
+    assert.deepEqual([...capitais], [['a', 101], ['b', 202]]);
+    assert.equal(calcularTotalCapitalAplicado(new Map([['a', Number.MAX_SAFE_INTEGER], ['b', 1]])), null);
+});

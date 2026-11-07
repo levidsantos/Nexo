@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
 const { resolve } = require('node:path');
 const { Script, createContext } = require('node:vm');
-const { criarEstadoDisponibilidade } = require('../../frontend/js/dados/estado.js');
+const { criarEstadoFinanceiro } = require('../../frontend/js/dados/estado.js');
 const { lerDados, gravarDados } = require('../../frontend/js/dados/repositorio.js');
 const validacoes = require('../../frontend/js/dominio/validacoes.js');
 const calculos = require('../../frontend/js/dominio/calculos.js');
@@ -22,7 +22,7 @@ function preparar(conteudo = JSON.stringify([conta()])) {
         getItem(chave) { leituras++; return valores.has(chave) ? valores.get(chave) : null; },
         setItem(chave, valor) { valores.set(chave, valor); gravacoes.push([chave, valor]); }
     };
-    const estado = criarEstadoDisponibilidade({
+    const estado = criarEstadoFinanceiro({
         ler: (chave) => lerDados(chave, storage),
         gravar: (chave, dados) => gravarDados(chave, dados, storage)
     });
@@ -79,7 +79,7 @@ test('falha de leitura permanece bloqueada, sem releitura ou desbloqueio automá
 
 test('consultas e referências externas não podem alterar contas ou campos adicionais aninhados', async () => {
     const origem = [conta({ extra: { notas: ['original'] } })];
-    const estado = criarEstadoDisponibilidade({ ler: () => ({ sucesso: true, dados: origem }) });
+    const estado = criarEstadoFinanceiro({ ler: () => ({ sucesso: true, dados: origem }) });
     estado.inicializarContas();
     origem[0].nome = 'Alterado fora';
     origem[0].extra.notas.push('fora');
@@ -206,7 +206,7 @@ test('adaptadores preservam exclusão protegida por movimentos históricos e fut
 
 test('adaptadores consultam a conta renomeada por ID e confirmam exclusão sem vínculos', async () => {
     const app = preparar(); const ui = adaptadores(app);
-    ui.carregarColecao('contas', validacoes.validarConta);
+    ui.carregarColecao('contas');
     assert.equal((await ui.persistirColecao('contas', [conta({ nome: 'Renomeada' })])), true);
     assert.equal(ui.validarContaTransacao(conta().id), true);
     assert.equal(ui.obterSaldosContas().saldoTotalCentavos, 10000);

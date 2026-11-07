@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
 const { resolve } = require('node:path');
 const { Script, createContext } = require('node:vm');
-const { criarEstadoDisponibilidade } = require('../../frontend/js/dados/estado.js');
+const { criarEstadoFinanceiro } = require('../../frontend/js/dados/estado.js');
 const { lerDados, gravarDados } = require('../../frontend/js/dados/repositorio.js');
 const validacoes = require('../../frontend/js/dominio/validacoes.js');
 const calculos = require('../../frontend/js/dominio/calculos.js');
@@ -21,7 +21,7 @@ function preparar(carteira = [investimento()], registros = [], inicializar = tru
         getItem(chave) { leituras.push(chave); return valores.has(chave) ? valores.get(chave) : null; },
         setItem(chave, valor) { gravacoes.push([chave, valor]); valores.set(chave, valor); }
     };
-    const estado = criarEstadoDisponibilidade({ ler: (chave) => lerDados(chave, storage),
+    const estado = criarEstadoFinanceiro({ ler: (chave) => lerDados(chave, storage),
         gravar: (chave, dados) => gravarDados(chave, dados, storage) });
     function carregar() {
         estado.inicializarTransacoes(); estado.inicializarContas(); estado.inicializarInvestimentos();
@@ -90,7 +90,7 @@ test('falha de leitura bloqueia apenas investimentos sem escrever', async () => 
 test('consultas congeladas isolam dados originais, candidatos e versões anteriores', async () => {
     const origem = investimento({ extra: { notas: ['original'] } });
     const dados = { contas: [conta()], transacoes: [], investimentos: [origem] };
-    const estado = criarEstadoDisponibilidade({ ler: (chave) => ({ sucesso: true, dados: dados[chave] }),
+    const estado = criarEstadoFinanceiro({ ler: (chave) => ({ sucesso: true, dados: dados[chave] }),
         gravar: () => ({ sucesso: true }) });
     estado.inicializarTransacoes(); estado.inicializarContas(); estado.inicializarInvestimentos();
     const antiga = estado.consultarInvestimentos();
@@ -275,7 +275,7 @@ function adaptadores(app, adicionais = {}) {
         disponibilidadeColecoes: app.estado, mostrarToast: (...args) => mensagens.push(args), ...adicionais });
     const nomes = ['carregarColecao', 'persistirColecao', 'verificarVinculosCarregados'];
     const ui = new Script(nomes.map(declaracao).join('\n') + `\n({${nomes.join(',')}})`).runInContext(contexto);
-    const { prepararOperacoes } = require('./support/operacoes-investimentos.cjs');
+    const { prepararOperacoes } = require('./support/ambiente-operacoes-investimentos.cjs');
     const operacoes = prepararOperacoes({ estado: app.estado, mostrarToast: (...args) => mensagens.push(args) });
     ui.podeExcluirInvestimento = operacoes.api.podeExcluirInvestimento;
     return { ui, contexto, mensagens };
@@ -298,7 +298,7 @@ test('adaptadores reais preservam mensagens e proteção de exclusão histórica
 });
 
 test('handlers reais exigem confirmação retroativa na edição e atualização manual', async () => {
-    const { prepararOperacoes } = require('./support/operacoes-investimentos.cjs');
+    const { prepararOperacoes } = require('./support/ambiente-operacoes-investimentos.cjs');
     for (const manual of [false, true]) {
         const app = preparar([investimento({ dataReferenciaValor: '2026-11-02' })]);
         const a = prepararOperacoes({ estado: app.estado }); a.api.inicializar();

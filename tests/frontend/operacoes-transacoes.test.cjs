@@ -8,7 +8,7 @@ const { pathToFileURL } = require('node:url');
 const { Script, createContext } = require('node:vm');
 const { criarOperacoesTransacoes } = require('../../frontend/js/funcionalidades/operacoes-transacoes.js');
 const { ehMovimentacaoInvestimento } = require('../../frontend/js/dominio/validacoes.js');
-const { criarEstadoDisponibilidade } = require('../../frontend/js/dados/estado.js');
+const { criarEstadoFinanceiro } = require('../../frontend/js/dados/estado.js');
 const { conta, transacao, investimento, aporte, resgate } = require('./support/fixtures.cjs');
 
 beforeEach((t) => t.mock.timers.enable({ apis: ['Date'], now: new Date(2026,10,5,12) }));
@@ -41,7 +41,7 @@ function ambiente({ registros=[], contas=[conta()], investimentos=[investimento(
     elementos.formTransacao.querySelectorAll=(seletor)=>seletor==='.erro-campo'?[...mensagens.values()]:campos.filter(c=>c.classList.contains('invalido'));
     elementos.formTransacao.querySelector=()=>campos.find(c=>c.classList.contains('invalido'));
     elementos.botoesFechar=[elemento('button','x'),elemento('button','cancelar')];
-    const estado=criarEstadoDisponibilidade({ler:(chave)=>({sucesso:true,dados:chave==='contas'?contas:chave==='transacoes'?registros:investimentos}),
+    const estado=criarEstadoFinanceiro({ler:(chave)=>({sucesso:true,dados:chave==='contas'?contas:chave==='transacoes'?registros:investimentos}),
         gravar:(chave,dados)=>{efeitos.push(['gravar',chave]);if(falhar)return{sucesso:false,erro:new Error('Quota')};gravacoes.push([chave,dados]);return{sucesso:true};}});
     estado.inicializarTransacoes();estado.inicializarContas();estado.inicializarInvestimentos();estado.verificarTransacoesCarregadas();estado.prepararCompatibilidadeTransacoes();
     const api=criarOperacoesTransacoes({elementos,consultas:estado,confirmarTransacoes: async (candidatas) =>{

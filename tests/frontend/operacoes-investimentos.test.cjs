@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const { execFileSync } = require('node:child_process');
 const { pathToFileURL } = require('node:url');
 const { resolve } = require('node:path');
-const { prepararOperacoes } = require('./support/operacoes-investimentos.cjs');
+const { prepararOperacoes } = require('./support/ambiente-operacoes-investimentos.cjs');
 const { investimento, conta, transacao, aporte, resgate, INVESTIMENTO_ID } = require('./support/fixtures.cjs');
 const { calcularSaldos, calcularCapitaisAplicados, calcularValoresInvestimentos } = require('../../frontend/js/dominio/calculos.js');
 beforeEach(t => t.mock.timers.enable({apis:['Date'],now:new Date(2026,10,5,12)}));
@@ -107,7 +107,7 @@ test('Operações Investimentos: coordenador real preserva ordem das atualizaç�
     new Script(trecho).runInContext(createContext({
         elementosOperacoesInvestimentos:{}, disponibilidadeColecoes:consultas,
         criarOperacoesInvestimentos:recebidas=>{opcoes=recebidas;return{};},persistirColecao:registrar('persistir'),
-        validarContaTransacao(){},prepararMovimentacaoInvestimento(){},obterRestricaoMovimentacaoInvestimentos(){},formatarDataInvestimento(){},
+        validarContaTransacao(){},obterRestricaoMovimentacaoInvestimentos(){},formatarDataInvestimento(){},
         abrirModal(){},fecharModal(){},mostrarToast(){},listaTransacoes:'recentes',
         renderizarInvestimentos:registrar('investimentos'),renderizarTransacoes:registrar('recentes'),atualizarTabelaCompleta:registrar('tabela'),
         prepararRetornoFocoInvestimento:registrar('foco'),limparSelecao:registrar('selecao'),atualizarCategorias:registrar('categorias'),atualizarResumo:registrar('resumo')

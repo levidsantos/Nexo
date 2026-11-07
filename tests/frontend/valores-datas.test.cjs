@@ -47,3 +47,8 @@ test('data local usa calendário local, inclusive meia-noite e virada do ano', (
     assert.equal(d.obterDataLocal(new Date(2025, 11, 31, 23, 59)), '2025-12-31');
     assert.equal(d.obterDataLocal(new Date(2026, 1, 3, 12)), '2026-02-03');
 });
+
+test('formatação de data de investimento preserva a saída textual sem conversão de fuso', () => {
+    assert.equal(utilitarios.formatarDataInvestimento('2026-01-02'), '02/01/2026');
+    assert.equal(utilitarios.formatarDataInvestimento('2025-12-31'), '31/12/2025');
+});

@@ -310,3 +310,12 @@ export function calcularTotaisResumo(registros) {
     }
     return totais;
 }
+
+export function calcularTotalCapitalAplicado(capitaisPorInvestimentoCentavos) {
+    let totalCapitalCentavos = 0;
+    for (const capital of capitaisPorInvestimentoCentavos.values()) {
+        totalCapitalCentavos += capital;
+        if (!Number.isSafeInteger(totalCapitalCentavos)) { totalCapitalCentavos = null; break; }
+    }
+    return totalCapitalCentavos;
+}

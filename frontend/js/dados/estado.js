@@ -18,7 +18,7 @@ function prepararColecao(registros) {
 }
 
 // Decisões de exclusão e coordenação da interface permanecem no consumidor.
-export function criarEstadoDisponibilidade({ ler = lerDados, gravar = gravarDados } = {}) {
+export function criarEstadoFinanceiro({ ler = lerDados, gravar = gravarDados } = {}) {
     const colecoesBloqueadas = new Set();
     let contas = Object.freeze([]);
     let contasInicializadas = false;

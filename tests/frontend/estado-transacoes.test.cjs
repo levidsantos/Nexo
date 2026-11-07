@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
 const { resolve } = require('node:path');
 const { Script, createContext } = require('node:vm');
-const { criarEstadoDisponibilidade } = require('../../frontend/js/dados/estado.js');
+const { criarEstadoFinanceiro } = require('../../frontend/js/dados/estado.js');
 const { lerDados, gravarDados } = require('../../frontend/js/dados/repositorio.js');
 const validacoes = require('../../frontend/js/dominio/validacoes.js');
 const calculos = require('../../frontend/js/dominio/calculos.js');
@@ -23,7 +23,7 @@ function preparar(registros = [], carteira = [], inicializar = true) {
         getItem(chave) { leituras.push(chave); return valores.has(chave) ? valores.get(chave) : null; },
         setItem(chave, valor) { gravacoes.push([chave, valor]); valores.set(chave, valor); }
     };
-    const estado = criarEstadoDisponibilidade({
+    const estado = criarEstadoFinanceiro({
         ler: (chave) => lerDados(chave, storage),
         gravar: (chave, dados) => gravarDados(chave, dados, storage)
     });
@@ -287,9 +287,9 @@ test('adaptadores mantêm mensagens, ordem de leitura e falha sem confirmação 
         lerDados: (chave) => lerDados(chave, app.storage),
         mostrarToast: (...args) => mensagens.push(args) });
     const ui = new Script(`${declaracoes}\n({ ${nomes.join(', ')} })`).runInContext(contexto);
-    ui.carregarColecao('transacoes', validacoes.validarTransacao);
-    ui.carregarColecao('contas', validacoes.validarConta);
-    ui.carregarColecao('investimentos', validacoes.validarInvestimento);
+    ui.carregarColecao('transacoes');
+    ui.carregarColecao('contas');
+    ui.carregarColecao('investimentos');
     ui.verificarVinculosCarregados(); app.estado.prepararCompatibilidadeTransacoes();
     assert.deepEqual(app.leituras, ['transacoes', 'contas', 'investimentos']);
     app.storage.setItem = () => { throw new Error('Quota'); };

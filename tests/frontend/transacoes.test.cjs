@@ -5,7 +5,7 @@ const { execFileSync } = require('node:child_process');
 const { pathToFileURL } = require('node:url');
 const { resolve } = require('node:path');
 const { criarOperacoesTransacoes } = require('../../frontend/js/funcionalidades/operacoes-transacoes.js');
-const { criarListagensTransacoes } = require('../../frontend/js/funcionalidades/transacoes.js');
+const { criarListagensTransacoes } = require('../../frontend/js/funcionalidades/listagens-transacoes.js');
 const { transacao, conta, aporte, resgate, investimento } = require('./support/fixtures.cjs');
 
 // Double limitado às operações usadas pela listagem. Não simula CSS ou cálculos financeiros.
@@ -109,7 +109,7 @@ const muitos = (quantidade) => Array.from({ length: quantidade }, (_, i) => tran
 const flush = async () => { for (let i = 0; i < 8; i++) await Promise.resolve(); };
 
 test('Listagens: importação não acessa DOM, armazenamento, eventos, preferência ou timers', async () => {
-    const url = pathToFileURL(resolve(__dirname, '../../frontend/js/funcionalidades/transacoes.js')).href;
+    const url = pathToFileURL(resolve(__dirname, '../../frontend/js/funcionalidades/listagens-transacoes.js')).href;
     execFileSync(process.execPath, ['--input-type=module', '-e', `
         for (const nome of ['document','window','localStorage']) Object.defineProperty(globalThis,nome,{get(){throw new Error(nome)}});
         globalThis.setTimeout=globalThis.requestAnimationFrame=()=>{throw new Error('efeito')}; await import(${JSON.stringify(url)});

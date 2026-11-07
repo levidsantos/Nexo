@@ -5,7 +5,7 @@ import { mostrarErro, limparErros, limparErroCampo, focarPrimeiroErro, criarConf
 // Estado de formulário local; coleções e confirmações são consultadas explicitamente.
 export function criarOperacoesInvestimentos({ elementos, consultas: disponibilidadeColecoes,
     confirmarInvestimentos, confirmarTransacoes, validarContaTransacao,
-    prepararMovimentacaoInvestimento, obterRestricaoMovimentacaoInvestimentos, formatarDataInvestimento,
+    obterRestricaoMovimentacaoInvestimentos, formatarDataInvestimento,
     modais: { abrirModal, fecharModal }, mostrarToast,
     aposSalvarInvestimento, aposExcluirInvestimento, aposAtualizarValor, aposSalvarMovimentacao,
     gerarId = () => crypto.randomUUID() }) {
@@ -401,4 +401,11 @@ export function criarOperacoesInvestimentos({ elementos, consultas: disponibilid
     }
     return { inicializar, abrirModalInvestimento, solicitarExclusaoInvestimento, podeExcluirInvestimento,
         fecharExclusaoInvestimento, abrirAtualizacaoValor, abrirModalMovimentacao, encerrar };
+}
+
+// Assume o valor recebido somente na preparação explícita, sem modificar a entrada.
+export function prepararMovimentacaoInvestimento(registro) {
+    return registro.tipo === "resgate"
+        ? { ...registro, valorRetiradoInvestimento: registro.valorRetiradoInvestimento ?? registro.valor }
+        : { ...registro };
 }
