@@ -1,3 +1,27 @@
+import { criarAnalises } from "./funcionalidades/analises.js";
+import { criarOperacoesInvestimentos } from "./funcionalidades/operacoes-investimentos.js";
+import { criarApresentacaoInvestimentos } from "./funcionalidades/apresentacao-investimentos.js";
+import { criarOperacoesTransacoes } from "./funcionalidades/operacoes-transacoes.js";
+import { criarListagensTransacoes } from "./funcionalidades/listagens-transacoes.js";
+import { criarContas } from "./funcionalidades/contas.js";
+import { criarResumo } from "./funcionalidades/resumo.js";
+import { criarModais } from "./ui/modais.js";
+import { criarNotificacoes } from "./ui/notificacoes.js";
+import { obterDataLocal, converterParaCentavos, formatarCentavos, formatadorMoeda, formatarDataInvestimento } from "./dominio/valores-datas.js";
+import { criarEstadoFinanceiro } from "./dados/estado.js";
+import {
+    textoPreenchido, ehMovimentacaoInvestimento, validarVinculosTransacoes,
+    validarTransacao, validarConta, validarColecao,
+    validarInvestimento
+} from "./dominio/validacoes.js";
+import {
+    saldosIndisponiveis, capitaisIndisponiveis, calcularCapitaisAplicados,
+    verificarIntegridadeTransacoes, valoresInvestimentosIndisponiveis, calcularValoresInvestimentos,
+    calcularSaldos, calcularTotalCapitalAplicado, historicoMensalIndisponivel,
+    prepararHistoricoMensal, distribuicaoDespesasIndisponivel, definirPeriodoDespesas,
+    prepararDistribuicaoDespesas, calcularTotaisResumo
+} from "./dominio/calculos.js";
+
 const addReceita = document.getElementById("add_receita");
 const addDespesa = document.getElementById("add_despesa");
 const botoesFechar = document.querySelectorAll("#modal-overlay .close-modal, #modal-overlay .cancel-modal");
@@ -13,89 +37,47 @@ const selectClassificacao = document.getElementById("classificacao");
 const selectPagamento = document.getElementById("pagamento");
 const campoConta = document.getElementById("conta");
 const campoData = document.getElementById("data");
-let tipoTransacao = "";
 // Inicializar antes da leitura: erros de carregamento também geram notificações.
 const areaNotificacoes = document.getElementById("notificacoes");
 const listaNotificacoes = document.getElementById("lista-notificacoes");
 const anuncioNotificacoes = document.getElementById("anuncio-notificacoes");
-const notificacoesAtivas = [];
-const filaNotificacoes = [];
-let mensagensParaAnunciar = [];
-let anuncioPendente = null;
-const transicoesToasts = new Map();
-const movimentoReduzidoToasts = window.matchMedia("(prefers-reduced-motion: reduce)");
-movimentoReduzidoToasts.addEventListener("change", () => {
-    if (movimentoReduzidoToasts.matches) {
-        for (const transicao of [...transicoesToasts.values()]) transicao.concluir();
+const notificacoes = criarNotificacoes({
+    areaNotificacoes, listaNotificacoes, anuncioNotificacoes,
+    movimentoReduzido: window.matchMedia("(prefers-reduced-motion: reduce)"),
+    podeReceberFoco,
+    obterFocoAlternativo: () => modais.obterModalAtivo() ? modais.obterModalAtivo().querySelector("button, input") : addReceita,
+    antesDeExibir: () => {
+        // O overlay está desaparecendo; seu fade não deve esconder o novo toast.
+        if (areaNotificacoes.parentElement?.classList.contains("modal-saindo")) {
+            document.body.appendChild(areaNotificacoes);
+        }
     }
 });
-const colecoesBloqueadas = new Set();
-let duracaoHistoricoAnalises = 6;
-let mesFinalHistoricoAnalises = null;
-const graficosHistorico = { resumo: null, analises: null };
-let graficoDistribuicao = null;
-let transacoes = carregarColecao("transacoes", validarTransacao);
-let contas = carregarColecao("contas", validarConta);
-let investimentos = carregarColecao("investimentos", validarInvestimento);
+const disponibilidadeColecoes = criarEstadoFinanceiro();
+carregarColecao("transacoes");
+carregarColecao("contas");
+carregarColecao("investimentos");
 verificarVinculosCarregados();
 const listaTransacoes = document.getElementById("lista-transacoes");
 const listaTransacoesCompleta = document.getElementById("lista-transacoes-completa");
 const valorRecebido = document.getElementById("valor-recebido");
 const valorDespesas = document.getElementById("valor-despesas");
 const valorSaldo = document.getElementById("valor-saldo");
-let transacoesSelecionadas = [];
-const areaAcoes = document.getElementById("area-acoes");
-const quantidadeSelecionadas = document.getElementById("transacoes-selecionadas");
-const botaoEditar = document.getElementById("btn-editar");
-const botaoExcluir = document.getElementById("btn-excluir");
-const areaAcoesCompleta = document.getElementById("area-acoes-completa");
-const quantidadeSelecionadasCompleta = document.getElementById("transacoes-selecionadas-completa");
-const botaoEditarCompleta = document.getElementById("btn-editar-completa");
-const botaoExcluirCompleta = document.getElementById("btn-excluir-completa");
+const resumo = criarResumo({
+    valorRecebido, valorDespesas, valorSaldo,
+    listaContas: document.getElementById("contas-resumo"),
+    abrirCadastroConta: () => abrirModalConta()
+});
 const modalExclusao = document.getElementById("modal-exclusao");
 const mensagemExclusao = document.getElementById("mensagem-exclusao");
 const botaoCancelarExclusao = document.getElementById("cancelar-exclusao");
 const botaoConfirmarExclusao = document.getElementById("confirmar-exclusao");
-let transacaoEmEdicao = null;
 const botaoSalvarTransacao = formTransacao.querySelector('button[type="submit"]');
 const linksNavegacao = document.querySelectorAll("[data-pagina]");
 const paginas = document.querySelectorAll(".pagina")
 const campoPesquisa = document.getElementById("pesquisa-transacoes");
-const filtroTipo = document.getElementById("filtro-tipo");
-const filtroCategoria = document.getElementById("filtro-categoria");
-const filtroClassificacao = document.getElementById("filtro-classificacao");
-const filtroDataInicial = document.getElementById("data-inicial");
-const filtroDataFinal = document.getElementById("data-final");
-const erroFiltroDatas = document.getElementById("erro-filtro-datas");
-const botaoLimparFiltros = document.getElementById("limpar-filtros");
-let paginaAtual = 1;
-let totalPaginasTransacoes = 1;
-let transicaoPaginacao = null;
-const movimentoReduzidoPaginacao = window.matchMedia("(prefers-reduced-motion: reduce)");
-movimentoReduzidoPaginacao.addEventListener("change", () => {
-    if (movimentoReduzidoPaginacao.matches && transicaoPaginacao) atualizarTabelaCompleta();
-});
-window.addEventListener("resize", () => {
-    if (transicaoPaginacao) atualizarTabelaCompleta();
-}, { passive: true });
 const larguraMobileTransacoes = window.matchMedia("(max-width: 850px)");
-let transacoesPorPagina = larguraMobileTransacoes.matches ? 6 : 8;
-const paginaTransacoes = document.getElementById("pagina-transacoes");
-const barraAcoesCompleta = document.getElementById("barra-acoes-completa");
-const barraContextual = document.getElementById("barra-contextual-transacoes");
-const quantidadeContextual = document.getElementById("quantidade-contextual-transacoes");
-const acoesContextuais = new Map([
-    [document.getElementById("editar-selecao-contextual"), botaoEditarCompleta],
-    [document.getElementById("excluir-selecao-contextual"), botaoExcluirCompleta],
-    [document.getElementById("cancelar-selecao-contextual"), document.getElementById("limpar-selecao-completa")]
-]);
 const navegacaoPrincipal = document.querySelector(".sidebar nav");
-let barraSuperiorVisivel = true;
-let observadorBarraSuperior = null;
-let alturaNavegacaoAcoes = 0;
-const infoPaginacao = document.getElementById("info-paginacao");
-const botaoPaginaAnterior = document.getElementById("pagina-anterior");
-const botaoProximaPagina = document.getElementById("proxima-pagina");
 const botaoNovaConta = document.getElementById("btn-nova-conta");
 const modalConta = document.getElementById("modal-conta");
 const botaoFecharConta = document.getElementById("fechar-modal-conta");
@@ -107,9 +89,6 @@ const campoInstituicaoConta = document.getElementById("instituicao-conta");
 const campoSaldoInicial = document.getElementById("saldo-inicial-conta");
 const campoDataReferencia = document.getElementById("data-referencia-conta");
 const campoIncluirNoSaldoDisponivel = document.getElementById("incluir-saldo-disponivel");
-let inclusaoSaldoAlterada = false;
-let contaEmEdicao = null;
-let contaEmExclusao = null;
 const tituloModalConta = document.getElementById("titulo-modal-conta");
 const botaoSalvarConta = document.getElementById("salvar-conta");
 const modalExclusaoConta = document.getElementById("modal-exclusao-conta");
@@ -118,1295 +97,244 @@ const botaoCancelarExclusaoConta = document.getElementById("cancelar-exclusao-co
 const botaoConfirmarExclusaoConta = document.getElementById("confirmar-exclusao-conta");
 const listaContas = document.getElementById("lista-contas");
 const saldoTotalContas = document.getElementById("saldo-total-contas");
-let modalAtivo = null;
-let focoAnteriorModal = null;
-let elementosInertes = [];
-let transicaoModal = null;
-let limpezaModal = null;
-const movimentoReduzidoModais = window.matchMedia("(prefers-reduced-motion: reduce)");
-
-// botoes para abrir e fechar o modal
-addReceita.addEventListener("click", () => {
-    if (!prepararContasTransacao()) return;
-    formTransacao.reset();
-    limparErros(formTransacao);
-    transacaoEmEdicao = null;
-    modalTitle.textContent = "Adicionar Receita";
-    botaoSalvarTransacao.textContent = "Salvar";
-    campoClassificacao.classList.add("hidden");
-    selectClassificacao.required = false;
-    campoPagamento.classList.add("hidden");
-    tipoTransacao = "receita";
-    
-    abrirModal(modalOverlay, campoNome);
+const modais = criarModais({
+    document, movimentoReduzido: window.matchMedia("(prefers-reduced-motion: reduce)"),
+    podeReceberFoco,
+    obterFocoAlternativo: () => document.getElementById("pagina-transacoes").classList.contains("ativa") ? campoPesquisa
+        : document.getElementById("pagina-contas").classList.contains("ativa") ? botaoNovaConta
+        : document.getElementById("pagina-investimentos").classList.contains("ativa") ? document.getElementById("novo-investimento")
+        : addReceita,
+    focarRetorno: (destino) => destino.focus({ preventScroll: Boolean(destino.closest("#lista-investimentos")) }),
+    prepararNotificacoes: (modal) => modal.querySelector('[role="dialog"]').appendChild(areaNotificacoes),
+    posicionarNotificacoesModal,
+    concluirNotificacoes: () => {
+        areaNotificacoes.appendChild(anuncioNotificacoes);
+        if (areaNotificacoes.parentElement !== document.body) document.body.appendChild(areaNotificacoes);
+    },
+    aoEscape: (modal) => {
+        if (!modalExclusao.classList.contains("hidden")) operacoesTransacoes.cancelarExclusao();
+        if (modal === modalExclusaoConta) fecharModalExclusaoConta();
+        if (modal === document.getElementById("modal-exclusao-investimento")) fecharExclusaoInvestimento();
+    }
 });
 
-addDespesa.addEventListener("click", () => {
-    if (!prepararContasTransacao()) return;
-    formTransacao.reset();
-    limparErros(formTransacao);
-    transacaoEmEdicao = null;
-    modalTitle.textContent = "Adicionar Despesa";
-    botaoSalvarTransacao.textContent = "Salvar";
-    campoClassificacao.classList.remove("hidden");
-    selectClassificacao.required = true;
-    campoPagamento.classList.remove("hidden");
-    tipoTransacao = "despesa";
-
-    abrirModal(modalOverlay, campoNome);
+const funcionalidadeContas = criarContas({
+    elementos: {
+        botaoNovaConta, modalConta, botaoFecharConta, botaoCancelarConta,
+        formConta, campoNomeConta, campoTipoConta, campoInstituicaoConta,
+        campoSaldoInicial, campoDataReferencia, campoIncluirNoSaldoDisponivel, tituloModalConta,
+        botaoSalvarConta, modalExclusaoConta, mensagemExclusaoConta, botaoCancelarExclusaoConta,
+        botaoConfirmarExclusaoConta, listaContas
+    },
+    estado: disponibilidadeColecoes,
+    confirmarContas: (candidatas) => persistirColecao("contas", candidatas),
+    modais: { abrirModal, fecharModal }, mostrarToast,
+    aoConfirmarAlteracao: (operacao) => {
+        atualizarOpcoesContas();
+        atualizarVisualizacoesSaldos();
+        if (operacao === "salvar") {
+            // Nomes atuais por ID, sem modificar os vínculos ou a seleção.
+            renderizarTransacoes(listaTransacoes, 5);
+            atualizarTabelaCompleta();
+        }
+    }
 });
 
-botoesFechar.forEach((fechar) => {
-    fechar.addEventListener("click", fecharModalTransacao);
+const listagensTransacoes = criarListagensTransacoes({
+    elementos: {
+        listaTransacoes: document.getElementById("lista-transacoes"),
+        listaTransacoesCompleta: document.getElementById("lista-transacoes-completa"),
+        areaAcoes: document.getElementById("area-acoes"),
+        quantidadeSelecionadas: document.getElementById("transacoes-selecionadas"),
+        botaoEditar: document.getElementById("btn-editar"),
+        botaoExcluir: document.getElementById("btn-excluir"),
+        areaAcoesCompleta: document.getElementById("area-acoes-completa"),
+        quantidadeSelecionadasCompleta: document.getElementById("transacoes-selecionadas-completa"),
+        botaoEditarCompleta: document.getElementById("btn-editar-completa"),
+        botaoExcluirCompleta: document.getElementById("btn-excluir-completa"),
+        campoPesquisa: document.getElementById("pesquisa-transacoes"),
+        filtroTipo: document.getElementById("filtro-tipo"),
+        filtroCategoria: document.getElementById("filtro-categoria"),
+        filtroClassificacao: document.getElementById("filtro-classificacao"),
+        filtroDataInicial: document.getElementById("data-inicial"),
+        filtroDataFinal: document.getElementById("data-final"),
+        erroFiltroDatas: document.getElementById("erro-filtro-datas"),
+        botaoLimparFiltros: document.getElementById("limpar-filtros"),
+        paginaTransacoes: document.getElementById("pagina-transacoes"),
+        barraAcoesCompleta: document.getElementById("barra-acoes-completa"),
+        barraContextual: document.getElementById("barra-contextual-transacoes"),
+        quantidadeContextual: document.getElementById("quantidade-contextual-transacoes"),
+        infoPaginacao: document.getElementById("info-paginacao"),
+        botaoPaginaAnterior: document.getElementById("pagina-anterior"),
+        botaoProximaPagina: document.getElementById("proxima-pagina"),
+        navegacaoPrincipal
+    },
+    consultas: {
+        consultarTransacoes: () => disponibilidadeColecoes.consultarTransacoes(),
+        consultarContas: () => disponibilidadeColecoes.consultarContas(),
+        consultarInvestimentos: () => disponibilidadeColecoes.consultarInvestimentos(),
+        colecaoEstaBloqueada: (chave) => disponibilidadeColecoes.colecaoEstaBloqueada(chave)
+    },
+    ambiente: { window, document }, larguraMobileTransacoes, modais,
+    aoEditar: solicitarEdicaoTransacaoSelecionada,
+    aoExcluir: solicitarExclusaoTransacoesSelecionadas
 });
+
+const operacoesTransacoes = criarOperacoesTransacoes({
+    elementos: {
+        addReceita, addDespesa, botoesFechar, modalOverlay,
+        modalTitle, campoClassificacao, campoPagamento, formTransacao,
+        campoNome, campoValor, campoCategoria, selectClassificacao,
+        selectPagamento, campoConta, campoData, botaoSalvarTransacao,
+        modalExclusao, mensagemExclusao, botaoCancelarExclusao, botaoConfirmarExclusao
+    },
+    consultas: {
+        consultarTransacoes: () => disponibilidadeColecoes.consultarTransacoes(),
+        consultarContas: () => disponibilidadeColecoes.consultarContas(),
+        colecaoEstaBloqueada: (chave) => disponibilidadeColecoes.colecaoEstaBloqueada(chave)
+    },
+    confirmarTransacoes: (candidatas) => persistirColecao("transacoes", candidatas),
+    validarContaTransacao,
+    consultarSelecao: () => listagensTransacoes.consultarSelecao(),
+    modais: { abrirModal, fecharModal }, mostrarToast,
+    aposPersistir: () => {
+        listagensTransacoes.definirSelecao([]);
+        renderizarTransacoes(listaTransacoes, 5);
+        atualizarCategorias();
+        atualizarTabelaCompleta();
+        atualizarResumo();
+        atualizarBarraAcoes();
+    },
+    // Na exclusão, a atualização de Investimentos continua após solicitar o fechamento.
+    aposFecharExclusao: () => renderizarInvestimentos()
+});
+
+operacoesTransacoes.inicializar();
 
 // funcoes reutilizaveis
 function mostrarToast(mensagem, tipo = "informacao") {
-    if (!["sucesso", "erro", "informacao"].includes(tipo)) tipo = "informacao";
-    const repetida = [...notificacoesAtivas, ...filaNotificacoes].some((notificacao) => {
-        return notificacao.mensagem === mensagem && notificacao.tipo === tipo;
-    });
-    if (repetida) return;
-
-    filaNotificacoes.push({ mensagem, tipo });
-    if (notificacoesAtivas.length === 3) {
-        const temporaria = notificacoesAtivas.find((notificacao) => {
-            return notificacao.tipo !== "erro"
-                && !notificacao.saindo
-                && !notificacao.elemento.contains(document.activeElement);
-        });
-        if (temporaria) {
-            fecharToast(temporaria);
-            return;
-        }
-    }
-    exibirProximosToasts();
-}
-
-function exibirProximosToasts() {
-    // O overlay está desaparecendo; seu fade não deve esconder o novo toast.
-    if (areaNotificacoes.parentElement?.classList.contains("modal-saindo")) {
-        document.body.appendChild(areaNotificacoes);
-    }
-    const titulos = { sucesso: "Sucesso", erro: "Erro", informacao: "Informação" };
-    while (notificacoesAtivas.length < 3 && filaNotificacoes.length > 0) {
-        const notificacao = filaNotificacoes.shift();
-        const elemento = document.createElement("div");
-        elemento.classList.add("notificacao", `notificacao-${notificacao.tipo}`);
-        elemento.setAttribute("role", "group");
-        elemento.setAttribute("aria-label", titulos[notificacao.tipo]);
-        const texto = document.createElement("div");
-        texto.classList.add("notificacao-texto");
-        const titulo = document.createElement("strong");
-        titulo.classList.add("notificacao-titulo");
-        titulo.textContent = titulos[notificacao.tipo];
-        const mensagem = document.createElement("p");
-        mensagem.classList.add("notificacao-mensagem");
-        mensagem.textContent = notificacao.mensagem;
-        const fechar = document.createElement("button");
-        fechar.type = "button";
-        fechar.classList.add("fechar-notificacao");
-        fechar.setAttribute("aria-label", `Fechar notificação: ${titulos[notificacao.tipo]}`);
-        fechar.textContent = "×";
-        fechar.addEventListener("click", () => fecharToast(notificacao));
-        texto.append(titulo, mensagem);
-        elemento.append(texto, fechar);
-        listaNotificacoes.appendChild(elemento);
-        notificacao.elemento = elemento;
-        notificacao.restante = 4000;
-        notificacao.temporizador = null;
-        notificacoesAtivas.push(notificacao);
-        animarToast(notificacao);
-
-        elemento.addEventListener("mouseenter", () => pausarToast(notificacao));
-        elemento.addEventListener("mouseleave", () => retomarToast(notificacao));
-        elemento.addEventListener("focusin", (evento) => {
-            if (!elemento.contains(evento.relatedTarget)) notificacao.focoAnterior = evento.relatedTarget;
-            pausarToast(notificacao);
-        });
-        elemento.addEventListener("focusout", (evento) => {
-            if (!elemento.contains(evento.relatedTarget)) retomarToast(notificacao);
-        });
-        retomarToast(notificacao);
-        mensagensParaAnunciar.push(`${titulos[notificacao.tipo]}: ${notificacao.mensagem}`);
-    }
-    // Agrupa anúncios que surgem juntos, como falhas nas duas coleções ao iniciar.
-    if (mensagensParaAnunciar.length > 0 && anuncioPendente === null) {
-        anuncioNotificacoes.textContent = "";
-        anuncioPendente = setTimeout(() => {
-            anuncioNotificacoes.textContent = mensagensParaAnunciar.join(" ");
-            mensagensParaAnunciar = [];
-            anuncioPendente = null;
-        }, 100);
-    }
-}
-
-function pausarToast(notificacao) {
-    if (notificacao.temporizador === null) return;
-    clearTimeout(notificacao.temporizador);
-    notificacao.temporizador = null;
-    notificacao.restante = Math.max(0, notificacao.restante - (Date.now() - notificacao.inicio));
-}
-
-function retomarToast(notificacao) {
-    if (notificacao.saindo || !notificacao.elemento.isConnected || notificacao.tipo === "erro" || notificacao.temporizador !== null
-        || notificacao.elemento.matches(":hover")
-        || notificacao.elemento.contains(document.activeElement)) return;
-    notificacao.inicio = Date.now();
-    notificacao.temporizador = setTimeout(() => fecharToast(notificacao), notificacao.restante);
-}
-
-function fecharToast(notificacao) {
-    const indice = notificacoesAtivas.indexOf(notificacao);
-    if (indice === -1 || notificacao.saindo) return;
-    notificacao.saindo = true;
-    const tinhaFoco = notificacao.elemento.contains(document.activeElement);
-    clearTimeout(notificacao.temporizador);
-    notificacao.temporizador = null;
-    if (tinhaFoco) {
-        const restantes = notificacoesAtivas.filter((item) => !item.saindo);
-        const proxima = restantes[Math.min(indice, restantes.length - 1)];
-        if (proxima) {
-            proxima.elemento.querySelector("button").focus();
-        } else if (podeReceberFoco(notificacao.focoAnterior)) {
-            notificacao.focoAnterior.focus();
-        } else if (modalAtivo) {
-            modalAtivo.querySelector("button, input").focus();
-        } else {
-            addReceita.focus();
-        }
-    }
-    notificacao.elemento.inert = true;
-    animarToast(notificacao, true, () => {
-        // Resolve o índice atual: outras notificações podem ter saído antes desta.
-        const atual = notificacoesAtivas.indexOf(notificacao);
-        if (atual !== -1) notificacoesAtivas.splice(atual, 1);
-        notificacao.elemento.remove();
-        exibirProximosToasts();
-    });
-}
-
-function animarToast(notificacao, saindo = false, aoTerminar = () => {}) {
-    const elemento = notificacao.elemento;
-    let quadroEntrada = null;
-    transicoesToasts.get(notificacao)?.cancelar();
-    transicoesToasts.delete(notificacao);
-    const concluir = () => {
-        transicoesToasts.get(notificacao)?.cancelar();
-        transicoesToasts.delete(notificacao);
-        elemento.classList.remove("notificacao-animando", "notificacao-entrando", "notificacao-saindo");
-        aoTerminar();
-    };
-    if (movimentoReduzidoToasts.matches) {
-        concluir();
-        return;
-    }
-    elemento.classList.add("notificacao-animando");
-    if (saindo) {
-        elemento.classList.remove("notificacao-entrando");
-        elemento.classList.add("notificacao-saindo");
-    }
-    else {
-        elemento.classList.add("notificacao-entrando");
-        void elemento.offsetWidth;
-        quadroEntrada = requestAnimationFrame(() => {
-            quadroEntrada = null;
-            elemento.classList.remove("notificacao-entrando");
-        });
-    }
-    const aoFinalizarTransicao = (evento) => {
-        if (evento.target === elemento && evento.propertyName === "opacity") concluir();
-    };
-    const temporizador = setTimeout(concluir, (saindo ? 150 : 220) + 50);
-    elemento.addEventListener("transitionend", aoFinalizarTransicao);
-    transicoesToasts.set(notificacao, {
-        concluir,
-        cancelar: () => {
-            if (quadroEntrada !== null) cancelAnimationFrame(quadroEntrada);
-            clearTimeout(temporizador);
-            elemento.removeEventListener("transitionend", aoFinalizarTransicao);
-        }
-    });
-}
-
-function textoPreenchido(valor) {
-    return typeof valor === "string" && valor.trim() !== "";
-}
-
-function textoOpcional(valor) {
-    return valor == null || typeof valor === "string";
+    notificacoes.mostrarToast(mensagem, tipo);
 }
 
 function validarContaTransacao(contaId) {
-    return !colecoesBloqueadas.has("contas") && textoPreenchido(contaId)
-        && contas.some((conta) => conta.id === contaId);
-}
-
-function ehMovimentacaoInvestimento(registro) {
-    return registro.tipo === "aporte" || registro.tipo === "resgate";
-}
-
-function validarVinculosTransacoes(registros, contasCadastradas, investimentosCadastrados = []) {
-    const idsContas = new Set(contasCadastradas.map((conta) => conta.id));
-    const idsInvestimentos = new Set(investimentosCadastrados.map((item) => item.id));
-    return registros.every((transacao) => idsContas.has(transacao.contaId)
-        && (!ehMovimentacaoInvestimento(transacao) || idsInvestimentos.has(transacao.investimentoId)));
+    return !disponibilidadeColecoes.colecaoEstaBloqueada("contas") && textoPreenchido(contaId)
+        && disponibilidadeColecoes.consultarContas().some((conta) => conta.id === contaId);
 }
 
 function verificarVinculosCarregados() {
-    if (colecoesBloqueadas.has("transacoes")) return;
-    const integridade = verificarIntegridadeTransacoes(transacoes, contas, investimentos);
-    if (colecoesBloqueadas.has("contas") || !integridade.disponivel) {
-        colecoesBloqueadas.add("transacoes");
-        // Não apresentar um histórico parcial nem gravar sobre a coleção original.
-        transacoes = [];
+    if (disponibilidadeColecoes.colecaoEstaBloqueada("transacoes")) return;
+    const integridade = disponibilidadeColecoes.verificarTransacoesCarregadas();
+    if (!integridade.disponivel) {
         mostrarToast("Transações indisponíveis: não foi possível confirmar os vínculos ou a integridade do capital. "
             + integridade.motivo + " "
             + "Os dados armazenados foram preservados e as gravações de transações estão bloqueadas nesta sessão.", "erro");
     }
 }
 
-function dataValida(data) {
-    if (typeof data !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(data)) return false;
-    const [ano, mes, dia] = data.split("-").map(Number);
-    if (ano < 1 || mes < 1 || mes > 12 || dia < 1) return false;
-    const bissexto = ano % 4 === 0 && (ano % 100 !== 0 || ano % 400 === 0);
-    const diasPorMes = [31, bissexto ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-    return dia <= diasPorMes[mes - 1];
-}
-
-function validarTransacao(registro) {
-    const baseValida = registro !== null && typeof registro === "object" && !Array.isArray(registro)
-        && textoPreenchido(registro.id)
-        && ["receita", "despesa", "aporte", "resgate"].includes(registro.tipo)
-        && textoPreenchido(registro.nome)
-        // Os vínculos são verificados depois de carregar todas as coleções.
-        && textoPreenchido(registro.contaId)
-        && Number.isFinite(registro.valor) && valorMonetarioValido(registro.valor) && registro.valor > 0
-        && dataValida(registro.data);
-    if (!baseValida) return false;
-    if (!ehMovimentacaoInvestimento(registro)) {
-        // Na leitura e nos cálculos, preserva despesas antigas sem classificação.
-        // Novas despesas e alterações têm validação adicional na gravação.
-        return textoPreenchido(registro.categoria) && textoOpcional(registro.pagamento)
-            && textoOpcional(registro.classificacao);
-    }
-    return textoPreenchido(registro.investimentoId) && valorInvestimentoValido(registro.valor)
-        && textoOpcional(registro.observacoes)
-        && (registro.observacoes == null || registro.observacoes.length <= 500)
-        && (registro.tipo !== "resgate" || (
-            valorInvestimentoValido(registro.capitalRetirado) && registro.capitalRetirado > 0
-            && valorInvestimentoValido(registro.valorRetiradoInvestimento) && registro.valorRetiradoInvestimento > 0));
-}
-
-// Uso explícito pela futura interface. Nunca normaliza ou regrava registros carregados.
-function prepararMovimentacaoInvestimento(registro) {
-    return registro.tipo === "resgate"
-        ? { ...registro, valorRetiradoInvestimento: registro.valorRetiradoInvestimento ?? registro.valor }
-        : { ...registro };
-}
-
-function validarConta(registro) {
-    return registro !== null && typeof registro === "object" && !Array.isArray(registro)
-        && textoPreenchido(registro.id)
-        && textoPreenchido(registro.nome)
-        && ["corrente", "poupanca", "reserva", "carteira"].includes(registro.tipo)
-        && Number.isFinite(registro.saldoInicial) && valorMonetarioValido(registro.saldoInicial)
-        && dataValida(registro.dataReferencia)
-        && registro.dataReferencia <= obterDataLocal()
-        && typeof registro.incluirNoSaldoDisponivel === "boolean"
-        && textoOpcional(registro.instituicao);
-}
-
-function validarColecao(registros, validarRegistro) {
-    if (!Array.isArray(registros)) return false;
-    const ids = new Set();
-    for (const registro of registros) {
-        if (!validarRegistro(registro) || ids.has(registro.id)) return false;
-        ids.add(registro.id);
-    }
-    return true;
-}
-
-function valorInvestimentoValido(valor) {
-    return Number.isFinite(valor) && valorMonetarioValido(valor);
-}
-
-function valorMonetarioValido(valor) {
-    return Number.isSafeInteger(converterParaCentavos(valor));
-}
-
-function validarInvestimento(registro) {
-    if (registro === null || typeof registro !== "object" || Array.isArray(registro)) return false;
-    const hoje = obterDataLocal();
-    const instante = typeof registro.atualizadoEm === "string" ? new Date(registro.atualizadoEm) : null;
-    return typeof registro.id === "string"
-        && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(registro.id)
-        && textoPreenchido(registro.nome) && textoPreenchido(registro.tipo)
-        && textoOpcional(registro.instituicao)
-        && valorInvestimentoValido(registro.capitalInicial) && valorInvestimentoValido(registro.valorInformado)
-        && dataValida(registro.dataReferenciaCapital) && registro.dataReferenciaCapital <= hoje
-        && dataValida(registro.dataReferenciaValor) && registro.dataReferenciaValor <= hoje
-        && instante !== null && Number.isFinite(instante.getTime())
-        && instante.toISOString() === registro.atualizadoEm
-        && textoOpcional(registro.observacoes)
-        && (registro.observacoes == null || registro.observacoes.length <= 500);
-}
-
-function obterDataLocal(data = new Date()) {
-    const ano = String(data.getFullYear()).padStart(4, "0");
-    const mes = String(data.getMonth() + 1).padStart(2, "0");
-    const dia = String(data.getDate()).padStart(2, "0");
-    return `${ano}-${mes}-${dia}`;
-}
-
-function converterParaCentavos(valor) {
-    if ((typeof valor !== "number" && typeof valor !== "string")
-        || String(valor).trim() === "" || !Number.isFinite(Number(valor)) || Number(valor) < 0) return NaN;
-    // Opera sobre dígitos decimais, sem arredondar frações de centavo.
-    const lerDecimal = (texto) => {
-        const partes = /^[-+]?(\d*)(?:\.(\d*))?(?:e([-+]?\d+))?$/i.exec(texto);
-        if (!partes || !(partes[1] + (partes[2] || "")).length) return NaN;
-        let digitos = (partes[1] + (partes[2] || "")).replace(/^0+/, "");
-        if (!digitos) return 0;
-        let deslocamento = 2 + Number(partes[3] || 0) - (partes[2] || "").length;
-        const semZerosFinais = digitos.replace(/0+$/, "");
-        deslocamento += digitos.length - semZerosFinais.length;
-        digitos = semZerosFinais;
-        if (deslocamento < 0 || digitos.length + deslocamento > 16) return NaN;
-        const centavos = Number(digitos + "0".repeat(deslocamento));
-        return Number.isSafeInteger(centavos) ? centavos : NaN;
-    };
-    const centavos = lerDecimal(String(valor).trim());
-    // A entrada do formulário também precisa sobreviver ao armazenamento como Number.
-    return centavos === lerDecimal(String(Number(valor))) ? centavos : NaN;
-}
-
-function saldosIndisponiveis(motivo) {
-    return {
-        disponivel: false,
-        motivo,
-        saldosPorContaCentavos: null,
-        saldoTotalCentavos: null,
-        saldoDisponivelCentavos: null
-    };
-}
-
-function capitaisIndisponiveis(motivo) {
-    return { disponivel: false, motivo, capitaisPorInvestimentoCentavos: null };
-}
-
-function calcularCapitaisAplicados(investimentosCadastrados, registros, hoje = obterDataLocal()) {
-    if (!dataValida(hoje) || !validarColecao(investimentosCadastrados, validarInvestimento)
-        || !validarColecao(registros, validarTransacao)) {
-        return capitaisIndisponiveis("Investimentos, transações ou data inválidos para calcular o capital.");
-    }
-    const porId = new Map(investimentosCadastrados.map((item) => [item.id, item]));
-    const movimentosPorDia = new Map(investimentosCadastrados.map((item) => [item.id, new Map()]));
-    for (const registro of registros) {
-        if (!ehMovimentacaoInvestimento(registro)) continue;
-        const investimento = porId.get(registro.investimentoId);
-        if (!investimento) return capitaisIndisponiveis("Há uma movimentação vinculada a um investimento inexistente.");
-        // A base é consolidada ao final da referência. Não conhecemos o capital anterior.
-        if (registro.data <= investimento.dataReferenciaCapital) continue;
-        const dias = movimentosPorDia.get(investimento.id);
-        const totais = dias.get(registro.data) || { aportes: 0, retiradas: 0 };
-        const campo = registro.tipo === "aporte" ? "aportes" : "retiradas";
-        const valor = converterParaCentavos(registro.tipo === "aporte" ? registro.valor : registro.capitalRetirado);
-        const acumulado = totais[campo] + valor;
-        if (!Number.isSafeInteger(valor) || !Number.isSafeInteger(acumulado)) {
-            return capitaisIndisponiveis("Um movimento diário ultrapassa o limite seguro em centavos.");
-        }
-        totais[campo] = acumulado;
-        dias.set(registro.data, totais);
-    }
-    const capitaisPorInvestimentoCentavos = new Map();
-    for (const investimento of investimentosCadastrados) {
-        let capital = converterParaCentavos(investimento.capitalInicial);
-        if (!Number.isSafeInteger(capital)) return capitaisIndisponiveis("Capital inicial fora do limite seguro.");
-        let corrente = capital;
-        // Sem horário, valida-se o fechamento de cada dia, independentemente da ordem do array.
-        const dias = [...movimentosPorDia.get(investimento.id)].sort(([a], [b]) => a.localeCompare(b));
-        for (const [data, totais] of dias) {
-            capital += totais.aportes - totais.retiradas;
-            if (!Number.isSafeInteger(capital) || capital < 0) {
-                return capitaisIndisponiveis(`Capital inconsistente no investimento "${investimento.nome}" em ${data}: saldo negativo ou fora do limite seguro.`);
-            }
-            if (data <= hoje) corrente = capital;
-        }
-        capitaisPorInvestimentoCentavos.set(investimento.id, corrente);
-    }
-    return { disponivel: true, motivo: "", capitaisPorInvestimentoCentavos };
-}
-
-function verificarIntegridadeTransacoes(registros, contasCadastradas, investimentosCadastrados) {
-    if (!validarColecao(registros, validarTransacao) || !validarColecao(contasCadastradas, validarConta)
-        || !validarVinculosTransacoes(registros, contasCadastradas, investimentosCadastrados)) {
-        return { disponivel: false, motivo: "Há dados inválidos ou vínculos com contas/investimentos inexistentes." };
-    }
-    // Uma coleção de investimentos indisponível não invalida receitas/despesas sem esses vínculos.
-    return registros.some(ehMovimentacaoInvestimento)
-        ? calcularCapitaisAplicados(investimentosCadastrados, registros)
-        : { disponivel: true, motivo: "" };
-}
-
 function obterCapitaisAplicados(hoje = obterDataLocal()) {
-    if (["investimentos", "transacoes", "contas"].some((chave) => colecoesBloqueadas.has(chave))) {
+    if (["investimentos", "transacoes", "contas"].some((chave) => disponibilidadeColecoes.colecaoEstaBloqueada(chave))) {
         return capitaisIndisponiveis("Dados necessários ao cálculo de capital indisponíveis nesta sessão.");
     }
-    const integridade = verificarIntegridadeTransacoes(transacoes, contas, investimentos);
+    const integridade = verificarIntegridadeTransacoes(disponibilidadeColecoes.consultarTransacoes(), disponibilidadeColecoes.consultarContas(), disponibilidadeColecoes.consultarInvestimentos());
     if (!integridade.disponivel) return capitaisIndisponiveis(integridade.motivo);
-    return calcularCapitaisAplicados(investimentos, transacoes, hoje);
-}
-
-function valoresInvestimentosIndisponiveis(motivo) {
-    return { disponivel: false, motivo, valoresPorInvestimento: null, totalValorCentavos: null };
-}
-
-function calcularValoresInvestimentos(investimentosCadastrados, registros, hoje = obterDataLocal()) {
-    if (!dataValida(hoje) || !validarColecao(investimentosCadastrados, validarInvestimento)
-        || !validarColecao(registros, validarTransacao)) {
-        return valoresInvestimentosIndisponiveis("Dados ou data inválidos para estimar as posições.");
-    }
-    const valoresPorInvestimento = new Map(investimentosCadastrados.map((item) => [item.id, {
-        disponivel: true, valorCentavos: converterParaCentavos(item.valorInformado),
-        ajustado: false, motivo: "", aportes: 0, retiradas: 0
-    }]));
-    const porId = new Map(investimentosCadastrados.map((item) => [item.id, item]));
-    for (const movimento of registros) {
-        if (!ehMovimentacaoInvestimento(movimento)) continue;
-        const investimento = porId.get(movimento.investimentoId);
-        if (!investimento) return valoresInvestimentosIndisponiveis("Movimentação sem investimento válido.");
-        if (movimento.data <= investimento.dataReferenciaValor || movimento.data > hoje) continue;
-        const posicao = valoresPorInvestimento.get(investimento.id);
-        const campo = movimento.tipo === "aporte" ? "aportes" : "retiradas";
-        posicao[campo] += converterParaCentavos(movimento.tipo === "aporte"
-            ? movimento.valor : movimento.valorRetiradoInvestimento);
-        posicao.ajustado = true;
-        if (!Number.isSafeInteger(posicao[campo])) posicao.disponivel = false;
-    }
-    let totalValorCentavos = 0;
-    let disponivel = true;
-    for (const posicao of valoresPorInvestimento.values()) {
-        const valor = posicao.valorCentavos + (posicao.aportes - posicao.retiradas);
-        if (!posicao.disponivel || !Number.isSafeInteger(valor) || valor < 0) {
-            posicao.disponivel = false;
-            posicao.valorCentavos = null;
-            posicao.motivo = "Estimativa inconsistente: atualize o valor manual ou revise as movimentações. Não foi aplicado ajuste automático.";
-            disponivel = false;
-        } else {
-            posicao.valorCentavos = valor;
-            totalValorCentavos += valor;
-            if (!Number.isSafeInteger(totalValorCentavos)) disponivel = false;
-        }
-        delete posicao.aportes;
-        delete posicao.retiradas;
-    }
-    return { disponivel, motivo: disponivel ? "" : "Valor total indisponível: há estimativa inconsistente ou limite numérico excedido.",
-        valoresPorInvestimento, totalValorCentavos: disponivel ? totalValorCentavos : null };
+    return calcularCapitaisAplicados(disponibilidadeColecoes.consultarInvestimentos(), disponibilidadeColecoes.consultarTransacoes(), hoje);
 }
 
 function obterAcompanhamentoInvestimentos(hoje = obterDataLocal()) {
     const capitais = obterCapitaisAplicados(hoje);
     if (!capitais.disponivel) return { capitais, valores: valoresInvestimentosIndisponiveis(capitais.motivo), totalCapitalCentavos: null };
-    let totalCapitalCentavos = 0;
-    for (const capital of capitais.capitaisPorInvestimentoCentavos.values()) {
-        totalCapitalCentavos += capital;
-        if (!Number.isSafeInteger(totalCapitalCentavos)) { totalCapitalCentavos = null; break; }
-    }
-    return { capitais, totalCapitalCentavos, valores: calcularValoresInvestimentos(investimentos, transacoes, hoje) };
-}
-
-function movimentoBancarioCentavos(transacao) {
-    const valor = converterParaCentavos(transacao.valor);
-    switch (transacao.tipo) {
-        case "receita": case "resgate": return valor;
-        case "despesa": case "aporte": return -valor;
-        default: return null;
-    }
-}
-
-// Recebe as coleções completas. Todos os valores retornados estão em centavos.
-// O parâmetro hoje permite testar datas sem depender do relógio da execução.
-function calcularSaldos(contasCadastradas, registrosTransacoes, hoje = obterDataLocal(), investimentosCadastrados = []) {
-    if (!dataValida(hoje) || !validarColecao(contasCadastradas, validarConta)
-        || !validarColecao(registrosTransacoes, validarTransacao)) {
-        return saldosIndisponiveis("Dados ou data inválidos para calcular os saldos.");
-    }
-    const integridade = verificarIntegridadeTransacoes(registrosTransacoes, contasCadastradas, investimentosCadastrados);
-    if (!integridade.disponivel) return saldosIndisponiveis(integridade.motivo);
-
-    const contasPorId = new Map();
-    const saldosPorContaCentavos = new Map();
-    for (const conta of contasCadastradas) {
-        const inicial = converterParaCentavos(conta.saldoInicial);
-        if (!Number.isSafeInteger(inicial)) {
-            return saldosIndisponiveis("O saldo inicial ultrapassa o limite de cálculo seguro em centavos.");
-        }
-        contasPorId.set(conta.id, conta);
-        saldosPorContaCentavos.set(conta.id, inicial);
-    }
-
-    for (const transacao of registrosTransacoes) {
-        const conta = contasPorId.get(transacao.contaId);
-        if (transacao.data <= conta.dataReferencia || transacao.data > hoje) continue;
-        const valor = converterParaCentavos(transacao.valor);
-        const movimento = movimentoBancarioCentavos(transacao);
-        const saldo = saldosPorContaCentavos.get(conta.id) + movimento;
-        if (!Number.isSafeInteger(valor) || !Number.isSafeInteger(saldo)) {
-            return saldosIndisponiveis("Um movimento ou saldo ultrapassa o limite de cálculo seguro em centavos.");
-        }
-        saldosPorContaCentavos.set(conta.id, saldo);
-    }
-
-    let saldoTotalCentavos = 0;
-    let saldoDisponivelCentavos = 0;
-    for (const conta of contasCadastradas) {
-        const saldo = saldosPorContaCentavos.get(conta.id);
-        saldoTotalCentavos += saldo;
-        if (conta.incluirNoSaldoDisponivel === true) saldoDisponivelCentavos += saldo;
-        if (!Number.isSafeInteger(saldoTotalCentavos) || !Number.isSafeInteger(saldoDisponivelCentavos)) {
-            return saldosIndisponiveis("Os totais ultrapassam o limite de cálculo seguro em centavos.");
-        }
-    }
-    return {
-        disponivel: true,
-        motivo: "",
-        saldosPorContaCentavos,
-        saldoTotalCentavos,
-        saldoDisponivelCentavos
-    };
+    const totalCapitalCentavos = calcularTotalCapitalAplicado(capitais.capitaisPorInvestimentoCentavos);
+    return { capitais, totalCapitalCentavos, valores: calcularValoresInvestimentos(disponibilidadeColecoes.consultarInvestimentos(), disponibilidadeColecoes.consultarTransacoes(), hoje) };
 }
 
 // Ponto de entrada da aplicação: nunca calcular sobre os arrays vazios de fallback
 // usados quando uma coleção não pôde ser carregada ou seus vínculos são inválidos.
 function obterSaldosContas(hoje = obterDataLocal()) {
-    if (colecoesBloqueadas.has("contas") || colecoesBloqueadas.has("transacoes")) {
+    if (disponibilidadeColecoes.colecaoEstaBloqueada("contas") || disponibilidadeColecoes.colecaoEstaBloqueada("transacoes")) {
         return saldosIndisponiveis("Dados de contas ou transações indisponíveis nesta sessão.");
     }
-    return calcularSaldos(contas, transacoes, hoje, investimentos);
-}
-
-function historicoMensalIndisponivel(motivo) {
-    return { disponivel: false, motivo, vazio: null, meses: null,
-        primeiroMes: null, ultimoMes: null, mesFinal: null, duracao: null };
-}
-
-// A duração e o mês final selecionam a janela; a agregação financeira é compartilhada.
-// Datas são comparadas como YYYY-MM-DD; não há conversão UTC nem referência de conta.
-function prepararHistoricoMensal(registros, hoje = obterDataLocal(), mesFinal = null, duracao = 6) {
-    if (!dataValida(hoje) || !validarColecao(registros, validarTransacao)
-        || ![3, 6, 12].includes(duracao)
-        || (mesFinal !== null && !dataValida(`${mesFinal}-01`))) {
-        return historicoMensalIndisponivel("Transações, data ou período inválidos para preparar o histórico.");
-    }
-
-    const totaisPorMes = new Map();
-    let primeiroIndice = null;
-    for (const transacao of registros) {
-        if (transacao.tipo !== "receita" && transacao.tipo !== "despesa") continue;
-        if (transacao.data > hoje) continue;
-        const ano = Number(transacao.data.slice(0, 4));
-        const mes = Number(transacao.data.slice(5, 7));
-        const indice = ano * 12 + mes - 1;
-        const totais = totaisPorMes.get(indice) || { receitasCentavos: 0, despesasCentavos: 0 };
-        const campo = transacao.tipo === "receita" ? "receitasCentavos" : "despesasCentavos";
-        const valor = converterParaCentavos(transacao.valor);
-        const total = totais[campo] + valor;
-        if (!Number.isSafeInteger(valor) || !Number.isSafeInteger(total)) {
-            return historicoMensalIndisponivel("Um valor ou total mensal ultrapassa o limite seguro em centavos.");
-        }
-        totais[campo] = total;
-        totaisPorMes.set(indice, totais);
-        primeiroIndice = primeiroIndice === null ? indice : Math.min(primeiroIndice, indice);
-    }
-
-    if (primeiroIndice === null) {
-        return { disponivel: true, motivo: "Nenhuma movimentação até a data atual.", vazio: true,
-            meses: [], primeiroMes: null, ultimoMes: null, mesFinal: null, duracao };
-    }
-
-    const indiceAtual = Number(hoje.slice(0, 4)) * 12 + Number(hoje.slice(5, 7)) - 1;
-    const fim = mesFinal === null ? indiceAtual
-        : Number(mesFinal.slice(0, 4)) * 12 + Number(mesFinal.slice(5, 7)) - 1;
-    if (fim < primeiroIndice || fim > indiceAtual) {
-        return historicoMensalIndisponivel("O mês final está fora do histórico disponível.");
-    }
-    const inicio = fim - duracao + 1;
-    const chaveMes = (indice) => `${String(Math.floor(indice / 12)).padStart(4, "0")}-${String(indice % 12 + 1).padStart(2, "0")}`;
-    const meses = [];
-    for (let indice = inicio; indice <= fim; indice++) {
-        const totais = totaisPorMes.get(indice) || { receitasCentavos: 0, despesasCentavos: 0 };
-        meses.push({ mes: chaveMes(indice), ...totais });
-    }
-    return { disponivel: true, motivo: "", vazio: false, meses,
-        primeiroMes: chaveMes(primeiroIndice), ultimoMes: chaveMes(indiceAtual),
-        mesFinal: chaveMes(fim), duracao };
+    return calcularSaldos(disponibilidadeColecoes.consultarContas(), disponibilidadeColecoes.consultarTransacoes(), hoje, disponibilidadeColecoes.consultarInvestimentos());
 }
 
 // Entrada da aplicação: utiliza a coleção completa e respeita os bloqueios existentes.
 function obterHistoricoMensal(mesFinal = null, duracao = 6, hoje = obterDataLocal()) {
-    if (colecoesBloqueadas.has("transacoes") || colecoesBloqueadas.has("contas")) {
+    if (disponibilidadeColecoes.colecaoEstaBloqueada("transacoes") || disponibilidadeColecoes.colecaoEstaBloqueada("contas")) {
         return historicoMensalIndisponivel("Dados de transações ou seus vínculos indisponíveis nesta sessão.");
     }
-    if (!validarColecao(transacoes, validarTransacao) || !validarColecao(contas, validarConta)
-        || !validarVinculosTransacoes(transacoes, contas, investimentos)) {
+    if (!validarColecao(disponibilidadeColecoes.consultarTransacoes(), validarTransacao) || !validarColecao(disponibilidadeColecoes.consultarContas(), validarConta)
+        || !validarVinculosTransacoes(disponibilidadeColecoes.consultarTransacoes(), disponibilidadeColecoes.consultarContas(), disponibilidadeColecoes.consultarInvestimentos())) {
         return historicoMensalIndisponivel("Não foi possível validar as transações e seus vínculos.");
     }
-    return prepararHistoricoMensal(transacoes, hoje, mesFinal, duracao);
+    return prepararHistoricoMensal(disponibilidadeColecoes.consultarTransacoes(), hoje, mesFinal, duracao);
 }
 
-// Chaves idênticas aos valores persistidos pelo formulário; cores independem da ordem dos dados.
-const CLASSIFICACOES_DESPESAS = Object.freeze({
-    Essencial: Object.freeze({ nome: "Necessidades", cor: "#289568" }),
-    Desnecessario: Object.freeze({ nome: "Desnecessários", cor: "#DC5252" }),
-    Imprevisto: Object.freeze({ nome: "Imprevistos", cor: "#E4B044" }),
-    Investimento: Object.freeze({ nome: "Investimentos", cor: "#E58A45" }),
-    Desejo: Object.freeze({ nome: "Desejos", cor: "#9164CB" })
-});
+listagensTransacoes.prepararClassificacoes();
 
-Object.entries(CLASSIFICACOES_DESPESAS).forEach(([id, definicao]) => {
-    const opcao = document.createElement("option");
-    opcao.value = id;
-    opcao.textContent = definicao.nome;
-    filtroClassificacao.appendChild(opcao);
-});
-
-function classificacaoDespesaValida(classificacao) {
-    return typeof classificacao === "string" && Object.hasOwn(CLASSIFICACOES_DESPESAS, classificacao);
-}
-
-// Retratos dos registros carregados: não são flags nem migrações no localStorage.
-const despesasLegadasSemClassificacao = new Map(transacoes
-    .filter((registro) => registro.tipo === "despesa" && !classificacaoDespesaValida(registro.classificacao))
-    .map((registro) => [registro.id, JSON.stringify(registro)]));
-
-function validarTransacaoParaGravacao(registro) {
-    if (!validarTransacao(registro)) return false;
-    return registro.tipo !== "despesa" || classificacaoDespesaValida(registro.classificacao)
-        // A coleção inteira é gravada: apenas legados integralmente inalterados são preservados.
-        || despesasLegadasSemClassificacao.get(registro.id) === JSON.stringify(registro);
-}
-
-function distribuicaoDespesasIndisponivel(motivo) {
-    return { disponivel: false, motivo, vazio: null, mesInicial: null, mesFinal: null,
-        totalCentavos: null, classificacoes: null };
-}
-
-function definirPeriodoDespesas(tipo = "atual", mesInicial = null, mesFinal = null, hoje = obterDataLocal()) {
-    if (!dataValida(hoje)) return { disponivel: false, motivo: "Data local inválida." };
-    if (tipo === "atual") {
-        mesInicial = mesFinal = hoje.slice(0, 7);
-    } else if (tipo === "anterior") {
-        const ano = Number(hoje.slice(0, 4));
-        const mes = Number(hoje.slice(5, 7));
-        mesInicial = mesFinal = mes === 1 ? `${String(ano - 1).padStart(4, "0")}-12`
-            : `${ano.toString().padStart(4, "0")}-${String(mes - 1).padStart(2, "0")}`;
-    } else if (tipo !== "personalizado") {
-        return { disponivel: false, motivo: "Tipo de período inválido." };
-    }
-    if (typeof mesInicial !== "string" || typeof mesFinal !== "string"
-        || !dataValida(`${mesInicial}-01`) || !dataValida(`${mesFinal}-01`)) {
-        return { disponivel: false, motivo: "Informe meses válidos no formato YYYY-MM." };
-    }
-    if (mesInicial > mesFinal) {
-        return { disponivel: false, motivo: "O mês inicial não pode ser posterior ao mês final." };
-    }
-    if (mesInicial > hoje.slice(0, 7)) {
-        return { disponivel: false, motivo: "O período não pode ser inteiramente futuro." };
-    }
-    return { disponivel: true, motivo: "", mesInicial, mesFinal };
-}
-
-// Função pura: meses inclusivos, sem referência de saldo e sem depender da interface.
-function prepararDistribuicaoDespesas(registros, mesInicial, mesFinal, hoje = obterDataLocal()) {
-    const periodo = definirPeriodoDespesas("personalizado", mesInicial, mesFinal, hoje);
-    if (!periodo.disponivel) return distribuicaoDespesasIndisponivel(periodo.motivo);
-    if (!validarColecao(registros, validarTransacao)) {
-        return distribuicaoDespesasIndisponivel("A coleção de transações contém dados inválidos.");
-    }
-    const totais = new Map(Object.keys(CLASSIFICACOES_DESPESAS).map((id) => [id, 0]));
-    let totalCentavos = 0;
-    for (const transacao of registros) {
-        const mes = transacao.data.slice(0, 7);
-        if (transacao.tipo !== "despesa" || mes < mesInicial || mes > mesFinal || transacao.data > hoje) continue;
-        if (!totais.has(transacao.classificacao)) {
-            return distribuicaoDespesasIndisponivel("Há despesas no período sem classificação ou com classificação desconhecida. Revise os registros; nenhum dado foi alterado.");
-        }
-        const valor = converterParaCentavos(transacao.valor);
-        const subtotal = totais.get(transacao.classificacao) + valor;
-        const proximoTotal = totalCentavos + valor;
-        if (!Number.isSafeInteger(valor) || !Number.isSafeInteger(subtotal) || !Number.isSafeInteger(proximoTotal)) {
-            return distribuicaoDespesasIndisponivel("Um valor ou total de despesas ultrapassa o limite seguro em centavos.");
-        }
-        totais.set(transacao.classificacao, subtotal);
-        totalCentavos = proximoTotal;
-    }
-    const classificacoes = Object.entries(CLASSIFICACOES_DESPESAS).map(([id, definicao]) => ({
-        id, ...definicao, totalCentavos: totais.get(id),
-        // Não arredondar aqui: a futura interface decide a precisão de apresentação.
-        percentual: totalCentavos === 0 ? 0 : (totais.get(id) / totalCentavos) * 100
-    }));
-    return { disponivel: true, motivo: totalCentavos === 0 ? "Nenhuma despesa no período até a data atual." : "",
-        vazio: totalCentavos === 0, mesInicial, mesFinal, totalCentavos, classificacoes };
-}
+disponibilidadeColecoes.prepararCompatibilidadeTransacoes();
 
 // Entrada da aplicação: sempre usa as coleções completas e os bloqueios existentes.
 function obterDistribuicaoDespesas(tipo = "atual", mesInicial = null, mesFinal = null, hoje = obterDataLocal()) {
-    if (colecoesBloqueadas.has("transacoes") || colecoesBloqueadas.has("contas")) {
+    if (disponibilidadeColecoes.colecaoEstaBloqueada("transacoes") || disponibilidadeColecoes.colecaoEstaBloqueada("contas")) {
         return distribuicaoDespesasIndisponivel("Dados de transações ou seus vínculos indisponíveis nesta sessão.");
     }
-    if (!validarColecao(transacoes, validarTransacao) || !validarColecao(contas, validarConta)
-        || !validarVinculosTransacoes(transacoes, contas, investimentos)) {
+    if (!validarColecao(disponibilidadeColecoes.consultarTransacoes(), validarTransacao) || !validarColecao(disponibilidadeColecoes.consultarContas(), validarConta)
+        || !validarVinculosTransacoes(disponibilidadeColecoes.consultarTransacoes(), disponibilidadeColecoes.consultarContas(), disponibilidadeColecoes.consultarInvestimentos())) {
         return distribuicaoDespesasIndisponivel("Não foi possível validar as transações e seus vínculos.");
     }
     const periodo = definirPeriodoDespesas(tipo, mesInicial, mesFinal, hoje);
     if (!periodo.disponivel) return distribuicaoDespesasIndisponivel(periodo.motivo);
-    return prepararDistribuicaoDespesas(transacoes, periodo.mesInicial, periodo.mesFinal, hoje);
+    return prepararDistribuicaoDespesas(disponibilidadeColecoes.consultarTransacoes(), periodo.mesInicial, periodo.mesFinal, hoje);
 }
 
-// Estado visual da sessão: a criação de uma instância oculta não consome a entrada.
-const formacoesAnalises = {
-    resumo: { exibido: false, ultimoInicio: null, iniciou: false, quadro: null, grafico: null, inicio: null, progresso: 1, assinatura: null },
-    historico: { exibido: false, ultimoInicio: null, iniciou: false, quadro: null, grafico: null, inicio: null, progresso: 1 },
-    distribuicao: { exibido: false, ultimoInicio: null, iniciou: false, quadro: null, grafico: null, inicio: null, progresso: 1 }
-};
-const movimentoReduzidoGraficos = window.matchMedia("(prefers-reduced-motion: reduce)");
-const recortesFormacaoAnalises = new WeakSet();
+const analises = criarAnalises({
+    document, window,
+    elementos: Object.fromEntries([
+        "grafico-distribuicao",
+        "area-distribuicao",
+        "periodo-distribuicao",
+        "mes-inicial-distribuicao",
+        "mes-final-distribuicao",
+        "estado-distribuicao",
+        "total-distribuicao",
+        "intervalo-distribuicao",
+        "legenda-distribuicao",
+        "meses-distribuicao",
+        "valor-total-distribuicao",
+        "mes-final-historico",
+        "area-historico-resumo",
+        "area-historico-analises",
+        "estado-historico-resumo",
+        "estado-historico-analises",
+        "periodo-historico-resumo",
+        "periodo-historico-analises",
+        "dados-historico-resumo",
+        "dados-historico-analises",
+        "grafico-historico-resumo",
+        "grafico-historico-analises"
+    ].map((id) => [id, document.getElementById(id)])),
+    botoesDuracao: document.querySelectorAll("[data-duracao-historico]"),
+    obterHistoricoMensal, obterDistribuicaoDespesas,
+    obterChart: () => window.Chart,
+    movimentoReduzidoGraficos: window.matchMedia("(prefers-reduced-motion: reduce)")
+});
 
-function restaurarRecorteFormacao(grafico) {
-    if (recortesFormacaoAnalises.delete(grafico)) grafico.ctx.restore();
-}
+function atualizarGraficosHistorico() { analises.atualizarGraficosHistorico(); }
+function atualizarDistribuicaoDespesas() { analises.atualizarDistribuicaoDespesas(); }
+function concluirFormacoesAnalises() { analises.concluirFormacoesAnalises(); }
+function prepararFormacoesPagina(pagina) { analises.prepararFormacoesPagina(pagina); }
+function agendarFormacaoAnalises(chave) { analises.agendarFormacaoAnalises(chave); }
 
-function graficoDaFormacao(chave) {
-    if (chave === "distribuicao") return graficoDistribuicao;
-    return chave === "resumo" ? graficosHistorico.resumo : graficosHistorico.analises;
-}
-
-// Apenas a entrada na seção pode liberar uma repetição, nunca uma atualização de dados.
-function prepararFormacoesPagina(pagina) {
-    const agora = performance.now();
-    for (const [chave, estado] of Object.entries(formacoesAnalises)) {
-        if ((chave === "resumo" ? "resumo" : "analises") !== pagina) continue;
-        estado.exibido = estado.ultimoInicio !== null && agora - estado.ultimoInicio < 5000;
-    }
-}
-
-function formacaoEstaVisivel(grafico) {
-    if (!grafico || document.visibilityState !== "visible"
-        || !grafico.canvas.closest(".pagina").classList.contains("ativa")) return false;
-    const area = grafico.canvas.parentElement;
-    if (area.hidden || !grafico.width || !grafico.height) return false;
-    const retangulo = area.getBoundingClientRect();
-    return retangulo.bottom > 0 && retangulo.top < window.innerHeight
-        && retangulo.right > 0 && retangulo.left < window.innerWidth;
-}
-
-function finalizarFormacaoAnalises(chave, redesenhar = false) {
-    const estado = formacoesAnalises[chave];
-    if (estado.quadro !== null) cancelAnimationFrame(estado.quadro);
-    const grafico = estado.grafico;
-    if (grafico) {
-        // Renderizações sucessivas na inicialização não consomem uma entrada ainda não desenhada.
-        if (estado.inicio !== null) estado.exibido = true;
-        restaurarRecorteFormacao(grafico);
-    }
-    estado.quadro = null;
-    estado.grafico = null;
-    estado.inicio = null;
-    estado.iniciou = false;
-    estado.progresso = 1;
-    if (redesenhar && grafico) {
-        try { grafico.draw(); } catch (erro) { /* Falhas visuais não interrompem a aplicação. */ }
-    }
-}
-
-function concluirFormacoesAnalises() {
-    Object.keys(formacoesAnalises).forEach((chave) => finalizarFormacaoAnalises(chave, true));
-}
-
-function agendarFormacaoAnalises(chave) {
-    if (!("IntersectionObserver" in window)) return;
-    const estado = formacoesAnalises[chave];
-    const grafico = graficoDaFormacao(chave);
-    if (estado.exibido || estado.quadro !== null || !formacaoEstaVisivel(grafico)) return;
-    estado.grafico = grafico;
-    const duracao = chave === "historico" ? 500 : 450;
-    const desenhar = (tempo) => {
-        estado.quadro = null;
-        if (grafico !== graficoDaFormacao(chave) || !formacaoEstaVisivel(grafico)
-            || movimentoReduzidoGraficos.matches) {
-            if (formacaoEstaVisivel(grafico)) estado.exibido = true;
-            finalizarFormacaoAnalises(chave, true);
-            return;
-        }
-        if (estado.inicio === null) {
-            estado.exibido = true;
-            estado.progresso = 0;
-            const entrada = grafico.canvas.closest(".card").getAnimations?.()
-                .find((animacao) => animacao.animationName === "entrada-pagina");
-            const timing = entrada?.effect.getTiming();
-            const espera = entrada ? Math.max(0, timing.delay + Number(timing.duration) / 2 - Number(entrada.currentTime)) : 0;
-            estado.inicio = tempo + espera;
-        }
-        const fracao = Math.max(0, Math.min(1, (tempo - estado.inicio) / duracao));
-        if (tempo >= estado.inicio && !estado.iniciou) {
-            estado.ultimoInicio = tempo; // Mesmo relógio monotônico de performance.now().
-            estado.iniciou = true;
-        }
-        estado.progresso = 1 - (1 - fracao) ** 3;
-        try {
-            grafico.draw();
-        } catch (erro) {
-            finalizarFormacaoAnalises(chave, true);
-            return;
-        }
-        // Um resize/update disparado pelo próprio draw pode ter concluído a formação.
-        if (estado.grafico !== grafico) return;
-        if (fracao < 1) estado.quadro = requestAnimationFrame(desenhar);
-        else finalizarFormacaoAnalises(chave);
-    };
-    estado.quadro = requestAnimationFrame(desenhar);
-}
-
-// Recorta somente as séries; eixos, legendas, tooltips e coordenadas ficam completos.
-const formacaoGraficosAnalises = {
-    id: "formacao-analises",
-    beforeDatasetsDraw(grafico) {
-        const estado = Object.values(formacoesAnalises).find((item) => item.grafico === grafico);
-        if (!estado || estado.progresso >= 1) return;
-        const { ctx, chartArea } = grafico;
-        ctx.save();
-        recortesFormacaoAnalises.add(grafico);
-        try {
-            ctx.beginPath();
-            if (grafico.config.type === "line") {
-                ctx.rect(chartArea.left, chartArea.top,
-                    (chartArea.right - chartArea.left) * estado.progresso, chartArea.bottom - chartArea.top);
-            } else {
-                const arcos = grafico.getDatasetMeta(0).data;
-                const primeiro = arcos[0];
-                const ultimo = arcos.at(-1);
-                ctx.moveTo(primeiro.x, primeiro.y);
-                ctx.arc(primeiro.x, primeiro.y, Math.max(grafico.width, grafico.height) * 2,
-                    primeiro.startAngle, primeiro.startAngle + (ultimo.endAngle - primeiro.startAngle) * estado.progresso);
-                ctx.closePath();
-            }
-            ctx.clip();
-        } catch (erro) {
-            restaurarRecorteFormacao(grafico);
-            throw erro;
-        }
-    },
-    afterDatasetsDraw(grafico) {
-        restaurarRecorteFormacao(grafico);
-    },
-    beforeUpdate(grafico) {
-        for (const [chave, estado] of Object.entries(formacoesAnalises)) {
-            // O compacto pode estabilizar seu tamanho enquanto ainda aguarda a entrada do card.
-            if (estado.grafico === grafico && estado.exibido && (chave !== "resumo" || estado.iniciou)) {
-                finalizarFormacaoAnalises(chave);
-            }
-        }
-    },
-    resize(grafico) { formacaoGraficosAnalises.beforeUpdate(grafico); },
-    beforeDestroy(grafico) {
-        for (const [chave, estado] of Object.entries(formacoesAnalises)) {
-            if (estado.grafico === grafico) finalizarFormacaoAnalises(chave);
-        }
-    }
-};
-
-function observarFormacoesAnalises() {
-    if (!("IntersectionObserver" in window)) return; // Sem observador, mantém os gráficos completos.
-    const observador = new IntersectionObserver((entradas) => {
-        for (const entrada of entradas) {
-            const chave = entrada.target.id === "area-historico-resumo" ? "resumo"
-                : entrada.target.id === "area-historico-analises" ? "historico" : "distribuicao";
-            if (entrada.isIntersecting) agendarFormacaoAnalises(chave);
-            else finalizarFormacaoAnalises(chave, true);
-        }
-    });
-    ["area-historico-resumo", "area-historico-analises", "area-distribuicao"]
-        .forEach((id) => observador.observe(document.getElementById(id)));
-    movimentoReduzidoGraficos.addEventListener("change", () => {
-        if (movimentoReduzidoGraficos.matches) concluirFormacoesAnalises();
-    });
-}
-
-function configurarGraficoDistribuicao(classificacoes) {
-    return {
-        type: "doughnut",
-        plugins: [formacaoGraficosAnalises],
-        data: { labels: classificacoes.map((item) => item.nome), datasets: [{
-            data: classificacoes.map((item) => item.totalCentavos / 100),
-            backgroundColor: classificacoes.map((item) => item.cor), borderWidth: 2, borderColor: "#ffffff"
-        }] },
-        options: { responsive: true, maintainAspectRatio: false, animation: false, cutout: "65%",
-            plugins: { legend: { display: false }, tooltip: { callbacks: {
-                label: (contexto) => {
-                    const item = classificacoes[contexto.dataIndex];
-                    return `${item.nome}: ${formatarCentavos(item.totalCentavos)} (${formatarPercentualDistribuicao(item.percentual)})`;
-                }
-            } } }
-        }
-    };
-}
-
-function formatarPercentualDistribuicao(percentual) {
-    return `${percentual.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
-}
-
-function formatarPeriodoDistribuicao(mesInicial, mesFinal) {
-    const nomes = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
-    const formatar = (mes) => `${nomes[Number(mes.slice(5, 7)) - 1]} de ${mes.slice(0, 4)}`;
-    return mesInicial === mesFinal ? formatar(mesInicial) : `${formatar(mesInicial)} — ${formatar(mesFinal)}`;
-}
-
-function destruirInstanciaGrafico(canvas, instancia = null) {
+function carregarColecao(chave) {
     try {
-        const grafico = instancia || window.Chart?.getChart?.(canvas);
-        if (grafico) grafico.destroy();
-        return true;
+        const inicializacao = chave === "contas" ? disponibilidadeColecoes.inicializarContas()
+            : chave === "transacoes" ? disponibilidadeColecoes.inicializarTransacoes()
+                : disponibilidadeColecoes.inicializarInvestimentos();
+        if (!inicializacao.sucesso) throw inicializacao.erro;
+        return chave === "contas" ? disponibilidadeColecoes.consultarContas()
+            : chave === "transacoes" ? disponibilidadeColecoes.consultarTransacoes()
+                : disponibilidadeColecoes.consultarInvestimentos();
     } catch (erro) {
-        // A falha visual não pode interromper operações já persistidas.
-        return false;
-    }
-}
-
-function limparGraficoDistribuicao() {
-    const canvas = document.getElementById("grafico-distribuicao");
-    document.getElementById("area-distribuicao").hidden = true;
-    const instancia = graficoDistribuicao;
-    graficoDistribuicao = null;
-    destruirInstanciaGrafico(canvas, instancia);
-}
-
-function atualizarDistribuicaoDespesas() {
-    finalizarFormacaoAnalises("distribuicao");
-    const tipo = document.getElementById("periodo-distribuicao").value;
-    const inicial = document.getElementById("mes-inicial-distribuicao");
-    const final = document.getElementById("mes-final-distribuicao");
-    const estado = document.getElementById("estado-distribuicao");
-    const total = document.getElementById("total-distribuicao");
-    const intervalo = document.getElementById("intervalo-distribuicao");
-    const legenda = document.getElementById("legenda-distribuicao");
-    document.getElementById("meses-distribuicao").hidden = tipo !== "personalizado";
-    limparErroCampo(inicial);
-    limparErroCampo(final);
-    let periodo = definirPeriodoDespesas(tipo, inicial.value, final.value);
-    if (tipo === "personalizado") {
-        if (!dataValida(`${inicial.value}-01`)) mostrarErro(inicial, "Selecione um mês inicial válido.");
-        if (!dataValida(`${final.value}-01`)) mostrarErro(final, "Selecione um mês final válido.");
-        if (dataValida(`${inicial.value}-01`) && dataValida(`${final.value}-01`) && !periodo.disponivel) {
-            mostrarErro(inicial.value > final.value ? final : inicial, periodo.motivo);
-        }
-    }
-    const distribuicao = periodo.disponivel
-        ? obterDistribuicaoDespesas(tipo, inicial.value, final.value)
-        : distribuicaoDespesasIndisponivel(periodo.motivo);
-    legenda.replaceChildren();
-    total.hidden = !distribuicao.disponivel;
-    document.getElementById("valor-total-distribuicao").textContent = distribuicao.disponivel
-        ? formatarCentavos(distribuicao.totalCentavos) : "";
-    intervalo.textContent = periodo.disponivel
-        ? formatarPeriodoDistribuicao(periodo.mesInicial, periodo.mesFinal) : "";
-    let mensagem = !distribuicao.disponivel ? `Distribuição indisponível. ${distribuicao.motivo}`
-        : distribuicao.vazio ? distribuicao.motivo : "";
-    if (!mensagem) {
-        const itens = distribuicao.classificacoes.filter((item) => item.totalCentavos > 0);
-        itens.forEach((item) => {
-            const linha = document.createElement("li");
-            const cor = document.createElement("span");
-            cor.classList.add("cor-classificacao");
-            cor.style.backgroundColor = item.cor;
-            cor.setAttribute("aria-hidden", "true");
-            const texto = document.createElement("span");
-            texto.classList.add("nome-classificacao");
-            texto.append(cor, `${item.nome}:`);
-            const valor = document.createElement("span");
-            valor.classList.add("valor-classificacao");
-            valor.textContent = ` ${formatarCentavos(item.totalCentavos)}`;
-            const percentual = document.createElement("span");
-            percentual.classList.add("percentual-classificacao");
-            percentual.textContent = ` ${formatarPercentualDistribuicao(item.percentual)}`;
-            linha.append(texto, valor, percentual);
-            legenda.appendChild(linha);
-        });
-        if (typeof window.Chart !== "function") {
-            mensagem = "Gráfico indisponível: não foi possível carregar a biblioteca. Os valores estão disponíveis na legenda.";
-        } else {
-            try {
-                document.getElementById("area-distribuicao").hidden = false;
-                const configuracao = configurarGraficoDistribuicao(itens);
-                if (graficoDistribuicao) {
-                    graficoDistribuicao.data = configuracao.data;
-                    graficoDistribuicao.options = configuracao.options;
-                    graficoDistribuicao.update("none");
-                    graficoDistribuicao.resize();
-                } else {
-                    const canvas = document.getElementById("grafico-distribuicao");
-                    if (!destruirInstanciaGrafico(canvas)) throw new Error("Não foi possível liberar o gráfico anterior.");
-                    graficoDistribuicao = new window.Chart(canvas, configuracao);
-                }
-            } catch (erro) {
-                mensagem = "Gráfico indisponível: não foi possível renderizar a distribuição. Consulte os valores na legenda.";
-            }
-        }
-    }
-    if (mensagem) limparGraficoDistribuicao();
-    estado.textContent = mensagem;
-    // Se a visita começou sem gráfico válido, novos lançamentos continuam instantâneos.
-    if (mensagem && document.getElementById("grafico-distribuicao").closest(".pagina").classList.contains("ativa")) {
-        formacoesAnalises.distribuicao.exibido = true;
-    }
-    agendarFormacaoAnalises("distribuicao");
-    estado.hidden = !mensagem;
-}
-
-function formatarMesHistorico(mes, incluirAno = true) {
-    const nomes = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
-    return nomes[Number(mes.slice(5, 7)) - 1] + (incluirAno ? ` ${mes.slice(0, 4)}` : "");
-}
-
-function formatarPeriodoHistorico(inicio, fim, hoje = obterDataLocal()) {
-    const periodo = inicio === fim ? formatarMesHistorico(fim)
-        : `${formatarMesHistorico(inicio, inicio.slice(0, 4) !== fim.slice(0, 4))} — ${formatarMesHistorico(fim)}`;
-    return periodo + (fim === hoje.slice(0, 7) ? " · Dados até hoje" : "");
-}
-
-// Plugin local: não altera a rosca nem registra comportamento global no Chart.js.
-const indicadorMesHistorico = {
-    id: "indicadorMesHistorico",
-    beforeUpdate(grafico) {
-        grafico.setActiveElements([]);
-        grafico.tooltip?.setActiveElements([], { x: 0, y: 0 });
-    },
-    afterEvent(grafico, argumentos) {
-        const tipo = argumentos.event.native?.type || argumentos.event.type;
-        if (argumentos.inChartArea && tipo !== "touchcancel") return;
-        grafico.setActiveElements([]);
-        grafico.tooltip?.setActiveElements([], { x: 0, y: 0 });
-        argumentos.changed = true;
-    },
-    beforeDatasetsDraw(grafico) {
-        const ativo = grafico.getActiveElements()[0];
-        if (!ativo) return;
-        const { ctx, chartArea } = grafico;
-        const x = ativo.element.x;
-        ctx.save();
-        try {
-            ctx.beginPath();
-            ctx.rect(chartArea.left, chartArea.top, chartArea.right - chartArea.left, chartArea.bottom - chartArea.top);
-            ctx.clip();
-            ctx.beginPath();
-            ctx.moveTo(x, chartArea.top);
-            ctx.lineTo(x, chartArea.bottom);
-            ctx.setLineDash([2, 3]);
-            ctx.lineWidth = 1;
-            ctx.strokeStyle = "#d8d2df";
-            ctx.stroke();
-        } finally {
-            ctx.restore();
-        }
-    }
-};
-
-// As duas visualizações diferem apenas na densidade de eixos e legenda.
-function configurarGraficoHistorico(historico, compacto = false) {
-    const configuracao = {
-        type: "line",
-        plugins: [indicadorMesHistorico, formacaoGraficosAnalises],
-        data: {
-            labels: historico.meses.map((mes) => formatarPeriodoDistribuicao(mes.mes, mes.mes)),
-            datasets: [
-                { label: "Receitas", data: historico.meses.map((mes) => mes.receitasCentavos / 100),
-                    borderColor: "#14966D", backgroundColor: "#14966D", pointStyle: "circle" },
-                { label: "Despesas", data: historico.meses.map((mes) => mes.despesasCentavos / 100),
-                    borderColor: "#E76F65", backgroundColor: "#E76F65", pointStyle: "circle" }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            animation: false,
-            locale: "pt-BR",
-            events: ["mousemove", "mouseout", "click", "touchstart", "touchmove", "touchcancel"],
-            interaction: { mode: "index", intersect: false },
-            elements: { line: { borderWidth: 2, cubicInterpolationMode: "monotone" }, point: { radius: 0, hoverRadius: 4, hitRadius: 14 } },
-            plugins: {
-                legend: { position: "bottom", labels: { usePointStyle: true, boxWidth: 8, font: { size: compacto ? 11 : 12 } } },
-                tooltip: { callbacks: {
-                    title: (itens) => itens.length ? formatarPeriodoDistribuicao(historico.meses[itens[0].dataIndex].mes, historico.meses[itens[0].dataIndex].mes) : "",
-                    label: (contexto) => `${contexto.dataset.label}: ${formatarCentavos(historico.meses[contexto.dataIndex][contexto.datasetIndex === 0 ? "receitasCentavos" : "despesasCentavos"])}` } }
-            },
-            scales: {
-                x: {
-                    grid: { display: false },
-                    afterBuildTicks: (escala) => {
-                        const limite = compacto || escala.chart.width < 480 ? 3 : 6;
-                        const quantidade = historico.meses.length;
-                        const selecionados = new Set([quantidade - 1]);
-                        // Preserva a virada do ano mesmo quando reduzimos os rótulos.
-                        historico.meses.forEach((item, indice) => {
-                            if (indice > 0 && item.mes.slice(5, 7) === "01") selecionados.add(indice);
-                        });
-                        const distancia = Math.max(1, Math.floor(quantidade / limite));
-                        for (let indice = 0; indice < quantidade && selecionados.size < limite; indice++) {
-                            if ([...selecionados].every((outro) => Math.abs(outro - indice) >= distancia)) selecionados.add(indice);
-                        }
-                        escala.ticks = escala.ticks.filter((tick) => selecionados.has(Number(tick.value)));
-                    },
-                    ticks: { maxRotation: 0, autoSkip: false, callback: (valor) => {
-                        const indice = Number(valor);
-                        const mes = historico.meses[indice].mes;
-                        const nomes = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
-                        const virada = indice > 0 && mes.slice(0, 4) !== historico.meses[indice - 1].mes.slice(0, 4);
-                        return nomes[Number(mes.slice(5, 7)) - 1] + (virada ? " '" + mes.slice(2, 4) : "");
-                    } }
-                },
-                y: { beginAtZero: true, border: { display: false },
-                    grid: { display: !compacto, color: "#edf0f5" },
-                    ticks: { maxTicksLimit: compacto ? 3 : 6, callback: (valor) => formatadorMoeda.format(valor) } }
-            }
-        }
-    };
-    if (!compacto) {
-        configuracao.options.plugins.legend.labels.color = "#62566f";
-        configuracao.options.plugins.legend.labels.padding = 20;
-        Object.assign(configuracao.options.plugins.tooltip, {
-            backgroundColor: "#302738", padding: 12, cornerRadius: 8,
-            titleFont: { size: 12 }, bodyFont: { size: 12 }
-        });
-        configuracao.options.scales.x.ticks.color = "#6d6278";
-        configuracao.options.scales.x.ticks.font = { size: 12 };
-        configuracao.options.scales.x.ticks.padding = 8;
-        configuracao.options.scales.y.ticks.color = "#6d6278";
-        configuracao.options.scales.y.ticks.font = { size: 11 };
-        configuracao.options.scales.y.grid.color = "#eeeaf3";
-    }
-    return configuracao;
-}
-
-function renderizarGraficoHistorico(destino, historico) {
-    const chaveFormacao = destino === "resumo" ? "resumo" : "historico";
-    const formacao = formacoesAnalises[chaveFormacao];
-    const assinatura = destino === "resumo" && historico.disponivel && !historico.vazio
-        ? JSON.stringify(historico.meses) : null;
-    const preservarEsperaResumo = destino === "resumo" && assinatura !== null
-        && assinatura === formacao.assinatura && formacao.grafico === graficosHistorico.resumo
-        && formacao.quadro !== null && !formacao.iniciou && formacaoEstaVisivel(formacao.grafico);
-    if (!preservarEsperaResumo) {
-        if (destino === "resumo" && formacao.grafico && assinatura !== formacao.assinatura) {
-            formacao.exibido = true;
-        }
-        finalizarFormacaoAnalises(chaveFormacao);
-    }
-    if (destino === "resumo") formacao.assinatura = assinatura;
-    const area = document.getElementById(`area-historico-${destino}`);
-    const estado = document.getElementById(`estado-historico-${destino}`);
-    const periodo = document.getElementById(`periodo-historico-${destino}`);
-    const descricao = document.getElementById(`dados-historico-${destino}`);
-    const canvas = document.getElementById(`grafico-historico-${destino}`);
-    let mensagem = !historico.disponivel ? `Histórico indisponível. ${historico.motivo}`
-        : historico.vazio ? "Nenhuma transação até a data atual para exibir no histórico."
-        : typeof window.Chart !== "function" ? "Gráfico indisponível: não foi possível carregar a biblioteca. Verifique sua conexão e recarregue a página." : "";
-
-    periodo.textContent = historico.disponivel && !historico.vazio
-        ? formatarPeriodoHistorico(historico.meses[0].mes, historico.meses.at(-1).mes) : "";
-    descricao.textContent = historico.disponivel && !historico.vazio
-        ? `${periodo.textContent}. ` + historico.meses.map((mes) => `${formatarPeriodoDistribuicao(mes.mes, mes.mes)}: receitas ${formatarCentavos(mes.receitasCentavos)}, despesas ${formatarCentavos(mes.despesasCentavos)}.`).join(" ") : "";
-    if (!mensagem) {
-        area.hidden = false;
-        try {
-            const configuracao = configurarGraficoHistorico(historico, destino === "resumo");
-            if (graficosHistorico[destino]) {
-                graficosHistorico[destino].data = configuracao.data;
-                // O tooltip monetário deve usar os centavos do período atualizado.
-                graficosHistorico[destino].options = configuracao.options;
-                graficosHistorico[destino].update("none");
-                graficosHistorico[destino].resize();
-            } else {
-                if (!destruirInstanciaGrafico(canvas)) throw new Error("Não foi possível liberar o gráfico anterior.");
-                graficosHistorico[destino] = new window.Chart(canvas, configuracao);
-            }
-        } catch (erro) {
-            mensagem = "Gráfico indisponível: não foi possível renderizar o histórico financeiro.";
-        }
-    }
-    if (mensagem) {
-        area.hidden = true;
-        // Também remove instâncias eventualmente registradas por um construtor que falhou.
-        const grafico = graficosHistorico[destino];
-        graficosHistorico[destino] = null;
-        destruirInstanciaGrafico(canvas, grafico);
-    }
-    estado.textContent = mensagem;
-    estado.hidden = !mensagem;
-    if (mensagem && canvas.closest(".pagina").classList.contains("ativa")) {
-        formacoesAnalises[chaveFormacao].exibido = true;
-    }
-    agendarFormacaoAnalises(chaveFormacao);
-}
-
-function atualizarControlesHistorico(historico) {
-    const seletor = document.getElementById("mes-final-historico");
-    const disponivel = historico.disponivel && !historico.vazio;
-    document.querySelectorAll("[data-duracao-historico]").forEach((botao) => {
-        botao.disabled = !disponivel;
-        botao.setAttribute("aria-pressed", String(Number(botao.dataset.duracaoHistorico) === duracaoHistoricoAnalises));
-    });
-    seletor.disabled = !disponivel;
-    const limites = disponivel ? historico.primeiroMes + ":" + historico.ultimoMes
-        : historico.disponivel ? "vazio" : "indisponivel";
-    if (seletor.dataset.limites !== limites || !seletor.options.length) {
-        seletor.replaceChildren();
-        if (disponivel) {
-            const primeiro = Number(historico.primeiroMes.slice(0, 4)) * 12 + Number(historico.primeiroMes.slice(5, 7)) - 1;
-            const ultimo = Number(historico.ultimoMes.slice(0, 4)) * 12 + Number(historico.ultimoMes.slice(5, 7)) - 1;
-            for (let indice = ultimo; indice >= primeiro; indice--) {
-                const mes = String(Math.floor(indice / 12)).padStart(4, "0") + "-" + String(indice % 12 + 1).padStart(2, "0");
-                const opcao = document.createElement("option");
-                opcao.value = mes;
-                opcao.textContent = formatarPeriodoDistribuicao(mes, mes);
-                seletor.appendChild(opcao);
-            }
-        } else {
-            const opcao = document.createElement("option");
-            opcao.textContent = historico.disponivel ? "Sem histórico" : "Dados indisponíveis";
-            seletor.appendChild(opcao);
-        }
-        seletor.dataset.limites = limites;
-    }
-    if (disponivel) seletor.value = mesFinalHistoricoAnalises;
-}
-
-function atualizarGraficosHistorico() {
-    const recente = obterHistoricoMensal(); // Resumo: sempre seis meses recentes.
-    if (recente.disponivel) {
-        mesFinalHistoricoAnalises = recente.vazio ? null
-            : mesFinalHistoricoAnalises === null ? recente.ultimoMes
-            : mesFinalHistoricoAnalises < recente.primeiroMes ? recente.primeiroMes
-            : mesFinalHistoricoAnalises > recente.ultimoMes ? recente.ultimoMes : mesFinalHistoricoAnalises;
-    }
-    const analises = !recente.disponivel || recente.vazio ? recente
-        : obterHistoricoMensal(mesFinalHistoricoAnalises, duracaoHistoricoAnalises);
-    atualizarControlesHistorico(recente);
-    renderizarGraficoHistorico("resumo", recente);
-    renderizarGraficoHistorico("analises", analises);
-}
-
-function carregarColecao(chave, validarRegistro) {
-    try {
-        const conteudo = localStorage.getItem(chave);
-        if (conteudo === null) return [];
-        const registros = JSON.parse(conteudo);
-        if (!validarColecao(registros, validarRegistro)) {
-            throw new Error("A coleção não é um array válido ou há registros inválidos/IDs repetidos.");
-        }
-        return registros;
-    } catch (erro) {
-        colecoesBloqueadas.add(chave);
+        disponibilidadeColecoes.bloquearColecao(chave);
         mostrarToast(`Os dados de ${chave} estão indisponíveis: não foi possível lê-los ou validá-los. `
             + (chave === "contas" ? "A referência do saldo deve ser válida e não posterior a hoje. " : "")
             + "O conteúdo armazenado não foi alterado. As gravações desta coleção estão bloqueadas nesta sessão.", "erro");
@@ -1414,81 +342,36 @@ function carregarColecao(chave, validarRegistro) {
     }
 }
 
-function persistirColecao(chave, registros) {
-    if (colecoesBloqueadas.has(chave)) {
+async function persistirColecao(chave, registros) {
+    if (chave === "contas" || chave === "transacoes" || chave === "investimentos") {
+        const resultado = chave === "contas" ? await disponibilidadeColecoes.confirmarContas(registros)
+            : chave === "transacoes" ? await disponibilidadeColecoes.confirmarTransacoes(registros)
+                : await disponibilidadeColecoes.confirmarInvestimentos(registros);
+        if (resultado.sucesso) return true;
+        if (resultado.motivo === "bloqueada") {
+            mostrarToast(`Não é possível salvar ${chave}: os dados estão indisponíveis e a coleção está bloqueada. `
+                + "O conteúdo armazenado não foi alterado.", "erro");
+        } else if (resultado.motivo === "invalida") {
+            mostrarToast("Não foi possível salvar: a coleção contém dados incompatíveis com o modelo atual. "
+                + "A alteração não foi confirmada e os dados anteriores foram preservados.", "erro");
+        } else if (resultado.motivo === "dependencias") {
+            mostrarToast("Não foi possível confirmar os vínculos e o capital: uma coleção necessária está indisponível. A alteração não foi confirmada.", "erro");
+        } else if (resultado.motivo === "integridade") {
+            mostrarToast(`Não foi possível salvar: ${resultado.detalhe} A alteração não foi confirmada.`, "erro");
+        } else {
+            mostrarToast(`Não foi possível salvar ${chave}. A alteração não foi confirmada. `
+                + "Os dados anteriores e os campos preenchidos foram mantidos. Tente novamente.", "erro");
+        }
+        return false;
+    }
+    if (disponibilidadeColecoes.colecaoEstaBloqueada(chave)) {
         mostrarToast(`Não é possível salvar ${chave}: os dados estão indisponíveis e a coleção está bloqueada. `
             + "O conteúdo armazenado não foi alterado.", "erro");
-        return false;
-    }
-    const validarRegistro = chave === "contas" ? validarConta
-        : chave === "transacoes" ? validarTransacaoParaGravacao
-        : chave === "investimentos" ? validarInvestimento : null;
-    if (!validarRegistro || !validarColecao(registros, validarRegistro)) {
+    } else {
         mostrarToast("Não foi possível salvar: a coleção contém dados incompatíveis com o modelo atual. "
             + "A alteração não foi confirmada e os dados anteriores foram preservados.", "erro");
-        return false;
     }
-    if (chave === "transacoes" || chave === "investimentos") {
-        const candidatos = chave === "transacoes" ? registros : transacoes;
-        const investimentosCandidatos = chave === "investimentos" ? registros : investimentos;
-        const dependenciasBloqueadas = chave === "investimentos" && colecoesBloqueadas.has("transacoes")
-            || chave === "transacoes" && colecoesBloqueadas.has("contas")
-            || candidatos.some(ehMovimentacaoInvestimento) && colecoesBloqueadas.has("investimentos");
-        if (dependenciasBloqueadas) {
-            mostrarToast("Não foi possível confirmar os vínculos e o capital: uma coleção necessária está indisponível. A alteração não foi confirmada.", "erro");
-            return false;
-        }
-        const integridade = verificarIntegridadeTransacoes(candidatos, contas, investimentosCandidatos);
-        if (!integridade.disponivel) {
-            mostrarToast(`Não foi possível salvar: ${integridade.motivo} A alteração não foi confirmada.`, "erro");
-            return false;
-        }
-    }
-    try {
-        const legadosMantidos = chave === "transacoes" ? new Set(registros
-            .filter((registro) => despesasLegadasSemClassificacao.get(registro.id) === JSON.stringify(registro))
-            .map((registro) => registro.id)) : null;
-        localStorage.setItem(chave, JSON.stringify(registros));
-        if (legadosMantidos) {
-            for (const id of despesasLegadasSemClassificacao.keys()) {
-                if (!legadosMantidos.has(id)) despesasLegadasSemClassificacao.delete(id);
-            }
-        }
-        return true;
-    } catch (erro) {
-        mostrarToast(`Não foi possível salvar ${chave}. A alteração não foi confirmada. `
-            + "Os dados anteriores e os campos preenchidos foram mantidos. Tente novamente.", "erro");
-        return false;
-    }
-}
-
-function mostrarErro(campo, mensagem) {
-    const erro = document.getElementById(`erro-${campo.id}`);
-
-    erro.textContent = mensagem;
-    campo.classList.add("invalido");
-    campo.setAttribute("aria-invalid", "true");
-}
-function limparErros(formulario) {
-    formulario.querySelectorAll(".erro-campo").forEach((erro) => {
-        erro.textContent = "";
-    });
-
-    formulario.querySelectorAll(".invalido").forEach((campo) => {
-        campo.classList.remove("invalido");
-        campo.removeAttribute("aria-invalid");
-    });
-}
-function limparErroCampo(campo) {
-    const erro = document.getElementById(`erro-${campo.id}`);
-
-    erro.textContent = "";
-    campo.classList.remove("invalido");
-    campo.removeAttribute("aria-invalid");
-}
-
-function focarPrimeiroErro(formulario) {
-    formulario.querySelector(".invalido").focus();
+    return false;
 }
 
 function podeReceberFoco(elemento) {
@@ -1510,510 +393,36 @@ function posicionarNotificacoesModal(modal, noPainel) {
 }
 
 function abrirModal(modal, focoInicial) {
-    const focoRetorno = focoAnteriorModal;
-    if (modalAtivo && modalAtivo !== modal) concluirFechamentoModal(modalAtivo, false);
-    const reabrindo = modalAtivo === modal;
-    cancelarTransicaoModal();
-    limpezaModal = null;
-    if (!reabrindo) {
-        focoAnteriorModal = document.activeElement;
-        if (focoRetorno) focoAnteriorModal = focoRetorno;
-        modalAtivo = modal;
-        modal.classList.remove("hidden");
-        modal.querySelector('[role="dialog"]').appendChild(areaNotificacoes);
-
-        // Inativa apenas irmãos no caminho até o body, nunca um ancestral do modal.
-        let elemento = modal;
-        while (elemento !== document.body) {
-            for (const irmao of elemento.parentElement.children) {
-                if (irmao !== elemento) {
-                    elementosInertes.push({ elemento: irmao, inert: irmao.inert });
-                    irmao.inert = true;
-                }
-            }
-            elemento = elemento.parentElement;
-        }
-    }
-    modal.classList.remove("modal-saindo", "modal-entrando");
-    modal.classList.add("modal-abrindo");
-    if (!movimentoReduzidoModais.matches) {
-        // Fora do painel transformado, os toasts continuam fixos na viewport.
-        posicionarNotificacoesModal(modal, false);
-        if (!reabrindo) {
-            modal.classList.add("modal-entrando");
-            void modal.offsetWidth;
-            modal.classList.remove("modal-entrando");
-        }
-        aguardarTransicaoModal(modal, 200, () => {
-            modal.classList.remove("modal-abrindo");
-            posicionarNotificacoesModal(modal, true);
-        });
-    } else {
-        modal.classList.remove("modal-abrindo");
-        posicionarNotificacoesModal(modal, true);
-    }
-    focoInicial.focus();
-}
-
-function cancelarTransicaoModal() {
-    if (transicaoModal) transicaoModal();
-    transicaoModal = null;
-}
-
-function aguardarTransicaoModal(modal, duracao, concluir) {
-    const finalizar = () => {
-        cancelarTransicaoModal();
-        concluir();
-    };
-    const aoTerminar = (evento) => {
-        if (evento.target === modal && evento.propertyName === "opacity") finalizar();
-    };
-    // Fallback para abas suspensas ou ausência de transitionend.
-    const temporizador = setTimeout(finalizar, duracao + 50);
-    modal.addEventListener("transitionend", aoTerminar);
-    transicaoModal = () => {
-        clearTimeout(temporizador);
-        modal.removeEventListener("transitionend", aoTerminar);
-    };
+    modais.abrirModal(modal, focoInicial);
 }
 
 function fecharModal(modal, aoFechar = null) {
-    if (modal !== modalAtivo || modal.classList.contains("modal-saindo")) return;
-    cancelarTransicaoModal();
-    limpezaModal = aoFechar;
-    if (movimentoReduzidoModais.matches) {
-        concluirFechamentoModal(modal);
-        return;
-    }
-    posicionarNotificacoesModal(modal, false);
-    modal.classList.add("modal-saindo");
-    aguardarTransicaoModal(modal, 150, () => concluirFechamentoModal(modal));
+    modais.fecharModal(modal, aoFechar);
 }
 
-function concluirFechamentoModal(modal, restaurarFoco = true) {
-    cancelarTransicaoModal();
-    modal.classList.add("hidden");
-    modal.classList.remove("modal-abrindo", "modal-entrando", "modal-saindo");
-    const limpar = limpezaModal;
-    limpezaModal = null;
-    if (limpar) limpar();
-    for (const estado of elementosInertes) {
-        estado.elemento.inert = estado.inert;
-    }
-    elementosInertes = [];
-    modalAtivo = null;
-    areaNotificacoes.appendChild(anuncioNotificacoes);
-    if (areaNotificacoes.parentElement !== document.body) document.body.appendChild(areaNotificacoes);
-
-    const destino = podeReceberFoco(focoAnteriorModal) ? focoAnteriorModal
-        : document.getElementById("pagina-transacoes").classList.contains("ativa") ? campoPesquisa
-        : document.getElementById("pagina-contas").classList.contains("ativa") ? botaoNovaConta
-        : document.getElementById("pagina-investimentos").classList.contains("ativa") ? document.getElementById("novo-investimento")
-        : addReceita;
-    if (restaurarFoco) destino.focus({ preventScroll: Boolean(destino.closest("#lista-investimentos")) });
-    focoAnteriorModal = null;
-}
-
-// Mantém o foco contido, mas impede novas ações durante a saída.
-for (const tipo of ["click", "submit", "keydown"]) {
-    document.addEventListener(tipo, (evento) => {
-        if (!modalAtivo?.classList.contains("modal-saindo")
-            || (tipo === "keydown" && evento.key === "Tab")) return;
-        evento.preventDefault();
-        evento.stopImmediatePropagation();
-    }, true);
-}
-movimentoReduzidoModais.addEventListener("change", () => {
-    if (!movimentoReduzidoModais.matches || !modalAtivo) return;
-    if (modalAtivo.classList.contains("modal-saindo")) concluirFechamentoModal(modalAtivo);
-    else {
-        cancelarTransicaoModal();
-        modalAtivo.classList.remove("modal-abrindo", "modal-entrando");
-        posicionarNotificacoesModal(modalAtivo, true);
-    }
-});
-const formatadorMoeda = new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL"
-});
-
-function formatarCentavos(centavos) {
-    if (!Number.isSafeInteger(centavos)) return "Indisponível";
-    // Evita perder o último centavo ao dividir totais elevados por 100 como Number.
-    const inteiro = BigInt(centavos);
-    const fracao = String(inteiro < 0n ? -(inteiro % 100n) : inteiro % 100n).padStart(2, "0");
-    const partes = formatadorMoeda.formatToParts(inteiro / 100n);
-    const texto = partes.map((parte) => parte.type === "fraction" ? fracao : parte.value).join("");
-    return inteiro < 0n && inteiro > -100n ? `-${texto}` : texto;
-}
-
-function renderizarTransacoes(tabelaDestino, limite=null, pesquisa="", tipo="todos", categoria="todas", dataInicial="", dataFinal="", classificacao="todas") {
-    tabelaDestino.innerHTML = "";
-    
-    const transacoesOrdenadas = transacoes.toSorted((a, b) => {
-        return b.data.localeCompare(a.data);
-    });
-    const transacoesFiltradas = transacoesOrdenadas.filter((transacao) => {
-        const investimento = ehMovimentacaoInvestimento(transacao) && !colecoesBloqueadas.has("investimentos")
-            ? investimentos.find((item) => item.id === transacao.investimentoId) : null;
-        const correspondePesquisa = transacao.nome
-            .toLowerCase()
-            .includes(pesquisa.toLowerCase())
-            || (investimento?.nome ?? "").toLowerCase().includes(pesquisa.toLowerCase());
-
-        const correspondeTipo = tipo === "todos" || transacao.tipo === tipo;
-        const categoriaTransacao = ehMovimentacaoInvestimento(transacao) ? "" : transacao.categoria;
-        const correspondeCategoria = categoria === "todas" || categoriaTransacao.trim() === categoria.trim();
-        const correspondeClassificacao = classificacao === "todas"
-            || (transacao.tipo === "despesa" && transacao.classificacao === classificacao);
-        const correspondeDataInicial = !dataInicial || transacao.data >= dataInicial;
-        const correspondeDataFinal = !dataFinal || transacao.data <= dataFinal;
-
-        return correspondePesquisa && correspondeTipo && correspondeCategoria && correspondeClassificacao && correspondeDataInicial && correspondeDataFinal;
-    });
-
-    let transacoesExibidas;
-
-    if (tabelaDestino === listaTransacoesCompleta) {
-        const totalPaginas = Math.max(
-            1,
-            Math.ceil(transacoesFiltradas.length / transacoesPorPagina)
-        );
-        totalPaginasTransacoes = totalPaginas;
-
-        // Impede que a página atual ultrapasse a última disponível
-        paginaAtual = Math.min(paginaAtual, totalPaginas);
-
-        const inicio = (paginaAtual - 1) * transacoesPorPagina;
-        const fim = inicio + transacoesPorPagina;
-
-        transacoesExibidas = transacoesFiltradas.slice(inicio, fim);
-
-        // Atualiza os controles
-        infoPaginacao.textContent = `Página ${paginaAtual} de ${totalPaginas}`;
-        document.getElementById("total-resultados").textContent = colecoesBloqueadas.has("transacoes")
-            ? "Dados indisponíveis"
-            : `${transacoesFiltradas.length} ${transacoesFiltradas.length === 1 ? "transação" : "transações"}`;
-
-        botaoPaginaAnterior.disabled = paginaAtual === 1;
-        botaoProximaPagina.disabled = paginaAtual === totalPaginas;
-
-    } else {
-        transacoesExibidas = limite === null
-            ? transacoesFiltradas
-            : transacoesFiltradas.slice(0, limite);
-    }
-
-    if (transacoesExibidas.length === 0) {
-        const linha = document.createElement("tr");
-        const celula = document.createElement("td");
-
-        celula.colSpan = 8;
-        celula.textContent = colecoesBloqueadas.has("transacoes")
-            ? "Dados de transações indisponíveis. Gravações bloqueadas nesta sessão."
-            : "Nenhuma transação encontrada.";
-        celula.classList.add("mensagem-sem-resultados");
-
-        linha.appendChild(celula);
-        tabelaDestino.appendChild(linha);
-        if (tabelaDestino === listaTransacoesCompleta) sincronizarSelecaoPagina();
-        return;
-    }
-
-    transacoesExibidas.forEach((transacao) => {
-        const linha = document.createElement("tr");
-        
-        const celulaSelecao = document.createElement("td");
-        celulaSelecao.classList.add("coluna-selecao");
-
-        const checkbox = document.createElement("input");
-        checkbox.type = "checkbox";
-        checkbox.classList.add("checkbox-transacao");
-        checkbox.value = transacao.id;
-        checkbox.setAttribute("aria-label", `Selecionar ${transacao.nome}`);
-        checkbox.checked = transacoesSelecionadas.includes(transacao.id);
-
-        if (tabelaDestino === listaTransacoesCompleta) {
-            const rotuloSelecao = document.createElement("label");
-            rotuloSelecao.className = "alvo-selecao";
-            rotuloSelecao.appendChild(checkbox);
-            celulaSelecao.appendChild(rotuloSelecao);
-        } else {
-            celulaSelecao.appendChild(checkbox);
-        }
-        linha.appendChild(celulaSelecao);
-
-        checkbox.addEventListener("change", () => {
-            const id = checkbox.value;
-            if (checkbox.checked) {
-                if (!transacoesSelecionadas.includes(id)) {
-                    transacoesSelecionadas.push(id);
-                }
-            } else {
-                transacoesSelecionadas = transacoesSelecionadas.filter((idSelecionado) => {
-                    return idSelecionado !== id;
-                });   
-            }
-            sincronizarCheckboxes();
-            atualizarBarraAcoes();
-        });
-
-        const celulaNome = document.createElement("td");
-        const tipoMovimento = transacao.tipo === "aporte" ? "Aporte" : transacao.tipo === "resgate" ? "Resgate" : "";
-        const investimento = ehMovimentacaoInvestimento(transacao)
-            ? investimentos.find((item) => item.id === transacao.investimentoId) : null;
-        celulaNome.textContent = tipoMovimento
-            ? transacao.nome === `${tipoMovimento} - ${investimento?.nome}`
-                ? `${tipoMovimento} · ${investimento.nome}`
-                : `${tipoMovimento} · ${transacao.nome} (${investimento?.nome ?? "Investimento indisponível"})`
-            : transacao.nome;
-        linha.appendChild(celulaNome);
-        
-        const celulaCategoria = document.createElement("td");
-        celulaCategoria.textContent = ehMovimentacaoInvestimento(transacao) ? "-" : transacao.categoria;
-        linha.appendChild(celulaCategoria);
-
-        const celulaData = document.createElement("td");
-        const [ano, mes, dia] = transacao.data.split("-");
-        const dataFormatada = `${dia}/${mes}/${ano}`;
-        celulaData.textContent = dataFormatada;
-        linha.appendChild(celulaData);
-
-        const celulaPagamento = document.createElement("td");
-        celulaPagamento.textContent = ehMovimentacaoInvestimento(transacao) ? "-" : transacao.pagamento || "-";
-        linha.appendChild(celulaPagamento);
-        
-        const celulaClassificacao = document.createElement("td");
-        celulaClassificacao.textContent = ehMovimentacaoInvestimento(transacao) ? "-" : transacao.classificacao || "-";
-        linha.appendChild(celulaClassificacao);
-
-        const celulaConta = document.createElement("td");
-        const conta = contas.find((conta) => conta.id === transacao.contaId);
-        celulaConta.textContent = conta ? conta.nome : "Conta indisponível";
-        linha.appendChild(celulaConta);
-
-        const celulaValor = document.createElement("td");
-        const sinal = movimentoBancarioCentavos(transacao) < 0 ? "-" : "+";
-        celulaValor.textContent = `${sinal}${formatadorMoeda.format(transacao.valor)}`;
-        celulaValor.classList.add(transacao.tipo);
-        linha.appendChild(celulaValor);
-        if (tabelaDestino === listaTransacoes) {
-            linha.setAttribute("role", "row");
-            ["selecao", "nome", "categoria", "data", "pagamento", "classificacao", "conta", "valor"].forEach((campo, indice) => {
-                linha.children[indice].classList.add(`recente-${campo}`);
-                linha.children[indice].setAttribute("role", "cell");
-            });
-            const rotuloSelecao = document.createElement("label");
-            rotuloSelecao.className = "selecao-recente";
-            rotuloSelecao.appendChild(checkbox);
-            celulaSelecao.appendChild(rotuloSelecao);
-
-            const categoriaDesktop = document.createElement("span");
-            categoriaDesktop.className = "categoria-recente-desktop";
-            categoriaDesktop.textContent = celulaCategoria.textContent;
-            const contexto = document.createElement("span");
-            contexto.className = "contexto-recente";
-            const tipo = { receita: "Receita", despesa: "Despesa", aporte: "Aporte", resgate: "Resgate" }[transacao.tipo];
-            const complemento = ehMovimentacaoInvestimento(transacao) ? celulaConta.textContent : transacao.categoria;
-            contexto.textContent = `${tipo} · ${complemento}`;
-            celulaCategoria.replaceChildren(categoriaDesktop, contexto);
-        }
-        if (tabelaDestino === listaTransacoesCompleta) {
-            linha.setAttribute("role", "row");
-            const nome = document.createElement("span");
-            nome.className = "nome-transacao";
-            nome.textContent = celulaNome.textContent;
-            const tipo = document.createElement("span");
-            tipo.className = `tipo-transacao tipo-${transacao.tipo}`;
-            tipo.textContent = { receita: "Receita", despesa: "Despesa", aporte: "Aporte", resgate: "Resgate" }[transacao.tipo];
-            celulaNome.replaceChildren(nome, tipo);
-            ["selecionar", "nome", "categoria", "data", "pagamento", "classificacao", "conta", "valor"].forEach((campo, indice) => {
-                linha.children[indice].classList.add(`transacao-${campo}`);
-                linha.children[indice].setAttribute("role", "cell");
-            });
-            [[celulaCategoria, "Categoria"], [celulaPagamento, "Pagamento"], [celulaClassificacao, "Classificação"], [celulaConta, "Conta"]].forEach(([celula, rotulo]) => {
-                const texto = document.createElement("span");
-                texto.textContent = celula.textContent;
-                const label = document.createElement("span");
-                label.className = "rotulo-mobile";
-                label.textContent = rotulo;
-                label.setAttribute("aria-hidden", "true");
-                celula.replaceChildren(label, texto);
-            });
-            // A tabela desktop permanece completa; no mobile, agrupa apenas os dados aplicáveis.
-            const complementos = document.createElement("div");
-            complementos.className = "complementos-mobile";
-            const movimentacao = ehMovimentacaoInvestimento(transacao);
-            const dados = movimentacao
-                ? [[transacao.tipo === "aporte" ? "Origem" : "Destino", celulaConta.lastChild.textContent],
-                    ["Investimento", investimento?.nome ?? "Investimento indisponível"]]
-                : [["Categoria", transacao.categoria], ["Conta", celulaConta.lastChild.textContent]];
-            if (transacao.tipo === "despesa") {
-                dados.push(["Classificação", transacao.classificacao], ["Pagamento", transacao.pagamento]);
-            }
-            dados.forEach(([rotulo, valor]) => {
-                if (typeof valor !== "string" || !valor.trim() || valor.trim() === "-") return;
-                const detalhe = document.createElement("span");
-                const label = document.createElement("span");
-                label.className = "rotulo-complemento";
-                label.textContent = `${rotulo}: `;
-                detalhe.append(label, document.createTextNode(valor));
-                complementos.appendChild(detalhe);
-            });
-            celulaCategoria.appendChild(complementos);
-            const tipoData = document.createElement("span");
-            tipoData.className = "tipo-data-mobile";
-            tipoData.textContent = `${tipo.textContent} · `;
-            celulaData.prepend(tipoData);
-            if (transacao.tipo === "resgate") {
-                const recebido = document.createElement("span");
-                recebido.className = "recebido-mobile";
-                recebido.textContent = "Recebido na conta";
-                celulaValor.appendChild(recebido);
-            }
-            linha.classList.toggle("selecionada", checkbox.checked);
-        }
-        tabelaDestino.appendChild(linha);
-    })
-    if (tabelaDestino === listaTransacoesCompleta) sincronizarSelecaoPagina();
-}
-
-function calcularTotaisResumo(registros) {
-    if (!validarColecao(registros, validarTransacao)) return { receitasCentavos: null, despesasCentavos: null };
-    const totais = { receitasCentavos: 0, despesasCentavos: 0 };
-    for (const transacao of registros) {
-        if (transacao.tipo !== "receita" && transacao.tipo !== "despesa") continue;
-        const campo = transacao.tipo === "receita" ? "receitasCentavos" : "despesasCentavos";
-        if (totais[campo] === null) continue;
-        const valor = converterParaCentavos(transacao.valor);
-        const total = totais[campo] + valor;
-        totais[campo] = Number.isSafeInteger(valor) && Number.isSafeInteger(total) ? total : null;
-    }
-    return totais;
+function renderizarTransacoes(tabelaDestino, limite = null, pesquisa = "", tipo = "todos", categoria = "todas", dataInicial = "", dataFinal = "", classificacao = "todas") {
+    listagensTransacoes.renderizarTransacoes(tabelaDestino, limite, pesquisa, tipo, categoria, dataInicial, dataFinal, classificacao);
 }
 
 function atualizarResumo() {
     atualizarVisualizacoesSaldos();
     atualizarGraficosHistorico();
     atualizarDistribuicaoDespesas();
-    if (colecoesBloqueadas.has("transacoes")) {
-        [valorRecebido, valorDespesas].forEach((campo) => {
-            campo.textContent = "Indisponível";
-        });
-        return;
-    }
-    const { receitasCentavos, despesasCentavos } = calcularTotaisResumo(transacoes);
-    valorRecebido.textContent = formatarCentavos(receitasCentavos);
-    valorDespesas.textContent = formatarCentavos(despesasCentavos);
-}
-
-function sincronizarCheckboxes() {
-    document.querySelectorAll(".checkbox-transacao").forEach((checkbox) => {
-        checkbox.checked = transacoesSelecionadas.includes(checkbox.value);
-        checkbox.closest("tr").classList.toggle("selecionada", checkbox.checked);
-    });
-    sincronizarSelecaoPagina();
+    const totais = disponibilidadeColecoes.colecaoEstaBloqueada("transacoes")
+        ? { receitasCentavos: null, despesasCentavos: null }
+        : calcularTotaisResumo(disponibilidadeColecoes.consultarTransacoes());
+    resumo.renderizarIndicadores(totais);
 }
 
 // O controle em lote opera apenas sobre os registros já renderizados nesta página.
-function sincronizarSelecaoPagina() {
-    const controle = document.getElementById("selecionar-pagina");
-    const caixas = [...listaTransacoesCompleta.querySelectorAll(".checkbox-transacao")];
-    const selecionadas = caixas.filter((caixa) => caixa.checked).length;
-    controle.disabled = caixas.length === 0;
-    controle.checked = caixas.length > 0 && selecionadas === caixas.length;
-    controle.indeterminate = selecionadas > 0 && selecionadas < caixas.length;
-}
+
 
 function limparSelecao() {
-    transacoesSelecionadas = [];
-    sincronizarCheckboxes();
-    atualizarBarraAcoes();
+    listagensTransacoes.limparSelecao();
 }
 
 function atualizarBarraAcoes() {
-    const quantidade = transacoesSelecionadas.length;
-
-    const texto = `${quantidade} ${quantidade === 1
-        ? "transação selecionada"
-        : "transações selecionadas"}`;
-
-    // Barra do Resumo
-    quantidadeSelecionadas.textContent = texto;
-    areaAcoes.classList.toggle("ativa", quantidade > 0);
-    botaoEditar.disabled = quantidade !== 1;
-
-    // Barra da página Transações
-    quantidadeSelecionadasCompleta.textContent = texto;
-    areaAcoesCompleta.classList.toggle("ativa", quantidade > 0);
-    botaoEditarCompleta.disabled = quantidade !== 1;
-    atualizarBarraContextual();
-}
-
-function atualizarBarraContextual() {
-    const temSelecaoMobile = larguraMobileTransacoes.matches && observadorBarraSuperior !== null && transacoesSelecionadas.length > 0
-        && paginaTransacoes.classList.contains("ativa");
-    const flutuante = temSelecaoMobile && !barraSuperiorVisivel;
-    const focoAtual = document.activeElement;
-    let proximoFoco = null;
-    acoesContextuais.forEach((original, contextual) => {
-        contextual.disabled = original.disabled || transacoesSelecionadas.length === 0;
-        if (flutuante && focoAtual === original) proximoFoco = contextual;
-        if (!flutuante && temSelecaoMobile && focoAtual === contextual) proximoFoco = original;
-    });
-    quantidadeContextual.textContent = quantidadeSelecionadasCompleta.textContent;
-    barraAcoesCompleta.classList.toggle("acoes-superiores-ocultas", flutuante);
-    barraAcoesCompleta.inert = flutuante || transacoesSelecionadas.length === 0;
-    if (barraAcoesCompleta.inert) barraAcoesCompleta.setAttribute("aria-hidden", "true");
-    else barraAcoesCompleta.removeAttribute("aria-hidden");
-    barraContextual.classList.toggle("visivel", flutuante);
-    barraContextual.inert = !flutuante;
-    barraContextual.setAttribute("aria-hidden", String(!flutuante));
-    paginaTransacoes.classList.toggle("tem-selecao-mobile", temSelecaoMobile);
-    if (proximoFoco && !modalAtivo && !proximoFoco.disabled) {
-        // Ao trocar a representação focada, não deixa o foco em controles ocultos.
-        [barraAcoesCompleta, barraContextual].forEach((barra) => barra.classList.add("troca-foco-contextual"));
-        proximoFoco.focus({ preventScroll: true });
-        requestAnimationFrame(() => {
-            [barraAcoesCompleta, barraContextual].forEach((barra) => barra.classList.remove("troca-foco-contextual"));
-        });
-    }
-}
-
-function observarBarraSuperior() {
-    if (!("IntersectionObserver" in window)) return; // Mantém a barra superior como alternativa.
-    observadorBarraSuperior?.disconnect();
-    observadorBarraSuperior = null;
-    if (!larguraMobileTransacoes.matches) barraSuperiorVisivel = true;
-    if (larguraMobileTransacoes.matches) {
-        alturaNavegacaoAcoes = Math.ceil(navegacaoPrincipal.getBoundingClientRect().height);
-        paginaTransacoes.style.setProperty("--altura-nav-acoes", `${alturaNavegacaoAcoes}px`);
-        observadorBarraSuperior = new IntersectionObserver(([entrada]) => {
-            barraSuperiorVisivel = entrada.isIntersecting && entrada.intersectionRatio >= .99;
-            atualizarBarraContextual();
-        }, { threshold: [0, .99, 1], rootMargin: `0px 0px -${alturaNavegacaoAcoes + 8}px 0px` });
-        observadorBarraSuperior.observe(areaAcoesCompleta);
-    }
-    atualizarBarraContextual();
-}
-
-function preencherFormulario(transacao) {
-    formTransacao.elements.namedItem("nome").value = transacao.nome;
-    formTransacao.elements.namedItem("valor").value = transacao.valor;
-    formTransacao.elements.namedItem("categoria").value = transacao.categoria;
-    formTransacao.elements.namedItem("conta").value = transacao.contaId;
-    formTransacao.elements.namedItem("data").value = transacao.data;
-
-    formTransacao.elements.namedItem("pagamento").value = transacao.pagamento ?? "";
-    formTransacao.elements.namedItem("classificacao").value = transacao.classificacao ?? "";
-}
-
-function fecharModalTransacao() {
-    fecharModal(modalOverlay, () => {
-        formTransacao.reset();
-        limparErros(formTransacao);
-        transacaoEmEdicao = null;
-    });
+    listagensTransacoes.atualizarBarraAcoes();
 }
 
 function navegarPara(paginaDestino) {
@@ -2024,7 +433,7 @@ function navegarPara(paginaDestino) {
     if (!paginaSelecionada) return;
 
     const mudouPagina = !paginaSelecionada.classList.contains("ativa");
-    if (mudouPagina && transicaoPaginacao) atualizarTabelaCompleta();
+    if (mudouPagina) listagensTransacoes.concluirPaginacaoSeAtiva();
     if (mudouPagina) {
         concluirFormacoesAnalises();
         prepararFormacoesPagina(paginaDestino);
@@ -2091,354 +500,45 @@ function navegarPara(paginaDestino) {
     }
 }
 
-function cancelarTransicaoPaginacao() {
-    if (!transicaoPaginacao) return;
-    const anterior = transicaoPaginacao;
-    transicaoPaginacao = null;
-    anterior.animacoes.forEach((animacao) => animacao.cancel());
-    anterior.animacaoAltura?.cancel();
-    listaTransacoesCompleta.inert = anterior.inert;
-    anterior.area.style.minHeight = anterior.alturaAnterior;
-    anterior.area.style.height = anterior.alturaExplicitaAnterior;
-    anterior.area.classList.remove("paginando-registros");
-}
-
-async function mudarPaginaTransacoes(direcao) {
-    const destino = Math.max(1, Math.min(totalPaginasTransacoes, paginaAtual + direcao));
-    if (destino === paginaAtual) return;
-    cancelarTransicaoPaginacao();
-    paginaAtual = destino;
-    limparSelecao();
-    const elementos = () => [...listaTransacoesCompleta.querySelectorAll(
-        larguraMobileTransacoes.matches ? ":scope > tr" : "td"
-    )];
-    if (movimentoReduzidoPaginacao.matches || !paginaTransacoes.classList.contains("ativa")
-        || !elementos().length || typeof elementos()[0].animate !== "function") {
-        atualizarTabelaCompleta();
-        return;
-    }
-    const area = listaTransacoesCompleta.closest(".tabela-transacoes");
-    const estado = { area, alturaAnterior: area.style.minHeight,
-        alturaExplicitaAnterior: area.style.height, alturaInicial: area.getBoundingClientRect().height,
-        inert: listaTransacoesCompleta.inert, animacoes: [] };
-    transicaoPaginacao = estado;
-    area.style.minHeight = `${estado.alturaInicial}px`;
-    area.classList.add("paginando-registros");
-    if (listaTransacoesCompleta.contains(document.activeElement)) {
-        (direcao > 0 ? botaoProximaPagina : botaoPaginaAnterior).focus({ preventScroll: true });
-    }
-    listaTransacoesCompleta.inert = true;
-    const animar = (quadros, duracao) => {
-        estado.animacoes = [];
-        for (const elemento of elementos()) {
-            const animacao = elemento.animate(quadros,
-                { duration: duracao, easing: "ease-out", fill: "both" });
-            estado.animacoes.push(animacao);
-            // Também cobre cancelamento se a criação de uma animação seguinte falhar.
-            animacao.finished.catch(() => {});
-        }
-        return Promise.all(estado.animacoes.map((animacao) => animacao.finished));
-    };
-    try {
-        await animar([{ opacity: 1, transform: "translateX(0)" },
-            { opacity: 0, transform: `translateX(${-direcao * 8}px)` }], 100);
-        if (transicaoPaginacao !== estado) return;
-        atualizarTabelaCompleta(true);
-        estado.animacoes.forEach((animacao) => animacao.cancel());
-        // Mede o layout natural já com os novos registros, antes do próximo paint.
-        area.style.minHeight = estado.alturaAnterior;
-        area.style.height = estado.alturaExplicitaAnterior;
-        // Inclui a barra de rolagem horizontal, quando o layout desktop precisar dela.
-        area.classList.remove("paginando-registros");
-        const alturaFinal = area.getBoundingClientRect().height;
-        area.classList.add("paginando-registros");
-        area.style.height = `${estado.alturaInicial}px`;
-        let fimAltura = Promise.resolve();
-        if (Math.abs(alturaFinal - estado.alturaInicial) > 0.5) {
-            estado.animacaoAltura = area.animate([
-                { height: `${estado.alturaInicial}px` }, { height: `${alturaFinal}px` }
-            ], { duration: 250, easing: "cubic-bezier(0.23, 1, 0.32, 1)", fill: "both" });
-            fimAltura = estado.animacaoAltura.finished;
-            fimAltura.catch(() => {});
-        }
-        await Promise.all([fimAltura,
-            animar([{ opacity: 0, transform: `translateX(${direcao * 8}px)` },
-                { opacity: 1, transform: "translateX(0)" }], 180)]);
-        if (transicaoPaginacao === estado) cancelarTransicaoPaginacao();
-    } catch {
-        // Cancelamentos antigos não podem sobrescrever uma navegação mais recente.
-        if (transicaoPaginacao === estado) atualizarTabelaCompleta();
-    }
-}
-
 function atualizarTabelaCompleta(preservarTransicao = false) {
-    if (!preservarTransicao) cancelarTransicaoPaginacao();
-    const pesquisa = campoPesquisa.value.trim().toLowerCase();
-    const tipo = filtroTipo.value;
-    const categoria = filtroCategoria.value;
-    const dataInicial = filtroDataInicial.value;
-    const dataFinal = filtroDataFinal.value;
-    const intervaloInvalido = Boolean(dataInicial && dataFinal && dataInicial > dataFinal);
-    erroFiltroDatas.textContent = intervaloInvalido
-        ? "A data inicial deve ser anterior ou igual à data final." : "";
-    [filtroDataInicial, filtroDataFinal].forEach((campo) => {
-        campo.classList.toggle("invalido", intervaloInvalido);
-        if (intervaloInvalido) {
-            campo.setAttribute("aria-invalid", "true");
-        } else {
-            campo.removeAttribute("aria-invalid");
-        }
-    });
-
-    renderizarTransacoes(listaTransacoesCompleta, null, pesquisa, tipo, categoria, dataInicial, dataFinal, filtroClassificacao.value);
+    listagensTransacoes.atualizarTabelaCompleta(preservarTransicao);
 }
 
 function atualizarCategorias() {
-    const categoriaAtual = filtroCategoria.value;
-
-    const categorias = [...new Set(
-        transacoes.filter((transacao) => !ehMovimentacaoInvestimento(transacao))
-            .map((transacao) => transacao.categoria.trim())
-    )].sort();
-
-    filtroCategoria.innerHTML = '<option value="todas">Todas as categorias</option>';
-
-    categorias.forEach((categoria) => {
-        const option = document.createElement("option");
-
-        option.value = categoria;
-        option.textContent = categoria;
-
-        filtroCategoria.appendChild(option);
-    });
-
-    filtroCategoria.value = categorias.includes(categoriaAtual)
-        ? categoriaAtual
-        : "todas";
-}
-
-function aplicarFiltros() {
-    limparSelecao();
-    paginaAtual = 1;
-    atualizarTabelaCompleta();
+    listagensTransacoes.atualizarCategorias();
 }
 
 function abrirModalConta(contaId = null) {
-    const conta = contaId === null ? null : contas.find((registro) => registro.id === contaId);
-    if (contaId !== null && !conta) {
-        mostrarToast("Não foi possível editar: a conta não está disponível.", "erro");
-        return;
-    }
-    formConta.reset();
-    limparErros(formConta);
-    contaEmEdicao = conta ? conta.id : null;
-    tituloModalConta.textContent = conta ? "Editar Conta" : "Adicionar Conta";
-    botaoSalvarConta.textContent = conta ? "Salvar alterações" : "Salvar Conta";
-    campoNomeConta.value = conta ? conta.nome : "";
-    campoTipoConta.value = conta ? conta.tipo : "";
-    campoInstituicaoConta.value = conta ? conta.instituicao ?? "" : "";
-    campoSaldoInicial.value = conta ? conta.saldoInicial : "";
-    campoDataReferencia.max = obterDataLocal();
-    campoDataReferencia.value = conta ? conta.dataReferencia : obterDataLocal();
-    campoIncluirNoSaldoDisponivel.checked = conta ? conta.incluirNoSaldoDisponivel : true;
-    // Na edição, a opção salva prevalece sobre sugestões baseadas no tipo.
-    inclusaoSaldoAlterada = Boolean(conta);
-    abrirModal(modalConta, campoNomeConta);
+    funcionalidadeContas.abrirModalConta(contaId);
 }
 
 function atualizarOpcoesContas() {
-    const contaAtual = campoConta.value;
-    campoConta.innerHTML = '<option value="">Selecione uma conta...</option>';
-    if (colecoesBloqueadas.has("contas")) return;
-    contas.forEach((conta) => {
-        const option = document.createElement("option");
-        option.value = conta.id;
-        option.textContent = conta.nome;
-        campoConta.appendChild(option);
-    });
-    campoConta.value = contas.some((conta) => conta.id === contaAtual) ? contaAtual : "";
-}
-
-function prepararContasTransacao() {
-    if (colecoesBloqueadas.has("transacoes") || colecoesBloqueadas.has("contas")) {
-        mostrarToast("Não é possível abrir o formulário: os dados de contas ou transações estão indisponíveis. "
-            + "Os dados armazenados foram preservados.", "erro");
-        return false;
-    }
-    if (contas.length === 0) {
-        mostrarToast("É necessário cadastrar uma conta antes de criar transações. "
-            + "Cadastre a primeira conta na página Contas.", "informacao");
-        return false;
-    }
-    atualizarOpcoesContas();
-    return true;
-}
-
-function fecharModalConta() {
-    fecharModal(modalConta, () => {
-        formConta.reset();
-        limparErros(formConta);
-        contaEmEdicao = null;
-        inclusaoSaldoAlterada = false;
-    });
+    operacoesTransacoes.atualizarOpcoesContas();
 }
 
 function podeExcluirConta(contaId) {
-    if (colecoesBloqueadas.has("contas") || colecoesBloqueadas.has("transacoes")) {
-        mostrarToast("Não é possível excluir a conta: os dados de contas ou transações estão indisponíveis. "
-            + "Não foi possível confirmar a ausência de vínculos.", "erro");
-        return false;
-    }
-    if (!contas.some((conta) => conta.id === contaId)) {
-        mostrarToast("Não foi possível excluir: a conta não está disponível.", "erro");
-        return false;
-    }
-    if (transacoes.some((transacao) => transacao.contaId === contaId)) {
-        mostrarToast("Esta conta possui transações vinculadas e não pode ser excluída, "
-            + "mesmo que sejam históricas. Nenhuma transação foi alterada.", "erro");
-        return false;
-    }
-    return true;
-}
-
-function solicitarExclusaoConta(contaId) {
-    if (!podeExcluirConta(contaId)) return;
-    const conta = contas.find((registro) => registro.id === contaId);
-    contaEmExclusao = conta.id;
-    mensagemExclusaoConta.textContent = `Deseja excluir a conta "${conta.nome}"? Esta ação não poderá ser desfeita.`;
-    abrirModal(modalExclusaoConta, botaoCancelarExclusaoConta);
+    return funcionalidadeContas.podeExcluirConta(contaId);
 }
 
 function fecharModalExclusaoConta() {
-    fecharModal(modalExclusaoConta);
-    contaEmExclusao = null;
+    funcionalidadeContas.fecharModalExclusaoConta();
 }
 
 function renderizarContas(saldos) {
-    listaContas.innerHTML = "";
-
-    if (colecoesBloqueadas.has("contas")) {
-        const mensagem = document.createElement("p");
-        mensagem.classList.add("mensagem-vazia");
-        mensagem.textContent = "Dados de contas indisponíveis. Gravações bloqueadas nesta sessão.";
-        listaContas.appendChild(mensagem);
-        return;
-    }
-
-    if (!saldos.disponivel) {
-        const mensagem = document.createElement("p");
-        mensagem.classList.add("mensagem-vazia");
-        mensagem.textContent = `Saldos indisponíveis. ${saldos.motivo}`;
-        listaContas.appendChild(mensagem);
-    }
-
-    if (contas.length === 0) {
-        if (!saldos.disponivel) return;
-        listaContas.innerHTML = `
-            <p class="mensagem-vazia">
-                Nenhuma conta cadastrada.
-            </p>
-        `;
-        return;
-    }
-
-    contas.forEach((conta) => {
-        const item = document.createElement("div");
-        item.classList.add("item-conta");
-
-        const nome = document.createElement("h3");
-        nome.textContent = conta.nome;
-
-        const detalhes = document.createElement("p");
-
-        const tipos = {
-            corrente: "Conta corrente",
-            poupanca: "Poupança",
-            reserva: "Reserva",
-            carteira: "Carteira física"
-        };
-
-        detalhes.textContent = [
-            conta.instituicao,
-            tipos[conta.tipo] || conta.tipo
-        ].filter(Boolean).join(" · ");
-
-        const saldo = document.createElement("strong");
-        saldo.textContent = saldos.disponivel
-            ? formatarCentavos(saldos.saldosPorContaCentavos.get(conta.id))
-            : "Saldo indisponível";
-
-        const acoes = document.createElement("div");
-        acoes.classList.add("acoes-conta");
-        const editar = document.createElement("button");
-        editar.type = "button";
-        editar.textContent = "Editar";
-        editar.setAttribute("aria-label", `Editar conta ${conta.nome}`);
-        editar.addEventListener("click", () => abrirModalConta(conta.id));
-        const excluir = document.createElement("button");
-        excluir.type = "button";
-        excluir.classList.add("btn-excluir");
-        excluir.textContent = "Excluir";
-        excluir.setAttribute("aria-label", `Excluir conta ${conta.nome}`);
-        excluir.addEventListener("click", () => solicitarExclusaoConta(conta.id));
-        acoes.append(editar, excluir);
-        const rotuloSaldo = document.createElement("span");
-        rotuloSaldo.className = "rotulo-saldo-conta";
-        rotuloSaldo.textContent = "Saldo atual";
-        saldo.className = "saldo-atual-conta";
-        if (saldos.disponivel && saldos.saldosPorContaCentavos.get(conta.id) < 0) saldo.classList.add("saldo-negativo");
-        const inclusao = document.createElement("p");
-        inclusao.className = "inclusao-conta";
-        inclusao.textContent = conta.incluirNoSaldoDisponivel
-            ? "Incluída no saldo disponível" : "Fora do saldo disponível";
-        if (conta.incluirNoSaldoDisponivel) inclusao.classList.add("incluida");
-        item.append(nome, detalhes, rotuloSaldo, saldo, inclusao, acoes);
-        listaContas.appendChild(item);
-    });
+    funcionalidadeContas.renderizarContas(saldos);
 }
 // Compartilha um único cálculo sobre as coleções completas entre as páginas.
 function atualizarVisualizacoesSaldos() {
     const saldos = obterSaldosContas();
     saldoTotalContas.textContent = saldos.disponivel
         ? formatarCentavos(saldos.saldoTotalCentavos) : "Indisponível";
-    valorSaldo.textContent = saldos.disponivel
-        ? formatarCentavos(saldos.saldoDisponivelCentavos) : "Indisponível";
+    resumo.renderizarSaldo(saldos);
     renderizarContas(saldos);
     renderizarContasResumo(saldos);
 }
 
 function renderizarContasResumo(saldos) {
-    const lista = document.getElementById("contas-resumo");
-    lista.replaceChildren();
-    if (!saldos.disponivel || contas.length === 0) {
-        const mensagem = document.createElement("p");
-        mensagem.classList.add("mensagem-vazia");
-        mensagem.textContent = !saldos.disponivel
-            ? `Dados de saldo indisponíveis. ${saldos.motivo}`
-            : "Cadastre sua primeira conta para acompanhar seus saldos.";
-        lista.appendChild(mensagem);
-        if (saldos.disponivel) {
-            const cadastrar = document.createElement("button");
-            cadastrar.type = "button";
-            cadastrar.classList.add("btn-primario");
-            cadastrar.textContent = "Cadastrar primeira conta";
-            cadastrar.addEventListener("click", () => abrirModalConta());
-            lista.appendChild(cadastrar);
-        }
-        return;
-    }
-    const itens = document.createElement("ul");
-    itens.classList.add("lista-contas-resumo");
-    contas.slice(0, 3).forEach((conta) => {
-        const item = document.createElement("li");
-        const nome = document.createElement("span");
-        nome.textContent = conta.nome;
-        const saldo = document.createElement("strong");
-        saldo.textContent = formatarCentavos(saldos.saldosPorContaCentavos.get(conta.id));
-        item.append(nome, saldo);
-        itens.appendChild(item);
-    });
-    lista.appendChild(itens);
+    resumo.renderizarContas({ contas: disponibilidadeColecoes.consultarContas(), saldos });
 }
 
 // eventos links de navegação
@@ -2452,1129 +552,191 @@ linksNavegacao.forEach((link) => {
     });
 });
 
-// evento modal de conta
-botaoNovaConta.addEventListener("click", () => abrirModalConta());
+funcionalidadeContas.inicializar();
 
-botaoFecharConta.addEventListener("click", fecharModalConta);
+function solicitarExclusaoTransacoesSelecionadas() {
+    operacoesTransacoes.solicitarExclusao();
+}
 
-botaoCancelarConta.addEventListener("click", fecharModalConta);
-campoTipoConta.addEventListener("change", () => {
-    // A sugestão por tipo não substitui uma escolha manual durante o cadastro.
-    if (!inclusaoSaldoAlterada) {
-        campoIncluirNoSaldoDisponivel.checked = campoTipoConta.value !== "reserva";
-    }
-});
-campoIncluirNoSaldoDisponivel.addEventListener("change", () => {
-    inclusaoSaldoAlterada = true;
-});
+function solicitarEdicaoTransacaoSelecionada() {
+    if (listagensTransacoes.consultarSelecao().length !== 1) return;
 
-formConta.addEventListener("submit", (evento) => {
-    evento.preventDefault();
-    limparErros(formConta);
+    const id = listagensTransacoes.consultarSelecao()[0];
 
-    const nome = campoNomeConta.value.trim();
-    const tipo = campoTipoConta.value;
-    const instituicao = campoInstituicaoConta.value.trim();
-    const valorInformado = campoSaldoInicial.value;
-    const saldoInicial = Number(valorInformado);
-    const dataReferencia = campoDataReferencia.value;
-    const incluirNoSaldoDisponivel = campoIncluirNoSaldoDisponivel.checked;
-
-    let formularioValido = true;
-    if (!nome) {
-        mostrarErro(campoNomeConta, "Informe o nome da conta.");
-        formularioValido = false;
-    }
-    if (!tipo) {
-        mostrarErro(campoTipoConta, "Selecione um tipo de conta.");
-        formularioValido = false;
-    }
-    if (valorInformado === "" || !valorMonetarioValido(valorInformado)
-        || !campoSaldoInicial.validity.valid) {
-        mostrarErro(campoSaldoInicial, "Informe um saldo zero ou positivo, com até duas casas decimais, dentro do limite permitido.");
-        formularioValido = false;
-    }
-    if (!dataValida(dataReferencia) || dataReferencia > obterDataLocal() || !campoDataReferencia.validity.valid) {
-        mostrarErro(campoDataReferencia, "Informe uma data válida, igual ou anterior a hoje.");
-        formularioValido = false;
-    }
-    if (!formularioValido) {
-        focarPrimeiroErro(formConta);
-        return;
-    }
-
-    const estavaEditando = contaEmEdicao !== null;
-    const contaExistente = estavaEditando ? contas.find((conta) => conta.id === contaEmEdicao) : null;
-    if (estavaEditando && !contaExistente) {
-        mostrarToast("Não foi possível salvar: a conta em edição não está disponível.", "erro");
-        return;
-    }
-    const contaAtualizada = {
-        ...contaExistente,
-        id: estavaEditando ? contaExistente.id : crypto.randomUUID(),
-        nome: nome,
-        tipo: tipo,
-        instituicao: instituicao,
-        saldoInicial: saldoInicial,
-        dataReferencia,
-        incluirNoSaldoDisponivel
-    };
-
-    const proximasContas = estavaEditando
-        ? contas.map((conta) => conta.id === contaEmEdicao ? contaAtualizada : conta)
-        : [...contas, contaAtualizada];
-    if (!persistirColecao("contas", proximasContas)) return;
-    contas = proximasContas;
-    atualizarOpcoesContas();
-    atualizarVisualizacoesSaldos();
-    // O nome exibido muda; os vínculos e a seleção continuam baseados nos IDs.
-    renderizarTransacoes(listaTransacoes, 5);
-    atualizarTabelaCompleta();
-
-    fecharModalConta();
-    mostrarToast(estavaEditando ? "Conta atualizada." : "Conta criada.", "sucesso");
-});
-
-botaoCancelarExclusaoConta.addEventListener("click", fecharModalExclusaoConta);
-modalExclusaoConta.addEventListener("click", (evento) => {
-    if (evento.target === modalExclusaoConta) fecharModalExclusaoConta();
-});
-botaoConfirmarExclusaoConta.addEventListener("click", () => {
-    if (contaEmExclusao === null || !podeExcluirConta(contaEmExclusao)) return;
-    const proximasContas = contas.filter((conta) => conta.id !== contaEmExclusao);
-    if (!persistirColecao("contas", proximasContas)) return;
-    contas = proximasContas;
-    atualizarOpcoesContas();
-    atualizarVisualizacoesSaldos();
-    fecharModalExclusaoConta();
-    mostrarToast("Conta excluída.", "sucesso");
-});
-
-// evento campo de pesquisa
-campoPesquisa.addEventListener("input", aplicarFiltros); 
-document.getElementById("selecionar-pagina").addEventListener("change", (evento) => {
-    const selecionar = evento.target.checked;
-    listaTransacoesCompleta.querySelectorAll(".checkbox-transacao").forEach((caixa) => {
-        caixa.checked = selecionar;
-        caixa.dispatchEvent(new Event("change"));
-    });
-});
-document.getElementById("limpar-selecao-completa").addEventListener("click", () => {
-    const veioDaContextual = barraContextual.contains(document.activeElement);
-    const destino = veioDaContextual ? [...listaTransacoesCompleta.querySelectorAll("input"),
-        botaoPaginaAnterior, botaoProximaPagina, campoPesquisa].find((elemento) => {
-        const posicao = elemento.getBoundingClientRect();
-        return !elemento.disabled && posicao.height > 0 && posicao.top >= 0
-            && posicao.bottom <= window.innerHeight - alturaNavegacaoAcoes - 110;
-    }) : null;
-    limparSelecao();
-    if (destino) destino.focus({ preventScroll: true });
-    else document.getElementById("selecionar-pagina").focus();
-});
-filtroTipo.addEventListener("change", aplicarFiltros);
-filtroCategoria.addEventListener("change", aplicarFiltros);
-filtroClassificacao.addEventListener("change", aplicarFiltros);
-filtroDataInicial.addEventListener("change", aplicarFiltros);
-filtroDataFinal.addEventListener("change", aplicarFiltros);
-
-botaoLimparFiltros.addEventListener("click", () => {
-    campoPesquisa.value = "";
-    filtroTipo.value = "todos";
-    filtroCategoria.value = "todas";
-    filtroClassificacao.value = "todas";
-
-    filtroDataInicial.value = "";
-    filtroDataFinal.value = "";
-    aplicarFiltros();
-});
-
-botaoPaginaAnterior.addEventListener("click", () => {
-    mudarPaginaTransacoes(-1);
-});
-
-botaoProximaPagina.addEventListener("click", () => {
-    mudarPaginaTransacoes(1);
-});
-
-larguraMobileTransacoes.addEventListener("change", ({ matches }) => {
-    const primeiroIndice = (paginaAtual - 1) * transacoesPorPagina;
-    transacoesPorPagina = matches ? 6 : 8;
-    paginaAtual = Math.floor(primeiroIndice / transacoesPorPagina) + 1;
-    // A lista visível muda de bloco; o Resumo mantém seus cinco registros e a seleção.
-    if (document.getElementById("pagina-transacoes").classList.contains("ativa")) limparSelecao();
-    atualizarTabelaCompleta();
-    observarBarraSuperior();
-});
-
-// limpar os erros quando o usuario digitar algo nos campos do formulario
-const camposFormulario = [
-    campoNome,
-    campoValor,
-    campoCategoria,
-    campoData,
-    campoConta,
-    campoNomeConta,
-    campoTipoConta,
-    campoSaldoInicial,
-    campoDataReferencia
-];
-
-camposFormulario.forEach((campo) => {
-    campo.addEventListener("input", () => {
-        limparErroCampo(campo);
-    });
-});
-selectClassificacao.addEventListener("change", () => {
-    if (classificacaoDespesaValida(selectClassificacao.value)) limparErroCampo(selectClassificacao);
-});
-[botaoExcluir, botaoExcluirCompleta].forEach((botao) => { 
-    botao.addEventListener("click", () => {
-        const quantidade = transacoesSelecionadas.length;
-
-        if (quantidade === 0) return;
-
-        mensagemExclusao.textContent =
-            `Deseja realmente excluir ${quantidade} ${quantidade === 1 ? "transação" : "transações"}? Esta ação não poderá ser desfeita.`;
-
-        abrirModal(modalExclusao, botaoCancelarExclusao);
-    });
-});
-
-botaoCancelarExclusao.addEventListener("click", () => {
-    fecharModal(modalExclusao);
-});
-
-botaoConfirmarExclusao.addEventListener("click", () => {
-    const quantidade = transacoesSelecionadas.length;
-const transacoesRestantes = transacoes.filter((transacao) => {
-    return !transacoesSelecionadas.includes(transacao.id);
-});
-
-    if (!persistirColecao("transacoes", transacoesRestantes)) return;
-    transacoes = transacoesRestantes;
-
-    transacoesSelecionadas = [];
-
-    renderizarTransacoes(listaTransacoes, 5);
-    atualizarCategorias();
-    atualizarTabelaCompleta();
-    atualizarResumo();
-    atualizarBarraAcoes();
-
-    fecharModal(modalExclusao);
-    renderizarInvestimentos();
-    mostrarToast(quantidade === 1 ? "Transação excluída." : `${quantidade} transações excluídas.`, "sucesso");
-});
-[botaoEditar, botaoEditarCompleta].forEach((botao) => {
-    botao.addEventListener("click", () => {
-        if (transacoesSelecionadas.length !== 1) return;
-
-        const id = transacoesSelecionadas[0];
-
-        const transacao = transacoes.find((transacao) => {
-            return transacao.id === id;
-        });
-
-        if (!transacao) return;
-        if (ehMovimentacaoInvestimento(transacao)) {
-            abrirModalMovimentacao(transacao.tipo, transacao.investimentoId, transacao.id);
-            return;
-        }
-        if (!prepararContasTransacao()) return;
-
-        limparErros(formTransacao);
-        transacaoEmEdicao = transacao.id;
-        tipoTransacao = transacao.tipo;
-
-        preencherFormulario(transacao);
-
-        modalTitle.textContent =
-            transacao.tipo === "receita" ? "Editar Receita" : "Editar Despesa";
-
-        botaoSalvarTransacao.textContent = "Salvar Alterações";
-
-        if (transacao.tipo === "receita") {
-            selectClassificacao.required = false;
-            campoClassificacao.classList.add("hidden");
-            campoPagamento.classList.add("hidden");
-        } else {
-            selectClassificacao.required = true;
-            campoClassificacao.classList.remove("hidden");
-            campoPagamento.classList.remove("hidden");
-        }
-
-        abrirModal(modalOverlay, campoNome);
-        });
+    const transacao = disponibilidadeColecoes.consultarTransacoes().find((transacao) => {
+        return transacao.id === id;
     });
 
-// fechar o modal de exclusao ao clicar fora dele ou botao esc
-modalExclusao.addEventListener("click", (event) => {
-    if (event.target === modalExclusao) {
-        fecharModal(modalExclusao);
-    }
-});
-
-document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && !modalExclusao.classList.contains("hidden")) {
-        fecharModal(modalExclusao);
-    }
-    if (event.key === "Escape" && modalAtivo === modalExclusaoConta) {
-        fecharModalExclusaoConta();
-    }
-    if (event.key === "Escape" && modalAtivo === document.getElementById("modal-exclusao-investimento")) {
-        fecharExclusaoInvestimento();
-    }
-    if (event.key === "Tab" && modalAtivo) {
-        const campos = [...modalAtivo.querySelectorAll(
-            'button, input, select, textarea, a[href], [tabindex]:not([tabindex="-1"])'
-        )].filter(podeReceberFoco);
-        const primeiro = campos[0];
-        const ultimo = campos[campos.length - 1];
-        if (!primeiro) {
-            event.preventDefault();
-            modalAtivo.querySelector('[role="dialog"]').focus();
-        } else if (!campos.includes(document.activeElement)
-            || (event.shiftKey && document.activeElement === primeiro)
-            || (!event.shiftKey && document.activeElement === ultimo)) {
-            event.preventDefault();
-            (event.shiftKey ? ultimo : primeiro).focus();
-        }
-    }
-});
-
-// evento de envio do formulario
-formTransacao.addEventListener("submit", (enviar) => { 
-    enviar.preventDefault();
-    if (!["receita", "despesa"].includes(tipoTransacao)
-        || transacoes.some((item) => item.id === transacaoEmEdicao && ehMovimentacaoInvestimento(item))) {
-        mostrarToast("Este formulário permite somente receitas e despesas nesta etapa.", "informacao");
+    if (!transacao) return;
+    if (ehMovimentacaoInvestimento(transacao)) {
+        abrirModalMovimentacao(transacao.tipo, transacao.investimentoId, transacao.id);
         return;
     }
-    limparErros(formTransacao);
-    const nome = campoNome.value.trim();
-    const valor = Number(campoValor.value);
-    const categoria = campoCategoria.value.trim();
-    const classificacao = selectClassificacao.value;
-    const pagamento = selectPagamento.value;
-    const contaId = campoConta.value;
-    const data = campoData.value;
-    
-    let formularioValido = true;
+    operacoesTransacoes.editarTransacao(id);
+}
 
-    if (nome === "") {
-        mostrarErro(campoNome, "Informe o nome da transação.");
-        formularioValido = false;
+const apresentacaoInvestimentos = criarApresentacaoInvestimentos({
+    document, window,
+    listaInvestimentos: document.getElementById("lista-investimentos"),
+    historicoInvestimentos: document.getElementById("historico-investimentos"),
+    totalCapital: document.getElementById("total-capital-investimentos"),
+    totalValor: document.getElementById("total-valor-investimentos"),
+    botaoNovoInvestimento: document.getElementById("novo-investimento"),
+    navegacaoPrincipal, larguraMobileTransacoes,
+    movimentoReduzidoMenus: window.matchMedia("(prefers-reduced-motion: reduce)"),
+    formatarCentavos, converterParaCentavos, formatadorMoeda, obterDataLocal, formatarDataInvestimento,
+    obterModalAtivo: () => modais.obterModalAtivo(),
+    definirFocoRetorno: (elemento) => modais.definirFocoRetorno(elemento),
+    acoes: {
+        aporte: (id) => abrirModalMovimentacao("aporte", id),
+        resgate: (id) => abrirModalMovimentacao("resgate", id),
+        atualizar: abrirAtualizacaoValor, editar: abrirModalInvestimento, excluir: solicitarExclusaoInvestimento
     }
-    if (!valorMonetarioValido(campoValor.value) || valor <= 0 || !campoValor.validity.valid) {
-        mostrarErro(campoValor, "Informe um valor maior que zero, com até duas casas decimais, dentro do limite permitido.");
-        formularioValido = false;
-    }
-    if (categoria.trim() === "") {
-        mostrarErro(campoCategoria, "Informe uma categoria.");
-        formularioValido = false;
-    }
-
-    if (tipoTransacao === "despesa" && !classificacaoDespesaValida(classificacao)) {
-        mostrarErro(selectClassificacao, "Selecione uma classificação válida para a despesa.");
-        formularioValido = false;
-    }
-
-    if (!dataValida(data) || !campoData.validity.valid) {
-        mostrarErro(campoData, "Selecione uma data válida.");
-        formularioValido = false;
-    }
-
-    if (!validarContaTransacao(contaId)) {
-        mostrarErro(campoConta, "Selecione uma conta cadastrada e disponível.");
-        formularioValido = false;
-    }
-    if (!formularioValido) {
-        focarPrimeiroErro(formTransacao);
-        return;
-    }
-
-    let proximasTransacoes;
-    if (transacaoEmEdicao !== null) {
-        const transacaoExistente = transacoes.find((transacao) => {
-            return transacao.id === transacaoEmEdicao;
-        });
-
-        if (!transacaoExistente) return;
-        const transacaoAtualizada = {
-            ...transacaoExistente,
-            nome,
-            valor,
-            categoria,
-            classificacao: tipoTransacao === "despesa" ? classificacao : null,
-            pagamento: tipoTransacao === "despesa" ? pagamento : null,
-            contaId,
-            data
-        };
-        proximasTransacoes = transacoes.map((transacao) => {
-            return transacao.id === transacaoEmEdicao ? transacaoAtualizada : transacao;
-        });
-    } else {
-    const transacao = {
-        id: crypto.randomUUID(),
-        tipo: tipoTransacao,
-        nome,
-        valor,
-        categoria,
-        classificacao: tipoTransacao === "despesa" ? classificacao : null,
-        pagamento: tipoTransacao === "despesa" ? pagamento : null,
-        contaId,
-        data,
-    };
-    proximasTransacoes = [...transacoes, transacao];
-    }
-    
-    if (!persistirColecao("transacoes", proximasTransacoes)) return;
-    transacoes = proximasTransacoes;
-    transacoesSelecionadas = []
-    renderizarTransacoes(listaTransacoes, 5);
-    atualizarCategorias();
-    atualizarTabelaCompleta();
-    atualizarResumo();
-    atualizarBarraAcoes();
-
-    const estavaEditando = transacaoEmEdicao !== null;
-    fecharModalTransacao();
-    mostrarToast(estavaEditando ? "Transação atualizada." : "Transação criada.", "sucesso");
 });
-
-let investimentoEmEdicao = null;
-let investimentoEmExclusao = null;
-const formInvestimento = document.getElementById("form-investimento");
-const modalInvestimento = document.getElementById("modal-investimento");
-const modalExclusaoInvestimento = document.getElementById("modal-exclusao-investimento");
-const camposInvestimento = {
-    nome: document.getElementById("nome-investimento"),
-    tipo: document.getElementById("tipo-investimento"),
-    instituicao: document.getElementById("instituicao-investimento"),
-    capital: document.getElementById("capital-investimento"),
-    valor: document.getElementById("valor-investimento"),
-    referencia: document.getElementById("referencia-investimento"),
-    referenciaValor: document.getElementById("referencia-valor-investimento"),
-    observacoes: document.getElementById("observacoes-investimento")
-};
-
-function investimentosDisponiveis() {
-    if (!colecoesBloqueadas.has("investimentos")) return true;
-    mostrarToast("Investimentos indisponíveis. As gravações estão bloqueadas e os dados armazenados foram preservados.", "erro");
-    return false;
-}
-
-function abrirModalInvestimento(id = null) {
-    if (!investimentosDisponiveis()) return;
-    const investimento = id === null ? null : investimentos.find((item) => item.id === id);
-    if (id !== null && !investimento) {
-        mostrarToast("O investimento não está disponível para edição.", "erro");
-        return;
-    }
-    formInvestimento.reset();
-    limparErros(formInvestimento);
-    investimentoEmEdicao = id;
-    document.getElementById("titulo-modal-investimento").textContent = investimento ? "Editar investimento" : "Adicionar investimento";
-    document.getElementById("salvar-investimento").textContent = investimento ? "Salvar alterações" : "Salvar investimento";
-    camposInvestimento.nome.value = investimento?.nome ?? "";
-    camposInvestimento.tipo.value = investimento?.tipo ?? "";
-    camposInvestimento.instituicao.value = investimento?.instituicao ?? "";
-    camposInvestimento.capital.value = investimento?.capitalInicial ?? "";
-    camposInvestimento.valor.value = investimento?.valorInformado ?? "";
-    camposInvestimento.referencia.max = obterDataLocal();
-    camposInvestimento.referencia.value = investimento?.dataReferenciaCapital ?? obterDataLocal();
-    camposInvestimento.referenciaValor.max = obterDataLocal();
-    camposInvestimento.referenciaValor.value = investimento?.dataReferenciaValor ?? obterDataLocal();
-    atualizarAvisoRetroativo(camposInvestimento.referenciaValor, investimento?.dataReferenciaValor,
-        "aviso-retroativo-investimento", "confirmar-retroativo-investimento");
-    camposInvestimento.observacoes.value = investimento?.observacoes ?? "";
-    abrirModal(modalInvestimento, camposInvestimento.nome);
-}
-
-function fecharModalInvestimento() {
-    fecharModal(modalInvestimento, () => {
-        formInvestimento.reset();
-        limparErros(formInvestimento);
-        investimentoEmEdicao = null;
-    });
-}
-
-// Ponto único de proteção da exclusão, incluindo movimentos históricos e futuros.
-function podeExcluirInvestimento(id) {
-    if (!investimentosDisponiveis()) return false;
-    if (colecoesBloqueadas.has("transacoes")) {
-        mostrarToast("Não é possível excluir o investimento: as transações estão indisponíveis e os vínculos não puderam ser verificados.", "erro");
-        return false;
-    }
-    if (transacoes.some((item) => ehMovimentacaoInvestimento(item) && item.investimentoId === id)) {
-        mostrarToast("Este investimento possui aportes ou resgates vinculados e não pode ser excluído, inclusive quando os registros são históricos ou futuros.", "erro");
-        return false;
-    }
-    if (!investimentos.some((item) => item.id === id)) {
-        mostrarToast("O investimento não está disponível para exclusão.", "erro");
-        return false;
-    }
-    return true;
-}
-
-function solicitarExclusaoInvestimento(id) {
-    if (!podeExcluirInvestimento(id)) return;
-    investimentoEmExclusao = id;
-    const investimento = investimentos.find((item) => item.id === id);
-    document.getElementById("mensagem-exclusao-investimento").textContent = `Deseja excluir o investimento "${investimento.nome}"? Esta ação não poderá ser desfeita.`;
-    abrirModal(modalExclusaoInvestimento, document.getElementById("cancelar-exclusao-investimento"));
-}
-
-function fecharExclusaoInvestimento() {
-    fecharModal(modalExclusaoInvestimento);
-    investimentoEmExclusao = null;
-}
-
-function apresentarValorInvestimento(elemento, centavos) {
-    elemento.textContent = formatarCentavos(centavos);
-    elemento.classList.toggle("valor-investimento-extenso", elemento.textContent.length > 18);
-}
+apresentacaoInvestimentos.inicializar();
 
 function prepararRetornoFocoInvestimento(id, acao) {
-    const item = [...document.getElementById("lista-investimentos").children]
-        .find((elemento) => elemento.dataset.investimentoId === id);
-    focoAnteriorModal = item?.querySelector(`[data-acao="${acao}"]`)
-        ?? document.getElementById("novo-investimento");
-    const administracao = focoAnteriorModal.closest(".gerenciar-investimento");
-    if (administracao) {
-        definirMenuAcoes(administracao, true, false);
-    }
+    apresentacaoInvestimentos.prepararRetornoFocoInvestimento(id, acao);
 }
-
-function posicionarAcoesAdministrativasInvestimento(menu) {
-    const posicao = menu.getBoundingClientRect();
-    const altura = menu.querySelector(".acoes-administrativas-investimento").getBoundingClientRect().height || 110;
-    const limiteInferior = larguraMobileTransacoes.matches
-        ? navegacaoPrincipal.getBoundingClientRect().top : window.innerHeight;
-    menu.classList.toggle("abre-acima", posicao.bottom + altura + 6 > limiteInferior && posicao.top > altura + 6);
-}
-
-const transicoesMenusAcoes = new Map();
-const movimentoReduzidoMenus = window.matchMedia("(prefers-reduced-motion: reduce)");
-
-function definirMenuAcoes(menu, aberto, animar = true) {
-    const painel = menu.querySelector(".painel-menu-acoes");
-    if (!aberto && menu.classList.contains("menu-acoes-saindo")) return;
-    const estavaAberto = menu.open;
-    transicoesMenusAcoes.get(menu)?.cancelar();
-    transicoesMenusAcoes.delete(menu);
-
-    const concluir = () => {
-        transicoesMenusAcoes.get(menu)?.cancelar();
-        transicoesMenusAcoes.delete(menu);
-        menu.open = aberto;
-        menu.classList.remove("menu-acoes-animando", "menu-acoes-entrando", "menu-acoes-saindo");
-        painel.inert = false;
-    };
-    if (!aberto && painel.contains(document.activeElement)) {
-        menu.querySelector("summary").focus({ preventScroll: true });
-    }
-    if (!animar || movimentoReduzidoMenus.matches || (!aberto && !estavaAberto)) {
-        concluir();
-        if (aberto) posicionarAcoesAdministrativasInvestimento(menu);
-        return;
-    }
-
-    menu.classList.add("menu-acoes-animando");
-    if (aberto) {
-        menu.open = true;
-        painel.inert = false;
-        posicionarAcoesAdministrativasInvestimento(menu);
-        if (!estavaAberto) {
-            menu.classList.add("menu-acoes-entrando");
-            void painel.offsetWidth;
-        }
-        menu.classList.remove("menu-acoes-entrando", "menu-acoes-saindo");
-    } else {
-        painel.inert = true;
-        menu.classList.add("menu-acoes-saindo");
-    }
-    const aoTerminar = (evento) => {
-        if (evento.target === painel && evento.propertyName === "opacity") concluir();
-    };
-    const temporizador = setTimeout(concluir, (aberto ? 170 : 120) + 50);
-    painel.addEventListener("transitionend", aoTerminar);
-    transicoesMenusAcoes.set(menu, {
-        concluir,
-        cancelar: () => {
-            clearTimeout(temporizador);
-            painel.removeEventListener("transitionend", aoTerminar);
-        }
-    });
-}
-
-movimentoReduzidoMenus.addEventListener("change", () => {
-    if (movimentoReduzidoMenus.matches) {
-        for (const transicao of [...transicoesMenusAcoes.values()]) transicao.concluir();
-    }
-});
-
-function fecharAcoesAdministrativasInvestimentos(exceto = null, restaurarFoco = false) {
-    document.querySelectorAll("#lista-investimentos .gerenciar-investimento[open]").forEach((menu) => {
-        if (menu === exceto) return;
-        const focoDentro = menu.contains(document.activeElement);
-        definirMenuAcoes(menu, false);
-        if (restaurarFoco && focoDentro) menu.querySelector("summary").focus({ preventScroll: true });
-    });
-}
-
-document.addEventListener("click", (evento) => {
-    if (modalAtivo || evento.target.closest(".modal-overlay")) return;
-    const menu = evento.target.closest(".gerenciar-investimento");
-    if (menu && evento.target.closest("summary")) {
-        evento.preventDefault();
-        definirMenuAcoes(menu, !menu.open || menu.classList.contains("menu-acoes-saindo"));
-    }
-    fecharAcoesAdministrativasInvestimentos(menu, true);
-});
-document.addEventListener("keydown", (evento) => {
-    if (evento.key !== "Escape" || modalAtivo || evento.target.closest(".modal-overlay")) return;
-    if (document.querySelector("#lista-investimentos .gerenciar-investimento[open]")) {
-        fecharAcoesAdministrativasInvestimentos(null, true);
-        evento.preventDefault();
-    }
-});
-
-// O painel acompanha o card; ao mudar a área visível, evita permanecer
-// aberto sobre a navegação inferior ou fora dos limites da janela.
-function fecharAcoesInvestimentosAoMudarViewport() {
-    if (!modalAtivo) fecharAcoesAdministrativasInvestimentos(null, true);
-}
-window.addEventListener("scroll", fecharAcoesInvestimentosAoMudarViewport, { passive: true });
-window.addEventListener("resize", fecharAcoesInvestimentosAoMudarViewport);
 
 function renderizarInvestimentos() {
     const acompanhamento = obterAcompanhamentoInvestimentos();
-    const { capitais, valores: estimativas, totalCapitalCentavos } = acompanhamento;
-    apresentarValorInvestimento(document.getElementById("total-capital-investimentos"), totalCapitalCentavos);
-    apresentarValorInvestimento(document.getElementById("total-valor-investimentos"),
-        estimativas.disponivel ? estimativas.totalValorCentavos : null);
+    apresentacaoInvestimentos.renderizarIndicadores(acompanhamento);
     renderizarHistoricoInvestimentos();
-    const lista = document.getElementById("lista-investimentos");
-    // Encerra saídas pendentes antes de descartar os cards; sem clones ou timers órfãos.
-    for (const transicao of [...transicoesMenusAcoes.values()]) transicao.concluir();
-    lista.replaceChildren();
-    if (colecoesBloqueadas.has("investimentos") || investimentos.length === 0) {
-        const mensagem = document.createElement("p");
-        mensagem.classList.add("mensagem-vazia");
-        mensagem.textContent = colecoesBloqueadas.has("investimentos")
-            ? "Dados de investimentos indisponíveis. Gravações bloqueadas nesta sessão; o conteúdo armazenado foi preservado."
-            : "Nenhum investimento cadastrado. Use Novo investimento para cadastrar o primeiro.";
-        lista.appendChild(mensagem);
-        return;
-    }
-    const restricaoMovimentacao = obterRestricaoMovimentacaoInvestimentos();
-    investimentos.forEach((investimento) => {
-        const item = document.createElement("article");
-        item.classList.add("item-investimento");
-        item.dataset.investimentoId = investimento.id;
-        const nome = document.createElement("h3");
-        nome.textContent = investimento.nome;
-        const detalhes = document.createElement("p");
-        detalhes.textContent = [investimento.tipo, investimento.instituicao].filter(Boolean).join(" · ");
-        const valores = document.createElement("dl");
-        const posicao = estimativas.valoresPorInvestimento?.get(investimento.id);
-        const capital = capitais.disponivel ? capitais.capitaisPorInvestimentoCentavos.get(investimento.id) : null;
-        [["Capital aplicado atual", capital, "Inicial", investimento.capitalInicial, investimento.dataReferenciaCapital],
-            ["Valor estimado atual",
-                posicao?.disponivel ? posicao.valorCentavos : null, "Manual",
-                investimento.valorInformado, investimento.dataReferenciaValor]].forEach(([rotulo, valor, rotuloBase, base, dataBase]) => {
-            const grupo = document.createElement("div");
-            const termo = document.createElement("dt");
-            termo.textContent = rotulo;
-            const descricao = document.createElement("dd");
-            const quantia = document.createElement("span");
-            quantia.className = "valor-investimento";
-            apresentarValorInvestimento(quantia, valor);
-            const referenciaBase = document.createElement("p");
-            referenciaBase.className = "base-investimento";
-            const quantiaBase = document.createElement("span");
-            quantiaBase.className = "valor-base-investimento";
-            quantiaBase.textContent = formatarCentavos(converterParaCentavos(base));
-            referenciaBase.append(`${rotuloBase}: `, quantiaBase,
-                ` · fim de ${formatarDataInvestimento(dataBase)}`);
-            descricao.append(quantia, referenciaBase);
-            grupo.append(termo, descricao);
-            valores.appendChild(grupo);
-        });
-        const referencia = document.createElement("p");
-        referencia.classList.add("referencia-investimento");
-        const dataAtualizacao = obterDataLocal(new Date(investimento.atualizadoEm));
-        referencia.textContent = `Atualização manual: ${formatarDataInvestimento(dataAtualizacao)}`;
-        const aviso = document.createElement("p");
-        aviso.classList.add("aviso-investimento");
-        aviso.textContent = posicao && !posicao.disponivel ? posicao.motivo
-            : !capitais.disponivel ? capitais.motivo : "";
-        const acoes = document.createElement("div");
-        acoes.classList.add("acoes-investimento");
-        const administracao = document.createElement("details");
-        administracao.className = "gerenciar-investimento menu-acoes";
-        const abrirAdministracao = document.createElement("summary");
-        abrirAdministracao.textContent = "Mais ações";
-        abrirAdministracao.setAttribute("aria-label", `Mais ações do investimento ${investimento.nome}`);
-        const acoesAdministrativas = document.createElement("div");
-        acoesAdministrativas.className = "acoes-administrativas-investimento painel-menu-acoes";
-        acoesAdministrativas.id = `administracao-investimento-${investimento.id}`;
-        abrirAdministracao.setAttribute("aria-controls", acoesAdministrativas.id);
-        administracao.append(abrirAdministracao, acoesAdministrativas);
-        [["Aporte", "aporte", (id) => abrirModalMovimentacao("aporte", id)],
-            ["Resgate", "resgate", (id) => abrirModalMovimentacao("resgate", id)],
-            ["Atualizar valor", "atualizar", abrirAtualizacaoValor],
-            ["Editar", "editar", abrirModalInvestimento], ["Excluir", "excluir", solicitarExclusaoInvestimento]].forEach(([rotulo, chave, acao]) => {
-            const botao = document.createElement("button");
-            botao.type = "button";
-            botao.textContent = rotulo;
-            botao.dataset.acao = chave;
-            if (chave === "atualizar") botao.classList.add("btn-primario");
-            botao.setAttribute("aria-label", `${rotulo} investimento ${investimento.nome}`);
-            if (rotulo === "Excluir") botao.classList.add("btn-excluir");
-            if (restricaoMovimentacao && (chave === "aporte" || chave === "resgate")) {
-                botao.disabled = true;
-                botao.setAttribute("aria-describedby", `restricao-movimentacao-${investimento.id}`);
-            }
-            const administrativa = chave === "editar" || chave === "excluir";
-            botao.addEventListener("click", () => {
-                if (!administrativa) fecharAcoesAdministrativasInvestimentos();
-                else definirMenuAcoes(administracao, true, false);
-                acao(investimento.id);
-            });
-            (administrativa ? acoesAdministrativas : acoes).appendChild(botao);
-        });
-        const identidade = document.createElement("header");
-        identidade.className = "identidade-investimento";
-        identidade.append(nome, detalhes);
-        item.append(identidade, valores, administracao);
-        if (investimento.observacoes) {
-            const nota = document.createElement("p");
-            nota.className = "nota-investimento";
-            nota.textContent = investimento.observacoes;
-            item.appendChild(nota);
-        }
-        if (aviso.textContent) item.appendChild(aviso);
-        if (restricaoMovimentacao) {
-            const explicacao = document.createElement("p");
-            explicacao.className = "restricao-movimentacao-investimento";
-            explicacao.id = `restricao-movimentacao-${investimento.id}`;
-            explicacao.textContent = restricaoMovimentacao.mensagem;
-            item.appendChild(explicacao);
-        }
-        const rodape = document.createElement("footer");
-        rodape.className = "rodape-investimento";
-        rodape.append(referencia, acoes);
-        item.appendChild(rodape);
-        lista.appendChild(item);
+    apresentacaoInvestimentos.renderizarCards({
+        acompanhamento,
+        investimentos: disponibilidadeColecoes.consultarInvestimentos(),
+        indisponivel: disponibilidadeColecoes.colecaoEstaBloqueada("investimentos"),
+        restricaoMovimentacao: !disponibilidadeColecoes.colecaoEstaBloqueada("investimentos")
+            && disponibilidadeColecoes.consultarInvestimentos().length > 0
+            ? obterRestricaoMovimentacaoInvestimentos() : null
     });
 }
 
-formInvestimento.addEventListener("submit", (evento) => {
-    evento.preventDefault();
-    limparErros(formInvestimento);
-    if (!investimentosDisponiveis()) return;
-    const campos = camposInvestimento;
-    let valido = true;
-    const erro = (campo, mensagem) => { mostrarErro(campo, mensagem); valido = false; };
-    if (!campos.nome.value.trim()) erro(campos.nome, "Informe o nome do investimento.");
-    if (!campos.tipo.value.trim()) erro(campos.tipo, "Informe o tipo do investimento ou escolha uma sugestão.");
-    [campos.capital, campos.valor].forEach((campo) => {
-        if (campo.value === "" || !valorMonetarioValido(campo.value) || !campo.validity.valid) {
-            erro(campo, "Informe um valor zero ou positivo, com até duas casas decimais, dentro do limite permitido.");
-        }
-    });
-    const referencia = campos.referencia.value;
-    if (!dataValida(referencia) || referencia > obterDataLocal() || !campos.referencia.validity.valid) {
-        erro(campos.referencia, "Informe uma data válida, igual ou anterior a hoje.");
+const elementosOperacoesInvestimentos = Object.fromEntries([
+    "aviso-retroativo-investimento",
+    "aviso-retroativo-manual",
+    "form-investimento",
+    "modal-investimento",
+    "modal-exclusao-investimento",
+    "nome-investimento",
+    "tipo-investimento",
+    "instituicao-investimento",
+    "capital-investimento",
+    "valor-investimento",
+    "referencia-investimento",
+    "referencia-valor-investimento",
+    "observacoes-investimento",
+    "titulo-modal-investimento",
+    "salvar-investimento",
+    "mensagem-exclusao-investimento",
+    "cancelar-exclusao-investimento",
+    "modal-valor-investimento",
+    "form-valor-investimento",
+    "valor-manual-investimento",
+    "data-valor-manual",
+    "titulo-valor-investimento",
+    "avaliacao-anterior-investimento",
+    "modal-movimentacao",
+    "form-movimentacao",
+    "titulo-modal-movimentacao",
+    "salvar-movimentacao",
+    "rotulo-investimento-movimentacao",
+    "rotulo-conta-movimentacao",
+    "rotulo-valor-movimentacao",
+    "campos-resgate",
+    "confirmar-retroativo-investimento",
+    "novo-investimento",
+    "fechar-investimento",
+    "cancelar-investimento",
+    "confirmar-exclusao-investimento",
+    "confirmar-retroativo-manual",
+    "cancelar-valor-investimento",
+    "fechar-valor-investimento",
+    "fechar-movimentacao",
+    "cancelar-movimentacao",
+    "investimento-movimentacao",
+    "conta-movimentacao",
+    "valor-movimentacao",
+    "capital-movimentacao",
+    "baixa-movimentacao",
+    "data-movimentacao",
+    "observacoes-movimentacao"
+].map((id) => [id, document.getElementById(id)]));
+elementosOperacoesInvestimentos.botoesMovimentacao = document.querySelectorAll("[data-movimentacao]");
+const operacoesInvestimentos = criarOperacoesInvestimentos({
+    elementos: elementosOperacoesInvestimentos,
+    consultas: {
+        colecaoEstaBloqueada: (chave) => disponibilidadeColecoes.colecaoEstaBloqueada(chave),
+        consultarInvestimentos: () => disponibilidadeColecoes.consultarInvestimentos(),
+        consultarTransacoes: () => disponibilidadeColecoes.consultarTransacoes(),
+        consultarContas: () => disponibilidadeColecoes.consultarContas()
+    },
+    confirmarInvestimentos: (candidatos) => persistirColecao("investimentos", candidatos),
+    confirmarTransacoes: (candidatos) => persistirColecao("transacoes", candidatos),
+    validarContaTransacao, obterRestricaoMovimentacaoInvestimentos, formatarDataInvestimento,
+    modais: { abrirModal, fecharModal }, mostrarToast,
+    aposSalvarInvestimento: (registro, editando) => {
+        renderizarInvestimentos();
+        renderizarTransacoes(listaTransacoes, 5);
+        atualizarTabelaCompleta();
+        if (editando) prepararRetornoFocoInvestimento(registro.id, "editar");
+    },
+    aposExcluirInvestimento: () => renderizarInvestimentos(),
+    aposAtualizarValor: (registro) => {
+        renderizarInvestimentos();
+        prepararRetornoFocoInvestimento(registro.id, "atualizar");
+    },
+    aposSalvarMovimentacao: () => {
+        limparSelecao();
+        atualizarCategorias();
+        renderizarTransacoes(listaTransacoes, 5);
+        atualizarTabelaCompleta();
+        atualizarResumo();
+        renderizarInvestimentos();
     }
-    if (campos.observacoes.value.length > 500) erro(campos.observacoes, "Use no máximo 500 caracteres.");
-    const referenciaValor = campos.referenciaValor.value;
-    if (!dataValida(referenciaValor) || referenciaValor > obterDataLocal() || !campos.referenciaValor.validity.valid) {
-        erro(campos.referenciaValor, "Informe uma data válida, igual ou anterior a hoje.");
-    }
-    const investimentoAnterior = investimentos.find((item) => item.id === investimentoEmEdicao);
-    if (investimentoAnterior && referenciaValor < investimentoAnterior.dataReferenciaValor
-        && !document.getElementById("confirmar-retroativo-investimento").checked) {
-        erro(campos.referenciaValor, "Confirme abaixo a substituição retroativa e o recálculo das movimentações.");
-    }
-    if (!valido) { focarPrimeiroErro(formInvestimento); return; }
-    const editando = investimentoEmEdicao !== null;
-    const anterior = editando ? investimentos.find((item) => item.id === investimentoEmEdicao) : null;
-    if (editando && !anterior) { mostrarToast("O investimento em edição não está disponível.", "erro"); return; }
-    const valorInformado = Number(campos.valor.value);
-    const atualizouValor = !anterior || anterior.valorInformado !== valorInformado || anterior.dataReferenciaValor !== referenciaValor;
-    const registro = {
-        id: anterior ? anterior.id : crypto.randomUUID(),
-        nome: campos.nome.value.trim(), tipo: campos.tipo.value.trim(), instituicao: campos.instituicao.value.trim(),
-        capitalInicial: Number(campos.capital.value), dataReferenciaCapital: referencia,
-        valorInformado, dataReferenciaValor: referenciaValor,
-        atualizadoEm: atualizouValor ? new Date().toISOString() : anterior.atualizadoEm,
-        observacoes: campos.observacoes.value.trim()
-    };
-    const proximos = editando ? investimentos.map((item) => item.id === anterior.id ? registro : item) : [...investimentos, registro];
-    if (!persistirColecao("investimentos", proximos)) return;
-    investimentos = proximos;
-    renderizarInvestimentos();
-    // Resolve os nomes atuais pelos IDs, preservando os registros e o estado da listagem.
-    renderizarTransacoes(listaTransacoes, 5);
-    atualizarTabelaCompleta();
-    if (editando) prepararRetornoFocoInvestimento(registro.id, "editar");
-    fecharModalInvestimento();
-    mostrarToast(editando ? "Investimento atualizado." : "Investimento cadastrado.", "sucesso");
 });
-document.getElementById("novo-investimento").addEventListener("click", () => abrirModalInvestimento());
-document.getElementById("fechar-investimento").addEventListener("click", fecharModalInvestimento);
-document.getElementById("cancelar-investimento").addEventListener("click", fecharModalInvestimento);
-Object.values(camposInvestimento).filter((campo) => campo.id !== "instituicao-investimento").forEach((campo) => {
-    campo.addEventListener("input", () => limparErroCampo(campo));
-});
-document.getElementById("cancelar-exclusao-investimento").addEventListener("click", fecharExclusaoInvestimento);
-modalExclusaoInvestimento.addEventListener("click", (evento) => {
-    if (evento.target === modalExclusaoInvestimento) fecharExclusaoInvestimento();
-});
-document.getElementById("confirmar-exclusao-investimento").addEventListener("click", () => {
-    if (investimentoEmExclusao === null || !podeExcluirInvestimento(investimentoEmExclusao)) return;
-    const proximos = investimentos.filter((item) => item.id !== investimentoEmExclusao);
-    if (!persistirColecao("investimentos", proximos)) return;
-    investimentos = proximos;
-    renderizarInvestimentos();
-    fecharExclusaoInvestimento();
-    mostrarToast("Investimento excluído.", "sucesso");
-});
+operacoesInvestimentos.inicializar();
 renderizarInvestimentos();
 
-function atualizarAvisoRetroativo(campo, referenciaAnterior, avisoId, confirmacaoId) {
-    const aviso = document.getElementById(avisoId);
-    aviso.classList.toggle("hidden", !referenciaAnterior || !campo.value || campo.value >= referenciaAnterior);
-    document.getElementById(confirmacaoId).checked = false;
-}
-
-camposInvestimento.referenciaValor.addEventListener("input", () => {
-    const anterior = investimentos.find((item) => item.id === investimentoEmEdicao);
-    atualizarAvisoRetroativo(camposInvestimento.referenciaValor, anterior?.dataReferenciaValor,
-        "aviso-retroativo-investimento", "confirmar-retroativo-investimento");
-});
-
-let investimentoEmAtualizacao = null;
-const modalValorInvestimento = document.getElementById("modal-valor-investimento");
-const formValorInvestimento = document.getElementById("form-valor-investimento");
-const campoValorManual = document.getElementById("valor-manual-investimento");
-const campoDataValorManual = document.getElementById("data-valor-manual");
-
-function abrirAtualizacaoValor(id) {
-    if (!investimentosDisponiveis()) return;
-    const investimento = investimentos.find((item) => item.id === id);
-    if (!investimento) { mostrarToast("Investimento indisponível para atualização.", "erro"); return; }
-    investimentoEmAtualizacao = id;
-    formValorInvestimento.reset();
-    limparErros(formValorInvestimento);
-    document.getElementById("titulo-valor-investimento").textContent = `Atualizar valor · ${investimento.nome}`;
-    document.getElementById("avaliacao-anterior-investimento").textContent =
-        `Avaliação anterior: ${formatarCentavos(converterParaCentavos(investimento.valorInformado))}, referente ao final de ${formatarDataInvestimento(investimento.dataReferenciaValor)}. Registro atualizado em ${formatarDataInvestimento(obterDataLocal(new Date(investimento.atualizadoEm)))}.`;
-    campoValorManual.value = investimento.valorInformado;
-    campoDataValorManual.max = obterDataLocal();
-    campoDataValorManual.value = investimento.dataReferenciaValor;
-    atualizarAvisoRetroativo(campoDataValorManual, investimento.dataReferenciaValor,
-        "aviso-retroativo-manual", "confirmar-retroativo-manual");
-    abrirModal(modalValorInvestimento, campoValorManual);
-}
-
-function fecharAtualizacaoValor() {
-    fecharModal(modalValorInvestimento, () => {
-        formValorInvestimento.reset();
-        limparErros(formValorInvestimento);
-        investimentoEmAtualizacao = null;
-    });
-}
-
-formValorInvestimento.addEventListener("submit", (evento) => {
-    evento.preventDefault();
-    limparErros(formValorInvestimento);
-    const anterior = investimentos.find((item) => item.id === investimentoEmAtualizacao);
-    if (!investimentosDisponiveis() || !anterior) return;
-    let valido = true;
-    if (campoValorManual.value === "" || !valorMonetarioValido(campoValorManual.value) || !campoValorManual.validity.valid) {
-        mostrarErro(campoValorManual, "Informe um valor zero ou positivo, com até duas casas decimais, dentro do limite permitido.");
-        valido = false;
-    }
-    const data = campoDataValorManual.value;
-    if (!dataValida(data) || data > obterDataLocal() || !campoDataValorManual.validity.valid) {
-        mostrarErro(campoDataValorManual, "Informe uma data válida, igual ou anterior a hoje.");
-        valido = false;
-    } else if (data < anterior.dataReferenciaValor && !document.getElementById("confirmar-retroativo-manual").checked) {
-        mostrarErro(campoDataValorManual, "Confirme abaixo a substituição retroativa e o recálculo das movimentações.");
-        valido = false;
-    }
-    if (!valido) { focarPrimeiroErro(formValorInvestimento); return; }
-    const atualizado = { ...anterior, valorInformado: Number(campoValorManual.value),
-        dataReferenciaValor: data, atualizadoEm: new Date().toISOString() };
-    const candidatos = investimentos.map((item) => item.id === anterior.id ? atualizado : item);
-    if (!persistirColecao("investimentos", candidatos)) return;
-    investimentos = candidatos;
-    renderizarInvestimentos();
-    prepararRetornoFocoInvestimento(atualizado.id, "atualizar");
-    fecharAtualizacaoValor();
-    mostrarToast("Valor informado atualizado. As estimativas foram recalculadas.", "sucesso");
-});
-campoDataValorManual.addEventListener("input", () => {
-    const anterior = investimentos.find((item) => item.id === investimentoEmAtualizacao);
-    atualizarAvisoRetroativo(campoDataValorManual, anterior?.dataReferenciaValor,
-        "aviso-retroativo-manual", "confirmar-retroativo-manual");
-});
-[campoValorManual, campoDataValorManual].forEach((campo) => campo.addEventListener("input", () => limparErroCampo(campo)));
-document.getElementById("cancelar-valor-investimento").addEventListener("click", fecharAtualizacaoValor);
-document.getElementById("fechar-valor-investimento").addEventListener("click", fecharAtualizacaoValor);
-
-function formatarDataInvestimento(data) {
-    return data.split("-").reverse().join("/");
+function abrirModalInvestimento(id = null) { return operacoesInvestimentos.abrirModalInvestimento(id); }
+function solicitarExclusaoInvestimento(id) { return operacoesInvestimentos.solicitarExclusaoInvestimento(id); }
+function fecharExclusaoInvestimento() { operacoesInvestimentos.fecharExclusaoInvestimento(); }
+function abrirAtualizacaoValor(id) { operacoesInvestimentos.abrirAtualizacaoValor(id); }
+function abrirModalMovimentacao(tipo, investimentoId = null, id = null) {
+    operacoesInvestimentos.abrirModalMovimentacao(tipo, investimentoId, id);
 }
 
 function renderizarHistoricoInvestimentos() {
-    const lista = document.getElementById("historico-investimentos");
-    lista.replaceChildren();
-    const disponivel = !["investimentos", "transacoes", "contas"].some((chave) => colecoesBloqueadas.has(chave))
-        && verificarIntegridadeTransacoes(transacoes, contas, investimentos).disponivel;
-    const movimentos = disponivel ? transacoes.filter(ehMovimentacaoInvestimento)
+    const disponivel = !["investimentos", "transacoes", "contas"].some((chave) => disponibilidadeColecoes.colecaoEstaBloqueada(chave))
+        && verificarIntegridadeTransacoes(disponibilidadeColecoes.consultarTransacoes(), disponibilidadeColecoes.consultarContas(), disponibilidadeColecoes.consultarInvestimentos()).disponivel;
+    const movimentos = disponivel ? disponibilidadeColecoes.consultarTransacoes().filter(ehMovimentacaoInvestimento)
         .slice().sort((a, b) => b.data.localeCompare(a.data)) : [];
-    if (!disponivel || !movimentos.length) {
-        const mensagem = document.createElement("p");
-        mensagem.classList.add("mensagem-vazia");
-        mensagem.textContent = disponivel ? "Nenhum aporte ou resgate registrado."
-            : "Histórico indisponível: não foi possível validar os dados e seus vínculos.";
-        lista.appendChild(mensagem);
-        return;
-    }
-    const itens = document.createElement("ul");
-    itens.classList.add("lista-historico-investimentos");
-    for (const movimento of movimentos) {
-        const item = document.createElement("li");
-        const investimento = investimentos.find((registro) => registro.id === movimento.investimentoId);
-        const conta = contas.find((registro) => registro.id === movimento.contaId);
-        const resgate = movimento.tipo === "resgate";
-        const titulo = document.createElement("strong");
-        item.classList.add(resgate ? "movimento-resgate" : "movimento-aporte");
-        titulo.textContent = `${resgate ? "Resgate" : "Aporte"} · ${investimento.nome}`;
-        const contexto = document.createElement("p");
-        contexto.textContent = `${formatarDataInvestimento(movimento.data)} · ${conta.nome}${movimento.data > obterDataLocal() ? " · Data futura" : ""}`;
-        const valor = document.createElement("p");
-        valor.className = "valor-movimento-investimento";
-        valor.textContent = resgate
-            ? `−${formatadorMoeda.format(movimento.valorRetiradoInvestimento)} da posição · Recebido na conta: ${formatadorMoeda.format(movimento.valor)}`
-            : `+${formatadorMoeda.format(movimento.valor)} na posição`;
-        item.append(titulo, contexto, valor);
-        if (resgate) {
-            const detalhes = document.createElement("details");
-            const resumo = document.createElement("summary");
-            resumo.textContent = "Detalhes do resgate";
-            const texto = document.createElement("p");
-            texto.textContent = `Capital retirado: ${formatadorMoeda.format(movimento.capitalRetirado)} · Valor retirado da posição: ${formatadorMoeda.format(movimento.valorRetiradoInvestimento)}`;
-            detalhes.append(resumo, texto);
-            item.appendChild(detalhes);
-        }
-        if (movimento.observacoes) {
-            const observacoes = document.createElement("p");
-            observacoes.textContent = movimento.observacoes;
-            item.appendChild(observacoes);
-        }
-        itens.appendChild(item);
-    }
-    lista.appendChild(itens);
+    apresentacaoInvestimentos.renderizarHistorico({
+        disponivel,
+        movimentos: movimentos.map((movimento) => ({
+            movimento,
+            nomeInvestimento: disponibilidadeColecoes.consultarInvestimentos().find((registro) => registro.id === movimento.investimentoId).nome,
+            nomeConta: disponibilidadeColecoes.consultarContas().find((registro) => registro.id === movimento.contaId).nome,
+            futura: movimento.data > obterDataLocal()
+        }))
+    });
 }
 
-const modalMovimentacao = document.getElementById("modal-movimentacao");
-const formMovimentacao = document.getElementById("form-movimentacao");
-const camposMovimentacao = Object.fromEntries(
-    ["investimento", "conta", "valor", "capital", "baixa", "data", "observacoes"]
-        .map((nome) => [nome, document.getElementById(`${nome}-movimentacao`)]));
-let tipoMovimentacao = "aporte";
-let movimentacaoEmEdicao = null;
-
 function obterRestricaoMovimentacaoInvestimentos() {
-    if (["transacoes", "contas", "investimentos"].some((chave) => colecoesBloqueadas.has(chave))) {
+    if (["transacoes", "contas", "investimentos"].some((chave) => disponibilidadeColecoes.colecaoEstaBloqueada(chave))) {
         return { mensagem: "Não é possível movimentar: contas, investimentos ou transações estão indisponíveis. Os dados armazenados foram preservados.", tipo: "erro" };
     }
-    if (!contas.length || !investimentos.length) {
+    if (!disponibilidadeColecoes.consultarContas().length || !disponibilidadeColecoes.consultarInvestimentos().length) {
         return { mensagem: "Cadastre pelo menos uma conta e um investimento antes de registrar aportes ou resgates.", tipo: "informacao" };
     }
     return null;
 }
 
-function podeMovimentarInvestimentos() {
-    const restricao = obterRestricaoMovimentacaoInvestimentos();
-    if (restricao) {
-        mostrarToast(restricao.mensagem, restricao.tipo);
-        return false;
-    }
-    return true;
-}
+analises.inicializar();
 
-function abrirModalMovimentacao(tipo, investimentoId = null, id = null) {
-    if (!["aporte", "resgate"].includes(tipo) || !podeMovimentarInvestimentos()) return;
-    const registro = id === null ? null : transacoes.find((item) => item.id === id && item.tipo === tipo);
-    if (id !== null && !registro) {
-        mostrarToast("A movimentação não está disponível para edição.", "erro");
-        return;
-    }
-    formMovimentacao.reset();
-    limparErros(formMovimentacao);
-    tipoMovimentacao = tipo;
-    movimentacaoEmEdicao = id;
-    const resgate = tipo === "resgate";
-    document.getElementById("titulo-modal-movimentacao").textContent = `${registro ? "Editar" : "Adicionar"} ${tipo}`;
-    document.getElementById("salvar-movimentacao").textContent = registro ? "Salvar alterações" : `Salvar ${tipo}`;
-    document.getElementById("rotulo-investimento-movimentacao").textContent = `Investimento de ${resgate ? "origem" : "destino"}`;
-    document.getElementById("rotulo-conta-movimentacao").textContent = `Conta de ${resgate ? "destino" : "origem"}`;
-    document.getElementById("rotulo-valor-movimentacao").textContent = resgate ? "Valor recebido" : "Valor do aporte";
-    document.getElementById("campos-resgate").classList.toggle("hidden", !resgate);
-    camposMovimentacao.capital.required = resgate;
-    camposMovimentacao.capital.disabled = !resgate;
-    camposMovimentacao.baixa.disabled = !resgate;
-    for (const [nome, colecao] of [["investimento", investimentos], ["conta", contas]]) {
-        const select = camposMovimentacao[nome];
-        select.replaceChildren(new Option("Selecione...", ""));
-        colecao.forEach((item) => select.add(new Option(item.nome, item.id)));
-    }
-    camposMovimentacao.investimento.value = registro?.investimentoId ?? investimentoId ?? "";
-    camposMovimentacao.conta.value = registro?.contaId ?? "";
-    camposMovimentacao.valor.value = registro?.valor ?? "";
-    camposMovimentacao.capital.value = registro?.capitalRetirado ?? "";
-    camposMovimentacao.baixa.value = registro?.valorRetiradoInvestimento ?? "";
-    camposMovimentacao.data.value = registro?.data ?? obterDataLocal();
-    camposMovimentacao.observacoes.value = registro?.observacoes ?? "";
-    abrirModal(modalMovimentacao, camposMovimentacao.investimento);
-}
+listagensTransacoes.inicializar();
 
-function fecharModalMovimentacao() {
-    fecharModal(modalMovimentacao, () => {
-        formMovimentacao.reset();
-        limparErros(formMovimentacao);
-        movimentacaoEmEdicao = null;
-    });
-}
-
-formMovimentacao.addEventListener("submit", (evento) => {
-    evento.preventDefault();
-    limparErros(formMovimentacao);
-    if (!podeMovimentarInvestimentos()) return;
-    const campos = camposMovimentacao;
-    let valido = true;
-    const erro = (campo, mensagem) => { mostrarErro(campo, mensagem); valido = false; };
-    const investimento = investimentos.find((item) => item.id === campos.investimento.value);
-    if (!investimento) erro(campos.investimento, "Selecione um investimento cadastrado.");
-    if (!validarContaTransacao(campos.conta.value)) erro(campos.conta, "Selecione uma conta cadastrada.");
-    const monetarios = [campos.valor];
-    if (tipoMovimentacao === "resgate") {
-        monetarios.push(campos.capital);
-        if (campos.baixa.value !== "") monetarios.push(campos.baixa);
-    }
-    for (const campo of monetarios) {
-        if (campo.value === "" || !valorMonetarioValido(campo.value)
-            || Number(campo.value) <= 0 || !campo.validity.valid) {
-            erro(campo, "Informe um valor maior que zero, com até duas casas decimais, dentro do limite permitido.");
-        }
-    }
-    if (!dataValida(campos.data.value) || !campos.data.validity.valid) erro(campos.data, "Selecione uma data válida.");
-    if (campos.observacoes.value.length > 500) erro(campos.observacoes, "Use até 500 caracteres.");
-    if (!valido) { focarPrimeiroErro(formMovimentacao); return; }
-    const anterior = movimentacaoEmEdicao === null ? null
-        : transacoes.find((item) => item.id === movimentacaoEmEdicao && item.tipo === tipoMovimentacao);
-    if (movimentacaoEmEdicao !== null && !anterior) {
-        mostrarToast("A movimentação em edição não está disponível.", "erro");
-        return;
-    }
-    const registro = prepararMovimentacaoInvestimento({
-        ...anterior,
-        id: anterior?.id ?? crypto.randomUUID(),
-        tipo: tipoMovimentacao,
-        nome: `${tipoMovimentacao === "aporte" ? "Aporte" : "Resgate"} - ${investimento.nome}`,
-        investimentoId: investimento.id,
-        contaId: campos.conta.value,
-        valor: Number(campos.valor.value),
-        data: campos.data.value,
-        observacoes: campos.observacoes.value.trim(),
-        ...(tipoMovimentacao === "resgate" ? {
-            capitalRetirado: Number(campos.capital.value),
-            valorRetiradoInvestimento: campos.baixa.value === "" ? null : Number(campos.baixa.value)
-        } : {})
-    });
-    const candidatos = anterior ? transacoes.map((item) => item.id === anterior.id ? registro : item)
-        : [...transacoes, registro];
-    // A persistência valida também a sequência futura completa, antes de qualquer confirmação.
-    if (!persistirColecao("transacoes", candidatos)) return;
-    transacoes = candidatos;
-    limparSelecao();
-    atualizarCategorias();
-    renderizarTransacoes(listaTransacoes, 5);
-    atualizarTabelaCompleta();
-    atualizarResumo();
-    renderizarInvestimentos();
-    fecharModalMovimentacao();
-    mostrarToast(anterior ? "Movimentação atualizada." : "Movimentação registrada.", "sucesso");
-});
-document.querySelectorAll("[data-movimentacao]").forEach((botao) => {
-    botao.addEventListener("click", () => abrirModalMovimentacao(botao.dataset.movimentacao));
-});
-document.getElementById("fechar-movimentacao").addEventListener("click", fecharModalMovimentacao);
-document.getElementById("cancelar-movimentacao").addEventListener("click", fecharModalMovimentacao);
-// Como no cadastro de investimentos, fundo e Escape não descartam o formulário.
-Object.values(camposMovimentacao).forEach((campo) => {
-    campo.addEventListener("input", () => limparErroCampo(campo));
-    campo.addEventListener("change", () => limparErroCampo(campo));
-});
-
-// Um único listener atende as instâncias atuais, sem listeners retidos após destroy().
-document.addEventListener("pointerdown", (evento) => {
-    for (const grafico of Object.values(graficosHistorico)) {
-        if (!grafico || grafico.canvas.contains(evento.target) || !grafico.getActiveElements().length) continue;
-        try {
-            grafico.setActiveElements([]);
-            grafico.tooltip?.setActiveElements([], { x: 0, y: 0 });
-            grafico.draw();
-        } catch (erro) {
-            // Reutiliza o tratamento de falhas visuais, sem gravar dados.
-            atualizarGraficosHistorico();
-            break;
-        }
-    }
-}, { passive: true });
-
-document.querySelectorAll("[data-duracao-historico]").forEach((botao) => {
-    botao.addEventListener("click", () => {
-        duracaoHistoricoAnalises = Number(botao.dataset.duracaoHistorico);
-        atualizarGraficosHistorico();
-    });
-});
-document.getElementById("mes-final-historico").addEventListener("change", (evento) => {
-    mesFinalHistoricoAnalises = evento.target.value;
-    atualizarGraficosHistorico();
-});
-
-const mesAtualDistribuicao = obterDataLocal().slice(0, 7);
-document.getElementById("mes-inicial-distribuicao").value = mesAtualDistribuicao;
-document.getElementById("mes-final-distribuicao").value = mesAtualDistribuicao;
-["periodo-distribuicao", "mes-inicial-distribuicao", "mes-final-distribuicao"].forEach((id) => {
-    document.getElementById(id).addEventListener("change", atualizarDistribuicaoDespesas);
-});
-
-acoesContextuais.forEach((original, contextual) => {
-    contextual.addEventListener("click", () => original.click());
-});
-observarBarraSuperior();
-if ("ResizeObserver" in window) {
-    const observadorDimensoesAcoes = new ResizeObserver((entradas) => {
-        for (const entrada of entradas) {
-            if (entrada.target === navegacaoPrincipal && larguraMobileTransacoes.matches
-                && Math.ceil(navegacaoPrincipal.getBoundingClientRect().height) !== alturaNavegacaoAcoes) {
-                observarBarraSuperior();
-            }
-        }
-    });
-    observadorDimensoesAcoes.observe(navegacaoPrincipal);
-}
-
-observarFormacoesAnalises();
 navegarPara("resumo");
 atualizarOpcoesContas();
 renderizarTransacoes(listaTransacoes, 5);
@@ -3604,16 +766,3 @@ document.addEventListener("visibilitychange", () => {
         atualizarDistribuicaoDespesas();
     }
 });
-
-/* RESETAR OS DADOS DE TESTE
-
-transacoes.length = 0;
-localStorage.setItem("transacoes", JSON.stringify(transacoes));
-renderizarTransacoes(listaTransacoes, 5);
-atualizarTabelaCompleta();
-
-*/
-
-/*OU
-localStorage.removeItem("transacoes");
-*/
