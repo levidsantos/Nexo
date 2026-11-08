@@ -134,7 +134,6 @@ export function criarListagensTransacoes({ elementos, consultas: disponibilidade
             checkbox.type = "checkbox";
             checkbox.classList.add("checkbox-transacao");
             checkbox.value = transacao.id;
-            checkbox.setAttribute("aria-label", `Selecionar ${transacao.nome}`);
             checkbox.checked = transacoesSelecionadas.includes(transacao.id);
 
             if (tabelaDestino === listaTransacoesCompleta) {
@@ -171,6 +170,7 @@ export function criarListagensTransacoes({ elementos, consultas: disponibilidade
                     ? `${tipoMovimento} · ${investimento.nome}`
                     : `${tipoMovimento} · ${transacao.nome} (${investimento?.nome ?? "Investimento indisponível"})`
                 : transacao.nome;
+            checkbox.setAttribute("aria-label", `Selecionar ${celulaNome.textContent}`);
             linha.appendChild(celulaNome);
 
             const celulaCategoria = document.createElement("td");

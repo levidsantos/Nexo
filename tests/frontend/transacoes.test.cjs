@@ -18,6 +18,33 @@ class Alvo {
     listeners() { return [...this.eventos.values()].reduce((n, callbacks) => n + callbacks.size, 0); }
 }
 
+test('checkboxes acompanham o nome do investimento sem alterar registros ou seleção', () => {
+    const registros = [aporte({ nome: 'Aporte - Investimento de teste' }), resgate({ nome: 'Resgate - Investimento de teste' })];
+    const originais = JSON.stringify(registros);
+    const a = ambiente({ registros });
+    a.renderizar();
+    const verificar = (renomeado) => {
+        for (const tabela of [a.refs.listaTransacoes, a.refs.listaTransacoesCompleta]) {
+            assert.equal(a.checkboxes(tabela).length, 2);
+            for (const checkbox of a.checkboxes(tabela)) {
+                const registro = registros.find((item) => item.id === checkbox.value);
+                const tipo = registro.tipo === 'aporte' ? 'Aporte' : 'Resgate';
+                const nome = renomeado ? `${tipo} · ${registro.nome} (Carteira renomeada)` : `${tipo} · Investimento de teste`;
+                assert.equal(checkbox.getAttribute('aria-label'), `Selecionar ${nome}`);
+                assert.equal(checkbox.checked, renomeado);
+            }
+        }
+    };
+    verificar(false);
+    a.selecionar(0); a.selecionar(1);
+    const selecao = a.api.consultarSelecao();
+    a.alterar({ investimentos: [investimento({ nome: 'Carteira renomeada' })] });
+    a.renderizar();
+    verificar(true);
+    assert.deepEqual(a.api.consultarSelecao(), selecao);
+    assert.equal(JSON.stringify(registros), originais);
+});
+
 function ambiente({ registros = [], mobile = false, reduced = true, animar = false, observadores = true } = {}) {
     let transacoes = registros, contas = [conta()], investimentos = [investimento()];
     const bloqueadas = new Set(), elementosId = new Map(), efeitos = [], animacoes = [], ios = [], ros = [], quadros = new Map();

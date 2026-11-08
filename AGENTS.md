@@ -7,12 +7,19 @@ Nexo é um organizador financeiro pessoal, desenvolvido como projeto de estudo e
 Este documento descreve decisões e o estado conhecido do projeto, mas pode estar desatualizado. **Inspecione os arquivos reais antes de tirar conclusões.** Quando houver divergência, informe-a. Não presuma que recursos planejados já foram implementados.
 
 ## Tecnologias e estrutura conhecida
-- Frontend: HTML, CSS e JavaScript puro, sem framework.
+- Frontend: HTML, CSS e JavaScript puro, sem framework ou build. O ponto de entrada utiliza ES Modules nativos; servir por HTTP, não por `file://`.
 - Gráficos: Chart.js 4.5.1, carregado por CDN com versão fixa, antes do script da aplicação; sem ferramentas de build.
 - Persistência atual: `localStorage`, nas coleções separadas `contas`, `transacoes` e `investimentos`; os vínculos são verificados depois da leitura das coleções.
-- Arquivos principais conhecidos: `frontend/index.html`, `frontend/css/style.css` e `frontend/js/script.js`. Confirme a estrutura real.
-- Versionamento: Git/GitHub. O redesign base está na branch `experiment/nexo-ui-redesign`; confirmar a branch atual antes de atuar e não trocá-la sem autorização.
+- Entradas: `frontend/index.html`, `frontend/css/style.css` e `frontend/js/script.js`. JavaScript organizado em `dominio/`, `dados/`, `ui/` e `funcionalidades/`; CSS carregado, nesta ordem, de `base.css`, `componentes.css`, `interface.css` e `interface-complementar.css`. Preservar a ordem dos imports e das regras condicionais.
+- Versionamento: Git/GitHub. A auditoria final foi realizada na branch `frontend`; confirmar sempre a branch atual antes de atuar e não trocá-la sem autorização.
 - Backend futuro: Java, Spring Boot e SQL; não introduzir backend nesta fase sem solicitação.
+
+## Arquitetura e verificação
+- `dados/estado.js` exporta `criarEstadoFinanceiro()` e concentra coleções imutáveis, disponibilidade e compatibilidade legada. `dados/repositorio.js` concentra leitura/escrita no localStorage; domínio não acessa DOM ou armazenamento.
+- As confirmações públicas de Contas, Transações e Investimentos retornam Promises com os resultados existentes. O coordenador aguarda os resultados; controladores usam `criarConfirmacaoFinanceira()` para impedir reenvios e preservar formulários durante a espera. Persistir antes de substituir memória ou apresentar sucesso.
+- `script.js` mantém bootstrap, navegação SPA, composição, consultas contextualizadas e coordenação entre funcionalidades. Não extrair essas responsabilidades apenas por quantidade de linhas.
+- Testes em `tests/frontend/`: Node.js 24, `node:test` e `node:assert/strict`. Referência da auditoria final: 443 testes aprovados em America/Sao_Paulo, UTC e Pacific/Kiritimati. Parte dos testes de coordenação utiliza `node:vm`; doubles de DOM não substituem validação completa no navegador.
+- Execução local por HTTP e comandos de teste estão no README. Não é necessário instalar dependências para rodar os testes.
 
 ## Estado conhecido da implementação
 As funcionalidades abaixo foram verificadas no frontend. **Decisões de produto** registra as regras que devem ser preservadas; os recursos pendentes estão em **Limites de escopo e pendências**.
@@ -121,11 +128,15 @@ As funcionalidades abaixo foram verificadas no frontend. **Decisões de produto*
 - Não há integração bancária automática nem mecanismo independente de agendamento; datas futuras são registros normais, sujeitos às regras de cálculo acima.
 - O redesign das cinco páginas possui adaptação responsiva, registros compactos e navegação inferior mobile. Transações possui barra contextual de seleção acima da navegação, exibida somente com seleção e barra superior fora de vista, sem aparecer sobre modais. Modo escuro não foi implementado.
 - Não há projeções financeiras: os gráficos mostram somente o histórico até a data local atual. Não presumir implementações de cartões, faturas, parcelamentos ou cálculo de limites de crédito.
-- Modularização de CSS/JS e consolidações amplas da cascata ficam para etapa posterior. Preservar os refinamentos existentes de valores no Resumo mobile, ações e referências de Investimentos, barra contextual, gráficos e motion; não tratá-los como funcionalidades ainda ausentes.
+- A modularização principal de JavaScript e CSS está concluída. Consolidações amplas adicionais não fazem parte desta fase. Preservar os refinamentos existentes de valores no Resumo mobile, ações e referências de Investimentos, barra contextual, gráficos e motion; não tratá-los como funcionalidades ainda ausentes.
 
 ### Segurança da persistência
+- Concorrência entre abas permanece sem proteção completa: não há Web Locks, comparação de versões ou listener de `storage`. Usar uma aba para editar; tratar sincronização como evolução futura, sem presumir que as confirmações assíncronas já resolvam a concorrência.
 - Preservar validações, tratamento de erros e toasts. Confirmar a gravação antes de alterar memória ou interface como se a operação tivesse sido concluída; em caso de falha, preservar formulários e modais abertos.
 - Os dados fictícios antigos foram removidos manualmente para adoção do modelo atual, sem migração. Isso não autoriza novas limpezas automáticas durante a inicialização nem descarte silencioso de dados inválidos.
+
+### Observação da auditoria final
+- P2 de apresentação acessível: em `funcionalidades/listagens-transacoes.js`, o checkbox de aporte/resgate usa o nome armazenado; após renomear o investimento, a linha e a busca resolvem o nome atual, mas o nome acessível do checkbox não o inclui. Uma futura correção deve preservar registros e vínculos por ID.
 
 ## Preferências de desenvolvimento
 - O projeto é individual e educativo. Priorizar soluções compreensíveis e progressivas.
