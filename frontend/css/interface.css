@@ -826,3 +826,73 @@
     :root.aparencia-pronta .nexo-app,
     :root.aparencia-pronta .nexo-app :is(.topbar, .sidebar, .rodape-app, .indicador-tema) { transition: none; }
 }
+
+/* Central de Ajuda: conteúdo editorial no ciclo compartilhado dos modais. */
+#modal-ajuda button, .acesso-ajuda-sidebar { box-shadow: none; }
+.acesso-ajuda-sidebar { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; margin: 0 0 18px; padding: 8px 0; border: 0; border-radius: 8px; background: transparent; color: var(--nexo-texto-secundario); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+.acesso-ajuda-sidebar svg, .acesso-ajuda-mobile svg { width: 19px; height: 19px; flex-shrink: 0; }
+.acesso-ajuda-sidebar:hover { color: var(--nexo-primaria); }
+.nexo-app .topbar .acesso-ajuda-mobile { width: 100%; min-height: 44px; height: auto; justify-content: flex-start; gap: 10px; margin-top: 16px; padding: 10px 12px; border: 1px solid var(--nexo-borda); border-radius: 8px; background: transparent; color: var(--nexo-texto); font-size: 13px; font-weight: 500; text-align: left; }
+.nexo-app .topbar .acesso-ajuda-mobile svg { width: 18px; height: 18px; }
+.nexo-app .topbar .acesso-ajuda-mobile, .botoes-categorias-ajuda button { transition: background-color .16s ease, border-color .16s ease; }
+.nexo-app .topbar .acesso-ajuda-mobile:hover:not(:disabled), .botoes-categorias-ajuda button:hover:not(:disabled) { background: var(--tema-superficie-suave, #f4effb); border-color: var(--tema-borda-interativa, #b5a0cf); }
+.nexo-app #modal-ajuda { box-sizing: border-box; padding: 24px; background: rgba(33, 27, 45, .42); }
+#modal-ajuda .modal-ajuda { display: flex; flex-direction: column; box-sizing: border-box; width: min(100%, 800px); max-height: calc(100dvh - 48px); padding: 0; overflow: hidden; border: 1px solid var(--nexo-borda); border-radius: 16px; background: var(--nexo-superficie); color: var(--nexo-texto); box-shadow: 0 24px 80px rgba(30, 19, 47, .18); }
+.cabecalho-ajuda { display: flex; flex: 0 0 auto; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 24px 28px 20px; }
+.cabecalho-ajuda h2 { margin: 0 0 8px; font-size: 23px; line-height: 1.25; letter-spacing: -.025em; }
+.cabecalho-ajuda p { margin: 0; color: var(--nexo-texto-secundario); font-size: 13px; line-height: 1.5; }
+#fechar-ajuda { display: grid; place-items: center; flex: 0 0 44px; width: 44px; height: 44px; padding: 10px; border: 0; border-radius: 8px; background: var(--tema-superficie-suave, #f6f4f8); color: var(--nexo-texto-secundario); cursor: pointer; }
+#fechar-ajuda svg { width: 20px; height: 20px; }
+#fechar-ajuda:hover { color: var(--nexo-primaria); }
+.categorias-ajuda { flex-shrink: 0; padding: 0 28px 20px; border-bottom: 1px solid var(--nexo-borda); }
+.botoes-categorias-ajuda { display: flex; gap: 4px; padding: 4px; border-radius: 10px; background: var(--tema-superficie-suave, #f6f4f8); }
+.botoes-categorias-ajuda button { flex: 1; min-width: 0; min-height: 44px; padding: 8px; border: 0; border-radius: 7px; background: transparent; color: var(--nexo-texto-secundario); font: inherit; font-size: 13px; cursor: pointer; }
+.botoes-categorias-ajuda button[aria-pressed="true"] { background: var(--nexo-superficie); color: var(--tema-texto-destaque, #57338f); font-weight: 600; }
+.categoria-ajuda-mobile { display: none; }
+.conteudo-ajuda { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 24px 28px; scroll-padding-block: 16px; scrollbar-width: thin; scrollbar-color: var(--tema-rolagem, #b8adc8) transparent; }
+.ajuda-categoria[hidden] { display: none; }
+.ajuda-categoria h3 { margin: 0 0 12px; font-size: 16px; }
+.pergunta-ajuda { border-bottom: 1px solid var(--nexo-borda); }
+.pergunta-ajuda > summary { padding: 16px 4px; color: var(--nexo-texto); font-size: 14px; font-weight: 600; line-height: 1.5; cursor: pointer; overflow-wrap: anywhere; }
+.pergunta-ajuda > summary::marker { color: var(--nexo-texto-secundario); }
+.pergunta-ajuda > summary:hover { color: var(--nexo-primaria); }
+.resposta-ajuda { max-width: 72ch; padding: 0 4px 18px; font-size: 14px; line-height: 1.7; overflow-wrap: anywhere; }
+.resposta-ajuda p { margin: 0 0 12px; }
+.resposta-ajuda p:last-child { margin-bottom: 0; }
+.resposta-ajuda ul { margin: 0 0 12px; padding-left: 22px; }
+.resposta-ajuda li + li { margin-top: 8px; }
+.exemplo-ajuda { margin-top: 20px; padding: 18px; border: 1px solid var(--nexo-borda); border-radius: 10px; background: var(--tema-superficie-suave, #faf8fd); }
+.exemplo-ajuda h4 { margin: 0 0 12px; font-size: 14px; }
+.exemplo-ajuda .contexto-exemplo { font-size: 12px; color: var(--nexo-texto-secundario); }
+.exemplo-ajuda table { width: 100%; table-layout: fixed; border-collapse: collapse; margin: 16px 0; font-size: 13px; }
+.exemplo-ajuda caption { text-align: left; margin-bottom: 8px; font-weight: 600; }
+.exemplo-ajuda :is(th, td) { padding: 10px 6px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--nexo-borda); overflow-wrap: anywhere; font-weight: 400; }
+.exemplo-ajuda thead th { color: var(--nexo-texto-secundario); }
+.exemplo-ajuda tbody td { white-space: nowrap; }
+.exemplo-ajuda :is(th, td):last-child { width: 30%; font-variant-numeric: tabular-nums; font-weight: 600; }
+.aviso-ajuda { margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--nexo-borda); color: var(--nexo-texto-secundario); font-size: 12px; line-height: 1.7; }
+.aviso-ajuda h3 { margin: 0 0 8px; font-size: 13px; font-weight: 600; }
+.aviso-ajuda p { margin: 0; }
+.acesso-ajuda-sidebar:focus-visible, #modal-ajuda :is(button, summary):focus-visible { outline: 2px solid var(--nexo-primaria); outline-offset: 2px; border-radius: 6px; }
+@media (max-width: 850px) {
+    .botoes-categorias-ajuda { display: none; }
+    .categoria-ajuda-mobile { display: grid; gap: 8px; color: var(--nexo-texto-secundario); font-size: 12px; }
+    #categoria-ajuda { box-sizing: border-box; width: 100%; min-width: 0; min-height: 44px; padding: 10px 12px; border: 1px solid var(--tema-borda-campo, #b0a9bb); border-radius: 8px; background: var(--nexo-superficie); color: var(--nexo-texto); font: inherit; font-size: 16px; transition: border-color .2s ease, box-shadow .2s ease; }
+}
+@media (max-width: 640px) {
+    .nexo-app #modal-ajuda { padding: max(12px, env(safe-area-inset-top, 0px)) 12px max(12px, env(safe-area-inset-bottom, 0px)); }
+    #modal-ajuda .modal-ajuda { max-height: calc(100dvh - max(12px, env(safe-area-inset-top, 0px)) - max(12px, env(safe-area-inset-bottom, 0px))); }
+    .cabecalho-ajuda { padding: 20px 20px 16px; }
+    .cabecalho-ajuda h2 { font-size: 21px; }
+    .categorias-ajuda { padding: 0 20px 16px; }
+    .conteudo-ajuda { padding: 20px; }
+    .exemplo-ajuda { padding: 12px; }
+    .exemplo-ajuda :is(th, td) { padding-inline: 3px; font-size: 12px; }
+    .exemplo-ajuda :is(th, td):last-child { width: 38%; }
+}
+
+#categoria-ajuda:hover { border-color: var(--cor-borda-hover); }
+#categoria-ajuda:focus { border-color: var(--campo-modal-borda-foco); outline: none; box-shadow: var(--campo-sombra-foco); }
+@media (prefers-reduced-motion: reduce) {
+    .nexo-app .topbar .acesso-ajuda-mobile, .botoes-categorias-ajuda button, #categoria-ajuda { transition: none; }
+}

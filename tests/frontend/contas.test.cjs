@@ -94,7 +94,7 @@ test('Contas: estados vazio e bloqueado preservam mensagens e nenhuma gravação
     const a = ambiente(); a.renderizar();
     assert.match(a.elementos.listaContas.innerHTML, /Nenhuma conta cadastrada/);
     a.estado.bloquearColecao('contas'); a.renderizar();
-    assert.equal(a.elementos.listaContas.children[0].textContent, 'Dados de contas indisponíveis. Gravações bloqueadas nesta sessão.');
+    assert.equal(a.elementos.listaContas.children[0].textContent, 'Os dados das contas estão indisponíveis. Não é possível cadastrar, editar ou excluir contas nesta sessão.');
     assert.equal(a.gravacoes.length, 0);
 });
 

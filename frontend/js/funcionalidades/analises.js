@@ -506,7 +506,7 @@ export function criarAnalises({ document, window, elementos, botoesDuracao,
         const descricao = obterElemento(`dados-historico-${destino}`);
         const canvas = obterElemento(`grafico-historico-${destino}`);
         let mensagem = !historico.disponivel ? `Histórico indisponível. ${historico.motivo}`
-            : historico.vazio ? "Nenhuma transação até a data atual para exibir no histórico."
+            : historico.vazio ? "Nenhuma receita ou despesa até hoje para exibir no histórico."
             : typeof obterChart() !== "function" ? "Gráfico indisponível: não foi possível carregar a biblioteca. Verifique sua conexão e recarregue a página." : "";
 
         periodo.textContent = historico.disponivel && !historico.vazio

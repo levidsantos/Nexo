@@ -104,7 +104,7 @@ export function criarContas({ elementos, estado: disponibilidadeColecoes, confir
         if (disponibilidadeColecoes.colecaoEstaBloqueada("contas")) {
             const mensagem = document.createElement("p");
             mensagem.classList.add("mensagem-vazia");
-            mensagem.textContent = "Dados de contas indisponíveis. Gravações bloqueadas nesta sessão.";
+            mensagem.textContent = "Os dados das contas estão indisponíveis. Não é possível cadastrar, editar ou excluir contas nesta sessão.";
             listaContas.appendChild(mensagem);
             return;
         }
