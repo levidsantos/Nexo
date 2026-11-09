@@ -1,9 +1,14 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-tema="claro">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Nexo</title>
+    <script>
+        try {
+            if (localStorage.getItem("nexo-tema") === "escuro") document.documentElement.dataset.tema = "escuro";
+        } catch { /* Sem preferência disponível, manter o tema claro. */ }
+    </script>
     <link rel="stylesheet" href="css/style.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js" defer></script>
     <script type="module" src="js/script.js"></script>
@@ -19,6 +24,17 @@
                 <li><a href="#analises" data-pagina="analises"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v16h16M8 14l4-5 4 2 4-7"/></svg><span>Análises</span></a></li>
                 <li><a href="#investimentos" data-pagina="investimentos"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21v-8m0 3c-6 0-8-4-8-8 6 0 8 3 8 8Zm0-3c0-6 3-9 8-10 1 6-2 10-8 10Z"/></svg><span class="rotulo-investimentos">Investimentos</span><span class="rotulo-investimentos-curto">Investir</span></a></li>
             </ul></nav>
+            <div class="sidebar-aparencia">
+                <fieldset class="seletor-tema">
+                    <div class="opcoes-tema">
+                        <input type="radio" name="tema-desktop" id="tema-claro-desktop" value="claro" data-opcao-tema checked>
+                        <label for="tema-claro-desktop"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="4"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3M5 5l2 2m10 10 2 2M5 19l2-2M17 7l2-2"/></svg><span class="rotulo-tema">Tema claro</span></label>
+                        <input type="radio" name="tema-desktop" id="tema-escuro-desktop" value="escuro" data-opcao-tema>
+                        <label for="tema-escuro-desktop"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M20.5 14A9 9 0 0 1 10 3.5 9 9 0 1 0 20.5 14Z"/></svg><span class="rotulo-tema">Tema escuro</span></label>
+                        <span class="indicador-tema" aria-hidden="true"></span>
+                    </div>
+                </fieldset>
+            </div>
             <p class="sidebar-nota">Finanças pessoais<span>Armazenamento local</span></p>
         </aside>
 
@@ -28,6 +44,22 @@
                 <div class="topbar-acoes">
                     <button id="add_receita" aria-label="Adicionar receita"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg><span>Receita</span></button>
                     <button class="btn-primario" id="add_despesa" aria-label="Adicionar despesa"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg><span>Despesa</span></button>
+                    <div class="configuracoes-mobile">
+                        <button type="button" id="abrir-configuracoes" aria-label="Configurações" aria-expanded="false" aria-controls="painel-configuracoes"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="m10 3-.7 2.5-2 .9L5 5.8 3 9.2l1.8 1.9v2L3 15l2 3.4 2.3-.6 2 .9L10 21h4l.7-2.3 2-.9 2.3.6 2-3.4-1.8-1.9v-2L21 9.2l-2-3.4-2.3.6-2-.9L14 3Z"/><circle cx="12" cy="12" r="3"/></svg></button>
+                        <div id="painel-configuracoes" class="painel-configuracoes" aria-labelledby="titulo-configuracoes" hidden>
+                            <h2 id="titulo-configuracoes">Configurações</h2>
+                            <fieldset class="seletor-tema">
+                                <legend>Aparência</legend>
+                                <div class="opcoes-tema">
+                                    <input type="radio" name="tema-mobile" id="tema-claro-mobile" value="claro" data-opcao-tema checked>
+                                    <label for="tema-claro-mobile"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="4"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3M5 5l2 2m10 10 2 2M5 19l2-2M17 7l2-2"/></svg>Claro</label>
+                                    <input type="radio" name="tema-mobile" id="tema-escuro-mobile" value="escuro" data-opcao-tema>
+                                    <label for="tema-escuro-mobile"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M20.5 14A9 9 0 0 1 10 3.5 9 9 0 1 0 20.5 14Z"/></svg>Escuro</label>
+                                    <span class="indicador-tema" aria-hidden="true"></span>
+                                </div>
+                            </fieldset>
+                        </div>
+                    </div>
                 </div>
             </header>
 

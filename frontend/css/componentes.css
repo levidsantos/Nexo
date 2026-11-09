@@ -20,7 +20,7 @@
     margin-bottom: 20px;
     font-size: 15px;
     font-weight: 600;
-    color: #7c858f;
+    color: var(--tema-texto-apoio, #7c858f);
 }
 
 .resumo div h3 {
@@ -69,11 +69,11 @@
 }
 .sidebar a:hover {
     background: var(--cor-superficie);
-    color: #19141e;
+    color: var(--tema-texto-forte, #19141e);
 }
 .sidebar a.ativo {
-    background: #fcf9ff;
-    color: #19141e;
+    background: var(--tema-superficie-suave, #fcf9ff);
+    color: var(--tema-texto-forte, #19141e);
     font-weight: 600;
 }
 .sidebar a::before {
@@ -132,7 +132,7 @@ button {
     transition: background 0.2s, color 0.2s;
 }
 button:hover {
-    background: #f4f1f7ef;
+    background: var(--tema-superficie-suave, #f4f1f7ef);
     color: var(--cor-texto-controle);
     cursor:pointer;
 }
@@ -168,7 +168,7 @@ button:hover {
     transition: background 0.2s, color 0.2s;
 }
 .transacoes-header a:hover {
-    background: #f5f3f6;
+    background: var(--tema-superficie-suave, #f5f3f6);
     color: var(--cor-texto-campo);
 }
 
@@ -185,7 +185,7 @@ th:last-child, td:last-child {
 }
 
 tbody tr:hover {
-    background: #f9f8fa;
+    background: var(--tema-superficie-suave, #f9f8fa);
 }
 /* =========================
    MODAL
@@ -253,7 +253,7 @@ tbody tr:hover {
 
 .modal-header h2 {
     margin: 0;
-    color: #1f2937;
+    color: var(--tema-texto-forte, #1f2937);
     font-size: 1.4rem;
 }
 
@@ -273,7 +273,7 @@ tbody tr:hover {
 }
 
 .close-modal:hover {
-    background: #f5f3f6;
+    background: var(--tema-superficie-suave, #f5f3f6);
     color: var(--cor-texto-campo);
 }
 
@@ -313,7 +313,7 @@ tbody tr:hover {
 }
 
 .modal input::placeholder {
-    color: #a79caf;
+    color: var(--tema-texto-apoio, #a79caf);
 }
 
 .modal input:focus,
@@ -338,7 +338,7 @@ tbody tr:hover {
     gap: 10px;
     margin-top: 24px;
     padding-top: 16px;
-    border-top: 1px solid #e5e7eb;
+    border-top: 1px solid var(--tema-borda, #e5e7eb);
 }
 
 .form-actions button {
@@ -352,12 +352,12 @@ tbody tr:hover {
 }
 
 .form-actions button[type="button"] {
-    background: #f3f4f6;
-    color: #473751;
+    background: var(--tema-superficie-suave, #f3f4f6);
+    color: var(--tema-texto-apoio, #473751);
 }
 
 .form-actions button[type="button"]:hover {
-    background: #edeaf0;
+    background: var(--tema-superficie-suave, #edeaf0);
 }
 
 
@@ -429,12 +429,12 @@ tbody tr:hover {
 }
 
 td.receita {
-    color: var(--cor-receita);
+    color: var(--tema-receita, var(--cor-receita));
     font-weight: 600;
 }
 
 td.despesa {
-    color: var(--cor-despesa);
+    color: var(--tema-despesa, var(--cor-despesa));
     font-weight: 600;
 }
 
@@ -513,7 +513,7 @@ td.despesa {
     visibility: hidden;
     transform: translateY(-6px);
 
-    border: 1px solid #f2f4f7;
+    border: 1px solid var(--tema-borda, #f2f4f7);
     border-radius: var(--raio-controle);
     background-color: var(--cor-texto-inverso);
     box-shadow: var(--sombra-interativa);
@@ -572,7 +572,7 @@ td.despesa {
     min-width: 0;
     padding: 11px 14px;
     background: var(--cor-superficie-interativa);
-    border: 1px solid #e7e2f0;
+    border: 1px solid var(--tema-borda, #e7e2f0);
     border-radius: var(--raio-controle);
     color: var(--cor-texto-controle);
     font: inherit;
@@ -622,7 +622,7 @@ td.despesa {
 
 /* Placeholder */
 .area-pesquisa input::placeholder {
-    color: #a594b8;
+    color: var(--tema-texto-apoio, #a594b8);
 }
 
 /* Hover */
@@ -668,7 +668,7 @@ td.despesa {
 }
 
 #info-paginacao {
-    color: #7b648b;
+    color: var(--tema-texto-apoio, #7b648b);
     font-size: 13px;
 }
 
@@ -680,7 +680,7 @@ td.despesa {
 .botoes-paginacao button {
     padding: 4px 14px;
     background: var(--cor-superficie);
-    border: 1px solid #e9e2f0;
+    border: 1px solid var(--tema-borda, #e9e2f0);
     border-radius: var(--raio-controle);
     color: var(--cor-texto-controle);
     font: inherit;
@@ -882,7 +882,7 @@ td.despesa {
     margin-top: 6px;
     font-size: 14px;
     font-weight: 500;
-    color: #7b648b;
+    color: var(--tema-texto-apoio, #7b648b);
 }
 
 /* Resumo */
@@ -896,14 +896,14 @@ td.despesa {
 
 .card-conta-resumo {
     box-shadow: 0 2px 8px rgba(73, 30, 90, 0.068);
-    border: 1px solid #f1edf583;
+    border: 1px solid var(--tema-borda, #f1edf583);
     border-radius: var(--raio-painel);
     padding: 10px 0px 5px 20px;
 }
 
 .card-conta-resumo span {
     font-size: 14px;
-    color: #7f648b;
+    color: var(--tema-texto-apoio, #7f648b);
 }
 
 .card-conta-resumo h2 {
@@ -919,7 +919,7 @@ td.despesa {
 .secao-investimentos {
     background: var(--cor-superficie);
     box-shadow: 0 2px 8px rgba(55, 30, 90, 0.082);
-    border: 1px solid #f0e5fc;
+    border: 1px solid var(--tema-borda, #f0e5fc);
     border-radius: var(--raio-painel);
     padding: 15px 20px 15px 20px;
     margin-bottom: 24px;
@@ -1216,7 +1216,7 @@ td.despesa {
 .ajuda-investimentos { margin: 12px 0 20px; }
 .item-investimento .referencia-investimento, .item-investimento .aviso-investimento,
 .item-investimento .acoes-investimento { flex-basis: 100%; }
-.item-investimento .aviso-investimento { color: #b33b3b; }
+.item-investimento .aviso-investimento { color: var(--tema-despesa, #b33b3b); }
 .aviso-investimento:empty { display: none; }
 .lista-historico-investimentos { list-style: none; padding: 0; margin: 0; }
 .lista-historico-investimentos li { padding: 16px 0; border-top: 1px solid var(--cor-borda); overflow-wrap: anywhere; }
@@ -1343,7 +1343,7 @@ td.despesa {
 
 .notificacao .fechar-notificacao:hover {
     background: var(--cor-superficie-interativa);
-    color: #703bb4;
+    color: var(--tema-texto-destaque, #703bb4);
 }
 
 .notificacao .fechar-notificacao:focus-visible {

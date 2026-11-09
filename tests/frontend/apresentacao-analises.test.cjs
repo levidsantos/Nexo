@@ -53,6 +53,45 @@ function ambiente(t,{registros=[transacao({data:'2026-10-01',valor:12.34}),trans
         registros:novos=>{registros=novos;},bloquear:()=>{indisponivel=true;},biblioteca:ativa=>{ChartDisponivel=ativa;},tempo:ms=>{tempo=ms;}};
 }
 
+test('Análises: tema atualiza as três instâncias sem consultas financeiras, novos gráficos ou formação', t => {
+    const a = ambiente(t); a.ui.inicializar(); a.atualizar(); a.quadro(0); a.quadro(180);
+    const graficos = ['resumo', 'analises', 'distribuicao'].map(a.grafico);
+    const dados = graficos.map(g => g.data.datasets.map(d => ({ data: [...d.data], backgroundColor: d.backgroundColor, borderColor: g.config.type === 'line' ? d.borderColor : undefined })));
+    const consultas = a.consultas.length, criadas = a.criadas.length;
+    const cores = { '--grafico-texto': '#bdb4c9', '--grafico-legenda': '#d2c9df', '--grafico-grade': '#40364d', '--grafico-tooltip-fundo': '#eeeaf4', '--grafico-tooltip-texto': '#211d29', '--grafico-borda-rosca': '#211d29' };
+    a.window.getComputedStyle = () => ({ getPropertyValue: nome => cores[nome] ?? '' });
+    a.ui.atualizarAparenciaGraficos();
+    assert.equal(a.consultas.length, consultas); assert.equal(a.criadas.length, criadas); assert.equal(a.frames.size, 0);
+    for (const [i, g] of graficos.entries()) {
+        assert.strictEqual(a.criadas[i], g);
+        assert.equal(g.updates.at(-1), 'none');
+        assert.equal(g.options.plugins.tooltip.bodyColor, '#211d29');
+        assert.deepEqual(g.data.datasets.map(d => ({ data: [...d.data], backgroundColor: d.backgroundColor, borderColor: g.config.type === 'line' ? d.borderColor : undefined })), dados[i]);
+    }
+    assert.equal(graficos[0].options.scales.x.ticks.color, '#bdb4c9');
+    assert.equal(graficos[1].options.scales.y.grid.color, '#40364d');
+    assert.equal(graficos[2].data.datasets[0].borderColor, '#211d29');
+    a.window.getComputedStyle = () => ({ getPropertyValue: () => '' }); a.ui.atualizarAparenciaGraficos();
+    assert.equal(graficos[0].options.scales.x.ticks.color, '#666');
+    assert.equal(graficos[1].options.scales.x.ticks.color, '#6d6278');
+    assert.equal(graficos[2].data.datasets[0].borderColor, '#ffffff');
+});
+test('Análises: gráficos criados após a escolha recebem o tema e falhas visuais não interrompem os demais', t => {
+    const a = ambiente(t); a.ui.inicializar();
+    a.window.getComputedStyle = () => ({ getPropertyValue: nome => nome === '--grafico-texto' ? '#bdb4c9' : '' });
+    a.atualizar(); assert.equal(a.grafico('analises').options.scales.x.ticks.color, '#bdb4c9');
+    a.grafico('resumo').falhaUpdate = true;
+    const antes = a.grafico('analises').updates.length;
+    assert.doesNotThrow(a.ui.atualizarAparenciaGraficos);
+    assert.equal(a.grafico('analises').updates.length, antes + 1);
+});
+test('Análises: tema sem biblioteca ou sem dados não cria instâncias ou altera estados vazios', t => {
+    const a = ambiente(t, { registros: [] }); a.ui.inicializar(); a.biblioteca(false); a.atualizar();
+    const mensagem = a.elementos['estado-historico-analises'].textContent;
+    assert.doesNotThrow(a.ui.atualizarAparenciaGraficos);
+    assert.equal(a.criadas.length, 0); assert.equal(a.elementos['estado-historico-analises'].textContent, mensagem);
+});
+
 test('Análises: import sem DOM, Chart, armazenamento, observers, frames ou listeners',()=>{
     const url=pathToFileURL(resolve(__dirname,'../../frontend/js/funcionalidades/analises.js')).href;execFileSync(process.execPath,['--input-type=module','-e',`for(const n of ['document','window','localStorage','Chart','IntersectionObserver'])Object.defineProperty(globalThis,n,{get(){throw Error(n)}});globalThis.requestAnimationFrame=globalThis.addEventListener=()=>{throw Error('efeito')};await import(${JSON.stringify(url)});`]);
 });

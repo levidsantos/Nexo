@@ -1,4 +1,5 @@
 import { criarAnalises } from "./funcionalidades/analises.js";
+import { criarAparencia } from "./ui/aparencia.js";
 import { criarOperacoesInvestimentos } from "./funcionalidades/operacoes-investimentos.js";
 import { criarApresentacaoInvestimentos } from "./funcionalidades/apresentacao-investimentos.js";
 import { criarOperacoesTransacoes } from "./funcionalidades/operacoes-transacoes.js";
@@ -393,6 +394,7 @@ function posicionarNotificacoesModal(modal, noPainel) {
 }
 
 function abrirModal(modal, focoInicial) {
+    aparencia.fecharConfiguracoes();
     modais.abrirModal(modal, focoInicial);
 }
 
@@ -734,6 +736,9 @@ function obterRestricaoMovimentacaoInvestimentos() {
 }
 
 analises.inicializar();
+const aparencia = criarAparencia({ document, larguraMobile: larguraMobileTransacoes,
+    aoAlterarTema: () => analises.atualizarAparenciaGraficos() });
+aparencia.inicializar();
 
 listagensTransacoes.inicializar();
 
