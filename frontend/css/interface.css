@@ -38,7 +38,12 @@
 .nexo-app .topbar button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 38px; padding: 0 14px; border: 1px solid #ddd8e5; border-radius: 8px; box-shadow: none; font: inherit; font-size: 13px; font-weight: 600; color: #51465f; background: white; }
 .nexo-app .topbar button svg { width: 16px; height: 16px; }
 .nexo-app .topbar button:hover { background: #f6f2fc; border-color: #d5c8e4; }
-.nexo-app .content { width: 100%; max-width: 1480px; box-sizing: border-box; margin: 0 auto; padding: 32px 36px 48px; }
+.nexo-app .content { display: flex; flex-direction: column; flex: 1; width: 100%; max-width: 1480px; box-sizing: border-box; margin: 0 auto; padding: 32px 36px 48px; }
+.nexo-app .content > .pagina { flex-shrink: 0; }
+.nexo-app .rodape-app { width: 100%; max-width: 600px; margin-inline: auto; margin-top: auto; padding-top: 32px; color: var(--nexo-texto-secundario); font-size: 12px; line-height: 1.6; text-align: center; overflow-wrap: anywhere; }
+.nexo-app .rodape-app p { margin: 0; }
+.nexo-app .rodape-app p + p { margin-top: 6px; }
+.nexo-app .rodape-identificacao { font-weight: 600; }
 #pagina-resumo { color: var(--nexo-texto); }
 .resumo-abertura { display: flex; justify-content: space-between; align-items: center; gap: 20px; margin-bottom: 26px; }
 .resumo-abertura h1 { font-size: 28px; line-height: 1.2; font-weight: 650; letter-spacing: -0.035em; margin: 0; }
