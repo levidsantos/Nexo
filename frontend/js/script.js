@@ -1,5 +1,6 @@
 import { criarAnalises } from "./funcionalidades/analises.js";
 import { criarAparencia } from "./ui/aparencia.js";
+import { criarAjuda } from "./ui/ajuda.js";
 import { criarOperacoesInvestimentos } from "./funcionalidades/operacoes-investimentos.js";
 import { criarApresentacaoInvestimentos } from "./funcionalidades/apresentacao-investimentos.js";
 import { criarOperacoesTransacoes } from "./funcionalidades/operacoes-transacoes.js";
@@ -113,6 +114,7 @@ const modais = criarModais({
         if (areaNotificacoes.parentElement !== document.body) document.body.appendChild(areaNotificacoes);
     },
     aoEscape: (modal) => {
+        if (modal === document.getElementById("modal-ajuda")) ajuda.fecharAjuda();
         if (!modalExclusao.classList.contains("hidden")) operacoesTransacoes.cancelarExclusao();
         if (modal === modalExclusaoConta) fecharModalExclusaoConta();
         if (modal === document.getElementById("modal-exclusao-investimento")) fecharExclusaoInvestimento();
@@ -739,6 +741,9 @@ analises.inicializar();
 const aparencia = criarAparencia({ document, larguraMobile: larguraMobileTransacoes,
     aoAlterarTema: () => analises.atualizarAparenciaGraficos() });
 aparencia.inicializar();
+const ajuda = criarAjuda({ document, modais, larguraMobile: larguraMobileTransacoes,
+    fecharConfiguracoes: () => aparencia.fecharConfiguracoes() });
+ajuda.inicializar();
 
 listagensTransacoes.inicializar();
 
