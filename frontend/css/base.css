@@ -48,6 +48,33 @@
     --espaco-6: 24px;
 }
 
+:root { color-scheme: light; }
+:root[data-tema="escuro"] {
+    color-scheme: dark;
+    --cor-fundo: #17141d;
+    --cor-superficie: #211d29;
+    --cor-texto: #eeeaf4;
+    --cor-texto-auxiliar: #bdb4c9;
+    --cor-texto-secundario: #bdb4c9;
+    --cor-texto-campo: #eeeaf4;
+    --cor-texto-controle: #eeeaf4;
+    --cor-texto-titulo: #eeeaf4;
+    --cor-texto-formulario: #d2c9df;
+    --cor-superficie-interativa: #2c2537;
+    --cor-borda: #40364d;
+    --cor-borda-campo: #796c89;
+    --cor-borda-botao: #554761;
+    --cor-borda-hover: #9b88b3;
+    --cor-destaque: #bd98f3;
+    --cor-erro: #f2a49b;
+    --cor-texto-vazio: #bdb4c9;
+    --campo-modal-borda: #796c89;
+    --campo-modal-borda-hover: #a493b7;
+    --campo-modal-borda-foco: #bdacd0;
+    --campo-modal-borda-erro: #e39992;
+    --campo-sombra-foco: inset 0 0 0 1px var(--campo-modal-borda-foco), 0 0 0 3px rgba(189, 152, 243, 0.16);
+}
+
 body {
     margin: 0;
     font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 

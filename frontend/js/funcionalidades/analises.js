@@ -26,6 +26,43 @@ export function criarAnalises({ document, window, elementos, botoesDuracao,
     };
     const recortesFormacaoAnalises = new WeakSet();
 
+    function corAparencia(nome, padrao) {
+        return window.getComputedStyle?.(document.body).getPropertyValue(nome).trim() || padrao;
+    }
+
+    function aplicarAparenciaGrafico(grafico, compacto = false) {
+        const opcoes = grafico.options;
+        const historico = Boolean(opcoes.scales?.x);
+        const tooltip = opcoes.plugins.tooltip;
+        Object.assign(tooltip, {
+            backgroundColor: corAparencia("--grafico-tooltip-fundo", historico && !compacto ? "#302738" : "rgba(0, 0, 0, 0.8)"),
+            titleColor: corAparencia("--grafico-tooltip-texto", "#fff"),
+            bodyColor: corAparencia("--grafico-tooltip-texto", "#fff")
+        });
+        if (historico) {
+            const texto = corAparencia("--grafico-texto", compacto ? "#666" : "#6d6278");
+            opcoes.scales.x.ticks.color = texto;
+            opcoes.scales.y.ticks.color = texto;
+            opcoes.scales.x.border = { ...opcoes.scales.x.border,
+                color: corAparencia("--grafico-borda-eixo", "rgba(0, 0, 0, 0.1)") };
+            opcoes.scales.y.grid.color = corAparencia("--grafico-grade", compacto ? "#edf0f5" : "#eeeaf3");
+            opcoes.plugins.legend.labels.color = corAparencia("--grafico-legenda", compacto ? "#666" : "#62566f");
+        } else {
+            grafico.data.datasets[0].borderColor = corAparencia("--grafico-borda-rosca", "#ffffff");
+        }
+    }
+
+    function atualizarAparenciaGraficos() {
+        concluirFormacoesAnalises();
+        for (const [grafico, compacto] of [[graficosHistorico.resumo, true], [graficosHistorico.analises, false], [graficoDistribuicao, false]]) {
+            if (!grafico) continue;
+            try {
+                aplicarAparenciaGrafico(grafico, compacto);
+                grafico.update("none");
+            } catch { /* Uma falha visual não pode interromper a troca de tema. */ }
+        }
+    }
+
     function restaurarRecorteFormacao(grafico) {
         if (recortesFormacaoAnalises.delete(grafico)) grafico.ctx.restore();
     }
@@ -192,7 +229,7 @@ export function criarAnalises({ document, window, elementos, botoesDuracao,
     }
 
     function configurarGraficoDistribuicao(classificacoes) {
-        return {
+        const configuracao = {
             type: "doughnut",
             plugins: [formacaoGraficosAnalises],
             data: { labels: classificacoes.map((item) => item.nome), datasets: [{
@@ -208,6 +245,8 @@ export function criarAnalises({ document, window, elementos, botoesDuracao,
                 } } }
             }
         };
+        aplicarAparenciaGrafico(configuracao);
+        return configuracao;
     }
 
     function formatarPercentualDistribuicao(percentual) {
@@ -361,7 +400,7 @@ export function criarAnalises({ document, window, elementos, botoesDuracao,
                 ctx.lineTo(x, chartArea.bottom);
                 ctx.setLineDash([2, 3]);
                 ctx.lineWidth = 1;
-                ctx.strokeStyle = "#d8d2df";
+                ctx.strokeStyle = corAparencia("--grafico-guia", "#d8d2df");
                 ctx.stroke();
             } finally {
                 ctx.restore();
@@ -442,6 +481,7 @@ export function criarAnalises({ document, window, elementos, botoesDuracao,
             configuracao.options.scales.y.ticks.font = { size: 11 };
             configuracao.options.scales.y.grid.color = "#eeeaf3";
         }
+        aplicarAparenciaGrafico(configuracao, compacto);
         return configuracao;
     }
 
@@ -605,6 +645,6 @@ export function criarAnalises({ document, window, elementos, botoesDuracao,
         }
         limparGraficoDistribuicao();
     }
-    return { inicializar, atualizarGraficosHistorico, atualizarDistribuicaoDespesas,
+    return { inicializar, atualizarGraficosHistorico, atualizarDistribuicaoDespesas, atualizarAparenciaGraficos,
         prepararFormacoesPagina, concluirFormacoesAnalises, agendarFormacaoAnalises, encerrar };
 }
