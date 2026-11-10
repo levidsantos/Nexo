@@ -1,3 +1,5 @@
+import { criarCacheIndicadores } from './dados/cache-indicadores.js';
+import { criarIndicadoresEconomicos } from './funcionalidades/indicadores-economicos.js';
 import { criarAnalises } from "./funcionalidades/analises.js";
 import { criarAparencia } from "./ui/aparencia.js";
 import { criarAjuda } from "./ui/ajuda.js";
@@ -439,6 +441,7 @@ function navegarPara(paginaDestino) {
     const mudouPagina = !paginaSelecionada.classList.contains("ativa");
     if (mudouPagina) listagensTransacoes.concluirPaginacaoSeAtiva();
     if (mudouPagina) {
+        indicadoresEconomicos.concluirAnimacao();
         concluirFormacoesAnalises();
         prepararFormacoesPagina(paginaDestino);
         limparSelecao();
@@ -460,6 +463,12 @@ function navegarPara(paginaDestino) {
             else link.removeAttribute("aria-current");
         }
     });
+    if (paginaDestino === "indicadores") {
+        const focoNoMenu = document.getElementById("painel-configuracoes").contains(document.activeElement);
+        aparencia.fecharConfiguracoes();
+        if (!mudouPagina && focoNoMenu) paginaSelecionada.querySelector("h1").focus({ preventScroll: true });
+        void indicadoresEconomicos.carregar();
+    }
     if (paginaDestino === "analises" || paginaDestino === "resumo") atualizarGraficosHistorico();
     if (paginaDestino === "analises") atualizarDistribuicaoDespesas();
     if (paginaDestino === "investimentos") renderizarInvestimentos();
@@ -739,11 +748,12 @@ function obterRestricaoMovimentacaoInvestimentos() {
 
 analises.inicializar();
 const aparencia = criarAparencia({ document, larguraMobile: larguraMobileTransacoes,
-    aoAlterarTema: () => analises.atualizarAparenciaGraficos() });
+    aoAlterarTema: () => { analises.atualizarAparenciaGraficos(); indicadoresEconomicos.atualizarAparencia(); } });
 aparencia.inicializar();
 const ajuda = criarAjuda({ document, modais, larguraMobile: larguraMobileTransacoes,
     fecharConfiguracoes: () => aparencia.fecharConfiguracoes() });
 ajuda.inicializar();
+const indicadoresEconomicos = criarIndicadoresEconomicos({ document, cache: criarCacheIndicadores() });
 
 listagensTransacoes.inicializar();
 

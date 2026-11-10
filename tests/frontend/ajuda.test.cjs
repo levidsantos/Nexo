@@ -114,7 +114,10 @@ test('Ajuda: quatro exemplos associados às perguntas corretas, com datas fixas 
 });
 test('Ajuda: acesso mobile não acrescenta destino à navegação e Escape é coordenado pelo gerenciador existente', () => {
     const nav = html.match(/<nav aria-label="Navegação principal">([\s\S]*?)<\/nav>/)[1];
-    assert.equal((nav.match(/data-pagina=/g) ?? []).length, 5);
+    assert.equal((nav.match(/data-pagina=/g) ?? []).length, 6);
+    assert.match(nav, /class="destino-indicadores-desktop"/);
+    const css = readFileSync(require.resolve('../../frontend/css/interface.css'), 'utf8');
+    assert.match(css, /.nexo-app \.sidebar \.destino-indicadores-desktop \{ display: none; \}/);
     assert.ok(html.includes('id="abrir-ajuda-mobile"'));
     const script = readFileSync(require.resolve('../../frontend/js/script.js'), 'utf8');
     assert.ok(script.includes('if (modal === document.getElementById("modal-ajuda")) ajuda.fecharAjuda();'));
