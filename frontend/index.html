@@ -23,6 +23,7 @@
                 <li><a href="#contas" data-pagina="contas"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="15" rx="3"/><path d="M3 9h18m-5 5h2"/></svg><span>Contas</span></a></li>
                 <li><a href="#analises" data-pagina="analises"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v16h16M8 14l4-5 4 2 4-7"/></svg><span>Análises</span></a></li>
                 <li><a href="#investimentos" data-pagina="investimentos"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21v-8m0 3c-6 0-8-4-8-8 6 0 8 3 8 8Zm0-3c0-6 3-9 8-10 1 6-2 10-8 10Z"/></svg><span class="rotulo-investimentos">Investimentos</span><span class="rotulo-investimentos-curto">Investir</span></a></li>
+                <li class="destino-indicadores-desktop"><a href="#indicadores" data-pagina="indicadores"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v16h16M8 14l4-5 4 2 4-7"/></svg><span>Indicadores Econômicos</span></a></li>
             </ul></nav>
             <div class="sidebar-aparencia">
                 <button type="button" id="abrir-ajuda-desktop" class="acesso-ajuda-sidebar" aria-haspopup="dialog" aria-controls="modal-ajuda"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 8.5a2.5 2.5 0 0 1 5 0c0 2-2.5 2-2.5 4M12 16.5v.1"/></svg>Central de Ajuda</button>
@@ -46,9 +47,10 @@
                     <button id="add_receita" aria-label="Adicionar receita"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg><span>Receita</span></button>
                     <button class="btn-primario" id="add_despesa" aria-label="Adicionar despesa"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg><span>Despesa</span></button>
                     <div class="configuracoes-mobile">
-                        <button type="button" id="abrir-configuracoes" aria-label="Configurações" aria-expanded="false" aria-controls="painel-configuracoes"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="m10 3-.7 2.5-2 .9L5 5.8 3 9.2l1.8 1.9v2L3 15l2 3.4 2.3-.6 2 .9L10 21h4l.7-2.3 2-.9 2.3.6 2-3.4-1.8-1.9v-2L21 9.2l-2-3.4-2.3.6-2-.9L14 3Z"/><circle cx="12" cy="12" r="3"/></svg></button>
+                        <button type="button" id="abrir-configuracoes" aria-label="Menu" aria-expanded="false" aria-controls="painel-configuracoes"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
                         <div id="painel-configuracoes" class="painel-configuracoes" aria-labelledby="titulo-configuracoes" hidden>
-                            <h2 id="titulo-configuracoes">Configurações</h2>
+                            <h2 id="titulo-configuracoes">Menu</h2><nav class="navegacao-menu-mobile" aria-label="Navegação complementar"><h3>Navegação</h3><a href="#indicadores" data-pagina="indicadores"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v16h16M8 14l4-5 4 2 4-7"/></svg>Indicadores Econômicos</a>
+                            <button type="button" id="abrir-ajuda-mobile" class="acesso-ajuda-mobile" aria-haspopup="dialog" aria-controls="modal-ajuda"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 8.5a2.5 2.5 0 0 1 5 0c0 2-2.5 2-2.5 4M12 16.5v.1"/></svg>Central de Ajuda</button></nav>
                             <fieldset class="seletor-tema">
                                 <legend>Aparência</legend>
                                 <div class="opcoes-tema">
@@ -59,7 +61,6 @@
                                     <span class="indicador-tema" aria-hidden="true"></span>
                                 </div>
                             </fieldset>
-                            <button type="button" id="abrir-ajuda-mobile" class="acesso-ajuda-mobile" aria-haspopup="dialog" aria-controls="modal-ajuda"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 8.5a2.5 2.5 0 0 1 5 0c0 2-2.5 2-2.5 4M12 16.5v.1"/></svg>Central de Ajuda</button>
                         </div>
                     </div>
                 </div>
@@ -70,7 +71,7 @@
                     PÁGINA RESUMO
                 ========================= -->
                 <div id="pagina-resumo" class="pagina ativa" aria-labelledby="titulo-resumo">
-                    <header class="resumo-abertura"><div><h1 id="titulo-resumo">Resumo</h1><p>Acompanhe suas contas e movimentações.</p></div><a href="#contas" data-pagina="contas">Gerenciar contas <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg></a></header>
+                    <header class="resumo-abertura"><div><h1 id="titulo-resumo">Resumo</h1><p>Acompanhe suas contas e movimentações.</p><a class="atalho-indicadores-mobile" href="#indicadores" data-pagina="indicadores">Ver indicadores <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m9 5 7 7-7 7"/></svg></a></div></header>
                     <section class="resumo" aria-label="Indicadores financeiros">
                         <div class="card card-saldo">
                             <span>Saldo disponível</span>
@@ -373,7 +374,7 @@
                 </section>
                 <section id="pagina-investimentos" class="pagina" aria-labelledby="titulo-investimentos">
                     <header class="cabecalho-investimentos">
-                        <div><h1 id="titulo-investimentos">Investimentos</h1><p>Cadastre seus investimentos e mantenha os valores informados atualizados.</p></div>
+                        <div><h1 id="titulo-investimentos">Investimentos</h1><p>Cadastre seus investimentos e mantenha os valores informados atualizados.</p><a class="link-indicadores" href="#indicadores" data-pagina="indicadores">Ver indicadores <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m9 5 7 7-7 7"/></svg></a></div>
                         <button class="btn-primario" type="button" id="novo-investimento"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 5v14M5 12h14"/></svg>Novo investimento</button>
                     </header>
                     <div class="totais-investimentos" aria-label="Totais da carteira">
@@ -394,6 +395,21 @@
                         <div id="historico-investimentos"></div>
                     </section>
                 </section>
+                <section id="pagina-indicadores" class="pagina" aria-labelledby="titulo-indicadores">
+<header class="cabecalho-indicadores"><h1 id="titulo-indicadores">Indicadores Econômicos</h1><p>Referências públicas para acompanhar a economia brasileira.</p></header>
+<div class="cards-indicadores">
+<article class="card-indicador"><h2>Selic Meta</h2><div id="indicador-selic" aria-live="polite"><p>Carregando ao abrir esta página…</p></div><p class="contexto-indicador">Meta de juros definida pelo Copom.</p><a href="https://www3.bcb.gov.br/sgspub/consultarvalores/consultarValoresSeries.do?method=consultarGraficoPorId&amp;hdOidSeriesSelecionadas=432" target="_blank" rel="noopener noreferrer">Fonte: Banco Central · SGS 432</a></article>
+<article class="card-indicador"><h2>IPCA</h2><div id="indicador-ipca" aria-live="polite"><p>Carregando ao abrir esta página…</p></div><div class="complemento-ipca"><h3>Acumulado em 12 meses</h3><div id="indicador-ipca12" aria-live="polite"><p>Carregando…</p></div><a href="https://www3.bcb.gov.br/sgspub/consultarvalores/consultarValoresSeries.do?method=consultarGraficoPorId&amp;hdOidSeriesSelecionadas=13522" target="_blank" rel="noopener noreferrer">Fonte: IBGE via BCB · SGS 13522</a></div><a href="https://www3.bcb.gov.br/sgspub/consultarvalores/consultarValoresSeries.do?method=consultarGraficoPorId&amp;hdOidSeriesSelecionadas=433" target="_blank" rel="noopener noreferrer">Fonte: IBGE via BCB · SGS 433</a></article>
+<article class="card-indicador"><h2>Dólar PTAX</h2><div id="indicador-dolar" aria-live="polite"><p>Carregando ao abrir esta página…</p></div><p class="contexto-indicador">Cotação de venda. Não é uma cotação em tempo real.</p><a href="https://www3.bcb.gov.br/sgspub/consultarvalores/consultarValoresSeries.do?method=consultarGraficoPorId&amp;hdOidSeriesSelecionadas=1" target="_blank" rel="noopener noreferrer">Fonte: Banco Central · SGS 1</a></article>
+</div>
+<section class="historico-indicadores" aria-labelledby="titulo-historico-indicadores">
+<header class="cabecalho-historico-indicadores"><div><h2 id="titulo-historico-indicadores">Histórico dos indicadores</h2><p>Explore as observações oficiais disponíveis até hoje.</p></div><div class="controles-historico-indicadores"><label>Indicador<select id="selecao-indicador"><option value="selic">Selic Meta</option><option value="ipca">IPCA mensal</option><option value="ipca12">IPCA em 12 meses</option><option value="dolar">Dólar PTAX venda</option></select></label><label>Período<select id="periodo-indicador"><option value="12">12 meses</option></select></label></div></header>
+<p id="contexto-historico-indicador"></p><p id="referencia-historico-indicador" class="referencia-historico-indicador"></p><p id="estado-historico-indicador" role="status"></p>
+<div class="area-grafico-indicadores"><canvas id="grafico-indicadores" role="img" aria-label="Histórico dos indicadores" aria-describedby="referencia-historico-indicador contexto-historico-indicador" hidden></canvas></div>
+<a id="fonte-historico-indicador" target="_blank" rel="noopener noreferrer">Fonte oficial</a>
+<details class="alternativa-historico-indicadores"><summary>Consultar valores em tabela</summary><div class="tabela-historico-indicadores"><table><caption>Observações oficiais do indicador e período selecionados</caption><thead><tr><th scope="col">Referência</th><th scope="col">Valor</th></tr></thead><tbody id="valores-historico-indicador"></tbody></table></div></details>
+</section>
+</section>
                 <footer class="rodape-app">
                     <p class="rodape-identificacao">Nexo · Versão Beta</p>
                     <p>Projeto pessoal e demonstrativo em desenvolvimento. Os dados são armazenados localmente no navegador, sem sincronização ou backup automático.</p>

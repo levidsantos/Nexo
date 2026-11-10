@@ -779,6 +779,14 @@ td.despesa {
 #pagina-analises.ativa.entrada-pagina > .card-historico { animation-delay: 110ms; }
 #pagina-analises.ativa.entrada-pagina > .card-distribuicao { animation-delay: 220ms; }
 
+/* Indicadores: mesma entrada coordenada de Análises, sem animar o canvas separadamente. */
+#pagina-indicadores.ativa.entrada-pagina > :is(.cabecalho-indicadores, .cards-indicadores, .historico-indicadores) {
+    --entrada-deslocamento: 12px;
+    animation: entrada-pagina 400ms ease-in-out backwards;
+}
+#pagina-indicadores.ativa.entrada-pagina > .cards-indicadores { animation-delay: 110ms; }
+#pagina-indicadores.ativa.entrada-pagina > .historico-indicadores { animation-delay: 220ms; }
+
 /* Investimentos: cards escalonados e movimentações como um único bloco. */
 #pagina-investimentos.ativa.entrada-pagina > :is(.cabecalho-investimentos, .totais-investimentos),
 #pagina-investimentos.ativa.entrada-pagina > #ajuda-estimativa-investimentos,
@@ -840,6 +848,7 @@ td.despesa {
 }
 
 @media (prefers-reduced-motion: reduce) {
+    #pagina-indicadores.ativa.entrada-pagina > :is(.cabecalho-indicadores, .cards-indicadores, .historico-indicadores),
     #pagina-investimentos.ativa.entrada-pagina > :is(.cabecalho-investimentos, .totais-investimentos),
     #pagina-investimentos.ativa.entrada-pagina > #ajuda-estimativa-investimentos,
     #pagina-investimentos.ativa.entrada-pagina > .secao-investimentos:has(> #lista-investimentos) > .secao-investimentos-header,

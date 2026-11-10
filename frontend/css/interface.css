@@ -827,6 +827,72 @@
     :root.aparencia-pronta .nexo-app :is(.topbar, .sidebar, .rodape-app, .indicador-tema) { transition: none; }
 }
 
+/* Indicadores públicos: independentes dos dados financeiros pessoais. */
+.cabecalho-indicadores { margin-bottom: 26px; }
+.cabecalho-indicadores h1 { margin: 0; font-size: 28px; letter-spacing: -.035em; }
+.cabecalho-indicadores p { margin: 8px 0 0; color: var(--nexo-texto-secundario); font-size: 13px; }
+.cards-indicadores { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; align-items: stretch; }
+.card-indicador, .historico-indicadores { min-width: 0; padding: 24px; border: 1px solid var(--nexo-borda); border-radius: 14px; background: var(--nexo-superficie); }
+.card-indicador h2, .historico-indicadores h2 { margin: 0 0 20px; font-size: 16px; }
+.card-indicador p { margin: 8px 0; font-size: 12px; line-height: 1.6; color: var(--nexo-texto-secundario); overflow-wrap: anywhere; }
+.card-indicador .valor-indicador { margin: 0; font-size: clamp(25px, 2.6vw, 34px); font-weight: 650; line-height: 1.2; color: var(--nexo-texto); font-variant-numeric: tabular-nums; }
+.card-indicador .valor-indicador-complementar { font-size: 21px; font-weight: 600; color: var(--nexo-texto); }
+.card-indicador .unidade-indicador { color: var(--nexo-texto); }
+.card-indicador a, .link-indicadores { color: var(--nexo-primaria); font-size: 12px; text-underline-offset: 3px; }
+.complemento-ipca { margin: 20px 0; padding-top: 16px; border-top: 1px solid var(--nexo-borda); }
+.complemento-ipca h3 { margin: 0 0 10px; font-size: 12px; font-weight: 600; }
+.card-indicador .estado-indicador { color: var(--nexo-texto); }
+.historico-indicadores { margin-top: 24px; }
+.historico-indicadores h2 { margin-bottom: 8px; }
+.historico-indicadores p { margin: 0; color: var(--nexo-texto-secundario); font-size: 13px; line-height: 1.6; }
+.cabecalho-historico-indicadores { display:flex; justify-content:space-between; align-items:flex-start; gap:24px; margin-bottom:20px; }
+.controles-historico-indicadores { display:flex; gap:12px; flex-shrink:0; }
+.controles-historico-indicadores label { display:grid; gap:8px; color:var(--nexo-texto-secundario); font-size:12px; }
+.controles-historico-indicadores select { max-width:100%; min-width:0; min-height:44px; padding:10px 12px; border:1px solid var(--tema-borda-campo, #b0a9bb); border-radius:8px; background:var(--nexo-superficie); color:var(--nexo-texto); font:inherit; transition:border-color .2s ease,box-shadow .2s ease; }
+.controles-historico-indicadores select:hover { border-color:var(--cor-borda-hover); }
+.controles-historico-indicadores select:focus { outline:none; border-color:var(--campo-modal-borda-foco); box-shadow:var(--campo-sombra-foco); }
+.historico-indicadores .referencia-historico-indicador { margin-top:8px; font-size:12px; }
+.historico-indicadores #estado-historico-indicador:not(:empty) { margin-top:12px; color:var(--nexo-texto); }
+.area-grafico-indicadores { position:relative; min-width:0; height:320px; margin:20px 0; }
+.area-grafico-indicadores:has(canvas[hidden]) { display:none; }
+.historico-indicadores > a { color:var(--nexo-primaria); font-size:12px; text-underline-offset:3px; }
+.alternativa-historico-indicadores { margin-top:20px; color:var(--nexo-texto); font-size:13px; }
+.alternativa-historico-indicadores summary { padding:12px 0; cursor:pointer; }
+.alternativa-historico-indicadores summary:focus-visible { outline:2px solid var(--nexo-primaria); outline-offset:3px; }
+.tabela-historico-indicadores { max-height:300px; overflow-y:auto; margin-top:8px; }
+.tabela-historico-indicadores table { width:100%; border-collapse:collapse; font-size:12px; }
+.tabela-historico-indicadores caption { text-align:left; padding:8px 0; color:var(--nexo-texto-secundario); }
+.tabela-historico-indicadores :is(th,td) { padding:10px 4px; border-bottom:1px solid var(--nexo-borda); text-align:left; font-weight:400; }
+.tabela-historico-indicadores td { font-variant-numeric:tabular-nums; }
+@media (max-width:1050px) { .cabecalho-historico-indicadores { flex-direction:column; } }
+@media (max-width:640px) {
+    .controles-historico-indicadores { display:grid; grid-template-columns:minmax(0,1fr); width:100%; }
+    .controles-historico-indicadores select { font-size:16px; width:100%; }
+    .area-grafico-indicadores { height:280px; }
+}
+@media (prefers-reduced-motion:reduce) { .controles-historico-indicadores select { transition:none; } }
+.link-indicadores { display: inline-flex; align-items: center; gap: 8px; margin-top: 10px; text-decoration: none; }
+.link-indicadores svg { width: 14px; height: 14px; }
+.link-indicadores:hover { text-decoration: underline; }
+.resumo-abertura .atalho-indicadores-mobile { display: none; }
+.navegacao-menu-mobile { margin-bottom: 18px; }
+.navegacao-menu-mobile h3 { margin: 0 0 10px; font-size: 12px; font-weight: 400; color: var(--nexo-texto-secundario); }
+.nexo-app .topbar .navegacao-menu-mobile a, .nexo-app .topbar .navegacao-menu-mobile .acesso-ajuda-mobile { display: flex; box-sizing: border-box; align-items: center; gap: 10px; width: 100%; min-height: 44px; margin: 0; padding: 10px; border: 1px solid var(--nexo-borda); border-radius: 8px; font: inherit; font-size: 12px; font-weight: 500; color: var(--nexo-texto); text-decoration: none; background: transparent; }
+.nexo-app .topbar .navegacao-menu-mobile .acesso-ajuda-mobile { margin-top: 8px; }
+.nexo-app .topbar .navegacao-menu-mobile a svg { width: 18px; height: 18px; flex-shrink: 0; }
+.nexo-app .topbar .navegacao-menu-mobile a:hover { background: var(--tema-superficie-suave); border-color: var(--tema-borda-interativa); }
+.nexo-app .topbar .navegacao-menu-mobile a:focus-visible { outline: 2px solid var(--nexo-primaria); outline-offset: 3px; }
+@media (max-width: 1050px) { .cards-indicadores { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 850px) {
+    .nexo-app .sidebar .destino-indicadores-desktop { display: none; }
+    .resumo-abertura p { max-width: none; }
+    .resumo-abertura .atalho-indicadores-mobile { display: inline-flex; margin-top: 10px; }
+}
+@media (max-width: 640px) {
+    .cards-indicadores { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+    .card-indicador, .historico-indicadores { padding: 20px; }
+    .cabecalho-indicadores h1 { font-size: 25px; }
+}
 /* Central de Ajuda: conteúdo editorial no ciclo compartilhado dos modais. */
 #modal-ajuda button, .acesso-ajuda-sidebar { box-shadow: none; }
 .acesso-ajuda-sidebar { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; margin: 0 0 18px; padding: 8px 0; border: 0; border-radius: 8px; background: transparent; color: var(--nexo-texto-secundario); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
